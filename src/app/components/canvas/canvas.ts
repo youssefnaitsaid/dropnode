@@ -19,6 +19,7 @@ import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { ClipboardService } from '../../services/clipboard.service';
+import { PresentationService } from '../../services/presentation.service';
 import {
   CreateNodeCommand,
   MoveNodeCommand,
@@ -340,6 +341,7 @@ import { Text } from '../../models/text';
 export class CanvasComponent {
   graphService = inject(GraphService);
   contextMenuService = inject(ContextMenuService);
+  presentationService = inject(PresentationService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
 
@@ -508,6 +510,7 @@ export class CanvasComponent {
   }
 
   onCanvasDoubleClick(event: MouseEvent): void {
+    if (this.presentationService.active()) return;
     if ((event.target as HTMLElement).closest('app-node')) return;
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -531,6 +534,9 @@ export class CanvasComponent {
     // Left button only — right-click is reserved for the context menu and
     // must never start a Marquee or clear selection (the menu handles that)
     if (event.button !== 0) return;
+    // Present Mode: no Marquee, no click-to-clear — the pan branches above
+    // stay live (free-roam is part of the tour)
+    if (this.presentationService.active()) return;
 
     // Arm a Marquee; whether it becomes one (drag) or stays a click (clear,
     // or Ctrl no-op) is resolved by the 2px threshold
@@ -579,6 +585,14 @@ export class CanvasComponent {
   // outer element opens the menu; inline text inputs stop propagation so the
   // native browser menu still works there.
   onContextMenu(event: MouseEvent): void {
+    // Present Mode: the Context Menu is dead — stopPropagation keeps the
+    // event from the CdkContextMenuTrigger on the outer element, and
+    // preventDefault suppresses the native browser menu as usual
+    if (this.presentationService.active()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const el = event.target as HTMLElement;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
 
@@ -619,6 +633,9 @@ export class CanvasComponent {
       this.startPan(event.event);
       return;
     }
+
+    // Present Mode: no selection, no drag — only the pan branch above lives
+    if (this.presentationService.active()) return;
 
     // Ctrl+click toggles Selection membership and never arms a drag
     if (event.event.ctrlKey && !event.event.altKey) {
@@ -669,6 +686,7 @@ export class CanvasComponent {
   onNodeStartResize(event: {
     nodeId: string; corner: GripCorner; minWidth: number; minHeight: number; event: MouseEvent;
   }): void {
+    if (this.presentationService.active()) return;
     const node = this.graphService.nodes().find(n => n.id === event.nodeId);
     if (!node) return;
     this.isResizingNode = true;
@@ -687,6 +705,7 @@ export class CanvasComponent {
 
   // Handle drag start (connection creation)
   onHandleDragStart(event: { nodeId: string; handle: HandleSide; event: MouseEvent }): void {
+    if (this.presentationService.active()) return;
     event.event.stopPropagation();
     this.isDraggingConnection = true;
     this.connectionSourceNodeId = event.nodeId;
@@ -703,6 +722,7 @@ export class CanvasComponent {
 
   // Text card drag start — armed on mousedown; becomes a drag past 2px
   onConnectionTextDragStart(event: { connectionId: string; event: MouseEvent }): void {
+    if (this.presentationService.active()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn) return;
     this.isDraggingConnectionText = true;
@@ -1129,6 +1149,7 @@ export class CanvasComponent {
 
   // Double-click on a Group's body creates a child node at the cursor
   onCreateChild(event: { parentId: string; clientX: number; clientY: number }): void {
+    if (this.presentationService.active()) return;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
     if (!canvasPos) return;
 
@@ -1141,6 +1162,7 @@ export class CanvasComponent {
   // Plain click on a Connection collapses the Selection to it; Ctrl+click
   // toggles its membership (the layer already filtered to left-button)
   onConnectionSelect(event: { connectionId: string; additive: boolean }): void {
+    if (this.presentationService.active()) return;
     if (event.additive) {
       this.graphService.toggleConnectionSelection(event.connectionId);
     } else {

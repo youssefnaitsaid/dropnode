@@ -5,6 +5,7 @@ import { Curve, connectionCurve, pointAt, textPositionFromPoint } from '../../mo
 import { Text, isTextEmpty } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
 import { ContextMenuService } from '../../services/context-menu.service';
+import { PresentationService } from '../../services/presentation.service';
 import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
 
@@ -23,7 +24,7 @@ interface DragState {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TextViewComponent, TextEditorComponent],
   template: `
-    <svg class="connection-layer" [attr.width]="svgWidth()" [attr.height]="svgHeight()">
+    <svg class="connection-layer" [class.presenting]="presentationService.active()" [attr.width]="svgWidth()" [attr.height]="svgHeight()">
       <defs>
         @for (color of markerColors; track color) {
           <marker
@@ -75,7 +76,7 @@ interface DragState {
     </svg>
 
     <!-- Connection Text renders as DOM cards (ADR-0001 hybrid: text in DOM, curves in SVG) -->
-    <div class="label-layer">
+    <div class="label-layer" [class.presenting]="presentationService.active()">
       @for (conn of connections(); track conn.id) {
         @if (editingConnectionId() === conn.id) {
           <div
@@ -122,6 +123,13 @@ interface DragState {
       stroke-width: 12;
       pointer-events: stroke;
       cursor: pointer;
+    }
+    /* Present Mode: Connections are pictures — no hit area, no hover growth,
+       no Text card interactions; mousedowns fall through to the canvas so
+       free-roam panning still works over them */
+    .presenting .connection-hit,
+    .presenting .connection-text-card {
+      pointer-events: none;
     }
     .connection-path {
       fill: none;
@@ -186,6 +194,7 @@ interface DragState {
 })
 export class ConnectionLayerComponent {
   private graphService = inject(GraphService);
+  protected presentationService = inject(PresentationService);
 
   nodes = this.graphService.nodes;
   connections = this.graphService.connections;

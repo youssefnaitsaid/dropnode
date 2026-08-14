@@ -145,6 +145,17 @@
 - Zoom to fit and Zoom to selection are bounds-centered — a third zoom-centering behavior alongside cursor-centered wheel zoom and origin-centered toolbar buttons; both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
 - the toolbar zoom cluster carries a Zoom to fit button distinct from Reset View; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
 
+## present
+
+- Present Mode is entered from a toolbar Present button in the right cluster, disabled with a "Group nodes to present them" hint while the graph has no Groups; it works on the Scratch Canvas and Project routes alike and has no entry shortcut (ADR-0020) @implemented
+- every Group is a Step, childless ones included; loose Nodes are never framed; Steps run in reading order of the Group's top-left corner — y first, x tiebreak, nodes-array order beyond that — and reordering means moving Groups (no stored order) @implemented
+- entering Present Mode clears the Selection, snapshots the current Viewport, and animates to Step 1; each Step frames its Group unioned with its children into 90% of the visible Canvas, centered, magnifying no further than 2x — the Zoom-to-selection contract, with no bezier union for internal Connections @implemented
+- Step transitions animate pan and zoom together over 500ms ease-in-out via rAF writes to the normal Viewport signal; a keypress mid-flight retargets from the in-flight position, and prefers-reduced-motion turns every transition into an instant jump to the same destination @implemented
+- ArrowRight/ArrowDown/Space/Enter/PageDown advance and ArrowLeft/ArrowUp/PageUp go back (auto-repeat ignored); both ends are hard no-ops and Escape is the sole exit, restoring the exact pre-Present Viewport instantly @implemented
+- Present Mode hides the Sidebar and toolbar, suppresses toasts, and shows a single non-interactive "current / total" Step counter as the only overlay; the browser Fullscreen API is never used @implemented
+- while presenting the graph is read-only: mutation, Selection building, the Context Menu, and all global shortcuts are dead, and Handles and hover affordances disappear; free-roam wheel zoom and Space/middle pan stay live, as does Ctrl+Click on Text links — the next keypress re-frames from wherever the Viewport wandered @implemented
+- Viewport auto-save is suspended for the whole Present session — the pre-Present Viewport is what stays persisted, and a mid-Present reload lands there @implemented
+
 ## selection
 
 - the Selection is a set freely mixing Nodes and Connections — empty, one, or many (ADR-0015); it is transient interaction state, never serialized into Graph State, exports, or share links

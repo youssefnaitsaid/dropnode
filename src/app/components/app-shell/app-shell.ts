@@ -6,6 +6,7 @@ import { ExportDialogComponent } from '../export-dialog/export-dialog';
 import { SidebarComponent } from '../sidebar/sidebar';
 import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
+import { PresentationService } from '../../services/presentation.service';
 
 @Component({
   selector: 'app-shell',
@@ -14,7 +15,10 @@ import { ExportDialogService } from '../../services/export-dialog.service';
   imports: [RouterOutlet, ToastComponent, ImportDialogComponent, ExportDialogComponent, SidebarComponent],
   template: `
     <div class="app-frame">
-      <app-sidebar />
+      <!-- Present Mode hides all chrome; the canvas keeps the full width -->
+      @if (!presentationService.active()) {
+        <app-sidebar />
+      }
       <div class="app-main">
         <router-outlet />
       </div>
@@ -47,6 +51,7 @@ import { ExportDialogService } from '../../services/export-dialog.service';
 export class AppShellComponent {
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
+  protected presentationService = inject(PresentationService);
   private importDialog = viewChild<ImportDialogComponent>('importDialog');
   private exportDialog = viewChild<ExportDialogComponent>('exportDialog');
 
