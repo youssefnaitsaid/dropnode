@@ -2,14 +2,18 @@ import { Component, signal, inject, Injectable } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleCheck, lucideCircleX, lucideInfo, lucideX } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { PresentationService } from '../../services/presentation.service';
 
 @Injectable({ providedIn: 'root' })
 export class ToastService {
   readonly message = signal<string | null>(null);
   readonly type = signal<'error' | 'info' | 'success'>('info');
   private timeoutId: any = null;
+  private presentationService = inject(PresentationService);
 
   show(msg: string, toastType: 'error' | 'info' | 'success' = 'info', duration = 4000): void {
+    // Nothing pops over a Present tour — notifications are dropped, not queued
+    if (this.presentationService.active()) return;
     this.message.set(msg);
     this.type.set(toastType);
     if (this.timeoutId) clearTimeout(this.timeoutId);

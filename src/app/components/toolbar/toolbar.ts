@@ -28,6 +28,7 @@ import {
   lucideAlignHorizontalSpaceBetween,
   lucideAlignVerticalSpaceBetween,
   lucideNetwork,
+  lucidePresentation,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmSeparator } from '@spartan-ng/helm/separator';
@@ -43,6 +44,7 @@ import { ExportService } from '../../services/export.service';
 import { CollectionService } from '../../services/collection.service';
 import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
+import { PresentationService } from '../../services/presentation.service';
 import {
   CreateGroupCommand,
   buildSetNodesColorCommand,
@@ -91,6 +93,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideAlignHorizontalSpaceBetween,
       lucideAlignVerticalSpaceBetween,
       lucideNetwork,
+      lucidePresentation,
     }),
   ],
   template: `
@@ -255,6 +258,17 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         <button hlmBtn variant="ghost" size="icon" (click)="tidyUp()" title="Tidy up" aria-label="Tidy up">
           <ng-icon name="lucideNetwork" />
         </button>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon"
+          (click)="present()"
+          [disabled]="!presentationService.canPresent()"
+          [title]="presentationService.canPresent() ? 'Present' : 'Group nodes to present them'"
+          aria-label="Present"
+        >
+          <ng-icon name="lucidePresentation" />
+        </button>
         <span class="min-w-10 text-center text-sm font-medium text-muted-foreground">{{ zoomPercent() }}%</span>
         <hlm-separator orientation="vertical" class="mx-1" />
         <button hlmBtn variant="ghost" size="icon" (click)="addGroup()" title="Add Group" aria-label="Add group">
@@ -379,6 +393,7 @@ export class ToolbarComponent {
   graphService = inject(GraphService);
   historyService = inject(HistoryService);
   collectionService = inject(CollectionService);
+  presentationService = inject(PresentationService);
   private exportService = inject(ExportService);
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
@@ -547,6 +562,14 @@ export class ToolbarComponent {
     if (!cmd) return;
     this.historyService.execute(cmd);
     this.zoomToFit();
+  }
+
+  // Present Mode (spec #31, ADR-0020): entering hides all chrome (Sidebar
+  // and toolbar), so the canvas is about to fill the window — Steps must
+  // frame against that destination region, not the pre-hide canvas rect
+  // (which is still shrunk by the chrome at click time).
+  present(): void {
+    this.presentationService.enter(window.innerWidth, window.innerHeight);
   }
 
   undo(): void {

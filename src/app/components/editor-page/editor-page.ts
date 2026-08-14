@@ -13,6 +13,7 @@ import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { CollectionService } from '../../services/collection.service';
 import { UrlLoaderService } from '../../services/url-loader.service';
+import { PresentationService } from '../../services/presentation.service';
 
 /**
  * The editor page behind both routes: `/` (Scratch Canvas) and
@@ -26,8 +27,16 @@ import { UrlLoaderService } from '../../services/url-loader.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CanvasComponent, ToolbarComponent],
   template: `
-    <app-toolbar [scratchMode]="!projectId()" />
+    @if (!presentationService.active()) {
+      <app-toolbar [scratchMode]="!projectId()" />
+    }
     <app-canvas />
+    <!-- Present Mode's only overlay: a non-interactive Step counter -->
+    @if (presentationService.active()) {
+      <div class="step-counter">
+        {{ presentationService.stepIndex() + 1 }} / {{ presentationService.stepCount() }}
+      </div>
+    }
   `,
   styles: [`
     :host {
@@ -36,10 +45,26 @@ import { UrlLoaderService } from '../../services/url-loader.service';
       flex: 1 1 auto;
       min-width: 0;
       height: 100%;
+      position: relative;
     }
     app-canvas {
       flex: 1 1 auto;
       min-height: 0;
+    }
+    .step-counter {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(14, 14, 17, 0.75);
+      border: 1px solid rgba(232, 232, 238, 0.15);
+      color: #e8e8ee;
+      font-size: 12px;
+      font-weight: 500;
+      pointer-events: none;
+      user-select: none;
     }
   `],
 })
@@ -48,6 +73,7 @@ export class EditorPageComponent implements OnDestroy {
   private historyService = inject(HistoryService);
   private collectionService = inject(CollectionService);
   private urlLoader = inject(UrlLoaderService);
+  protected presentationService = inject(PresentationService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
@@ -65,13 +91,18 @@ export class EditorPageComponent implements OnDestroy {
 
     // Auto-save: every Graph State or Viewport change persists the current
     // Project (debounced so per-mousemove drag frames coalesce). The Scratch
-    // Canvas is never persisted — reload still clears it.
+    // Canvas is never persisted — reload still clears it. A Present session
+    // suspends persistence wholesale: the tour's Viewport writes must never
+    // clobber the saved one, and the graph can't change while presenting.
+    // Exit flips `active`, re-running the effect — the restored pre-Present
+    // Viewport is what gets saved.
     effect(() => {
       const nodes = this.graphService.nodes();
       const connections = this.graphService.connections();
       const viewport = this.graphService.viewportState();
+      const presenting = this.presentationService.active();
       const id = this.currentProjectId;
-      if (!id) return;
+      if (!id || presenting) return;
       this.scheduleSave(() => {
         this.collectionService.saveProjectGraph(id, { nodes, connections });
         this.collectionService.saveProjectViewport(id, viewport);
@@ -92,6 +123,10 @@ export class EditorPageComponent implements OnDestroy {
 
   /** Switching Projects (or entering scratch) — History never crosses over. */
   private activate(projectId: string | undefined): void {
+    // Browser back/forward can switch Projects mid-tour (the Sidebar is
+    // hidden, history navigation isn't): a Present session never crosses a
+    // Project boundary. exit() is a no-op when not presenting.
+    this.presentationService.exit();
     this.flushSave();
     this.historyService.clear();
 

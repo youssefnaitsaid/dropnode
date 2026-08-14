@@ -8,6 +8,7 @@ import { HandleComponent } from '../handle/handle';
 import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
 import { ContextMenuService } from '../../services/context-menu.service';
+import { PresentationService } from '../../services/presentation.service';
 
 export type GripCorner = 'nw' | 'ne' | 'sw' | 'se';
 
@@ -26,6 +27,7 @@ const GROUP_FILL_ALPHA = '4D';
       [class.group-card]="isGroup()"
       [class.selected]="isSelected()"
       [class.editing]="isEditing()"
+      [class.presenting]="presentationService.active()"
       [attr.data-node-id]="node().id"
       [style.left.px]="node().x"
       [style.top.px]="node().y"
@@ -120,6 +122,18 @@ const GROUP_FILL_ALPHA = '4D';
     }
     .node-card:hover {
       box-shadow: 0 6px 20px rgba(124, 92, 255, 0.28);
+    }
+    /* Present Mode: the card is a picture, not a control — no drag cursor,
+       no hover glow, no Handles. Text links keep their own pointer events
+       so Ctrl+Click still follows them. */
+    .node-card.presenting {
+      cursor: default;
+    }
+    .node-card.presenting:hover {
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
+    .node-card.presenting app-handle {
+      display: none;
     }
     .node-card.selected {
       box-shadow: 0 0 0px 1px grey, 0 0 6px 2px var(--selection-glow, #f0f0f5);
@@ -247,6 +261,7 @@ export class NodeComponent implements AfterViewInit {
 
   private editInput = viewChild<ElementRef<HTMLInputElement>>('editInput');
   private contextMenuService = inject(ContextMenuService);
+  protected presentationService = inject(PresentationService);
 
   constructor() {
     // autofocus doesn't fire for dynamically inserted inputs; focus and
@@ -300,6 +315,9 @@ export class NodeComponent implements AfterViewInit {
 
   onMouseDown(event: MouseEvent): void {
     if (this.isEditing()) return;
+    // Present Mode: no select/drag — let the event bubble to the canvas so
+    // Space+drag and middle-drag pans stay live over elements
+    if (this.presentationService.active()) return;
     // Left button only — right-click is reserved for the context menu
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -307,6 +325,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onDoubleClick(event: MouseEvent): void {
+    if (this.presentationService.active()) return;
     event.stopPropagation();
     if (this.isEditing()) return;
     if (this.isGroup()) {
@@ -322,6 +341,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onLabelStripDoubleClick(event: MouseEvent): void {
+    if (this.presentationService.active()) return;
     event.stopPropagation();
     this.isEditing.set(true);
   }

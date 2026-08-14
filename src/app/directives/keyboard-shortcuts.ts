@@ -3,6 +3,7 @@ import { GraphService } from '../services/graph.service';
 import { HistoryService } from '../services/history.service';
 import { SidebarService } from '../services/sidebar.service';
 import { ClipboardService } from '../services/clipboard.service';
+import { PresentationService } from '../services/presentation.service';
 import {
   DeleteConnectionCommand, DeleteNodeCompoundCommand, buildDeleteSelectionCommand,
 } from '../services/commands';
@@ -16,12 +17,36 @@ export class KeyboardShortcuts {
   private historyService = inject(HistoryService);
   private sidebarService = inject(SidebarService);
   private clipboardService = inject(ClipboardService);
+  private presentationService = inject(PresentationService);
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
     // Don't handle shortcuts when typing in an input
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
+    // Present Mode is a third keyboard context beside "canvas" and "editing
+    // Text": only Step navigation and Escape live — every global shortcut
+    // below is dead until the tour ends. Auto-repeat is ignored so a held
+    // key advances one Step, not a blur of them.
+    if (this.presentationService.active()) {
+      if (event.repeat) return;
+      if (
+        event.key === 'ArrowRight' || event.key === 'ArrowDown' ||
+        event.key === 'PageDown' || event.key === 'Enter' || event.code === 'Space'
+      ) {
+        event.preventDefault();
+        this.presentationService.next();
+      } else if (
+        event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp'
+      ) {
+        event.preventDefault();
+        this.presentationService.previous();
+      } else if (event.key === 'Escape') {
+        this.presentationService.exit();
+      }
       return;
     }
 
