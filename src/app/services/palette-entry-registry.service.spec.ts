@@ -33,6 +33,8 @@ describe('PaletteEntryRegistry', () => {
   it('exposes canonical intent-level entries with aliases and categories', () => {
     const fit = find('zoom-to-fit');
     const rose = find('node-color-rose');
+    const defaultColor = find('node-color-default');
+    const diamond = find('node-shape-diamond');
 
     expect(fit.label).toBe('Zoom to Fit');
     expect(fit.category).toBe('Viewport');
@@ -40,6 +42,18 @@ describe('PaletteEntryRegistry', () => {
     expect(fit.shortcut).toBe('Shift+1');
     expect(rose.label).toBe('Set selected Nodes to Rose');
     expect(rose.swatch).toBe('#ff8fa3');
+    expect(defaultColor.swatch).toBe('#f0f0f5');
+    expect(diamond.label).toBe('Set selected Nodes to Diamond shape');
+    expect(diamond.category).toBe('Nodes & Groups');
+    expect(diamond.aliases).toContain('node shape diamond');
+    expect(['rectangle', 'pill', 'diamond', 'ellipse'].map(shape => find(`node-shape-${shape}`).id))
+      .toEqual(['node-shape-rectangle', 'node-shape-pill', 'node-shape-diamond', 'node-shape-ellipse']);
+
+    const styleIds = registry.search('').filter(entry =>
+      entry.id.startsWith('node-color-') || entry.id.startsWith('node-shape-'),
+    ).map(entry => entry.id);
+    expect(styleIds.slice(0, 9).every(id => id.startsWith('node-color-'))).toBe(true);
+    expect(styleIds.slice(9).every(id => id.startsWith('node-shape-'))).toBe(true);
   });
 
   it('keeps prerequisite-dependent entries visible but unavailable', () => {
@@ -54,6 +68,22 @@ describe('PaletteEntryRegistry', () => {
     expect(align.available).toBe(false);
     expect(registry.execute('clear-selection')).toBe(false);
     expect(historyService.canUndo()).toBe(false);
+  });
+
+  it('keeps Shape entries unavailable until a regular Node is selected', () => {
+    const group = graphService.createGroup('G', 0, 0, 240, 160);
+    const shape = find('node-shape-pill');
+
+    expect(shape.available).toBe(false);
+    expect(shape.disabledReason).toBe('Select a regular Node first');
+
+    graphService.selectNode(group.id);
+    expect(find('node-shape-pill').available).toBe(false);
+    expect(registry.execute('node-shape-pill')).toBe(false);
+
+    const node = graphService.createNode('A', 0, 0);
+    graphService.toggleNodeSelection(node.id);
+    expect(find('node-shape-pill').available).toBe(true);
   });
 
   it('executes Add Node through History and requests the existing Text editor', () => {
@@ -72,6 +102,21 @@ describe('PaletteEntryRegistry', () => {
     expect(registry.execute('node-color-rose')).toBe(true);
     expect(graphService.nodes()[0].color).toBe('#ff8fa3');
     expect(historyService.canUndo()).toBe(true);
+  });
+
+  it('executes a Shape entry through the bulk Shape Command', () => {
+    const group = graphService.createGroup('G', 0, 0, 240, 160);
+    const node = graphService.createNode('A', 0, 0);
+    graphService.selectNode(group.id);
+    graphService.toggleNodeSelection(node.id);
+
+    expect(registry.execute('node-shape-pill')).toBe(true);
+    expect(graphService.nodes().find(item => item.id === node.id)?.shape).toBe('pill');
+    expect(graphService.nodes().find(item => item.id === group.id)?.shape).toBeUndefined();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect(graphService.nodes().find(item => item.id === node.id)?.shape).toBeUndefined();
   });
 
   it('re-checks live selection at execution time', () => {

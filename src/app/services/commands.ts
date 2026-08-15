@@ -1,5 +1,7 @@
 import { Command } from '../models/command';
 import { GraphNode, HandleSide, oppositeHandle } from '../models/node';
+import { NodeRect, NodeShape, effectiveNodeShape } from '../models/node-shape';
+export type { NodeRect } from '../models/node-shape';
 import { Connection, ReroutePoint, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT } from '../models/connection';
 import { Text } from '../models/text';
 import { AlignKind, DistributeAxis, RootRect, TargetPosition, alignRects, distributeRects } from '../models/align-distribute';
@@ -534,13 +536,6 @@ export class MoveGroupCommand implements Command {
   }
 }
 
-export interface NodeRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export class ResizeNodeCommand implements Command {
   description = 'Resize Node';
 
@@ -582,6 +577,48 @@ export class SetNodeColorCommand implements Command {
   }
 }
 
+export class SetNodeShapeCommand implements Command {
+  description = 'Set Node Shape';
+  private originalShape: NodeShape;
+  private originalRect: NodeRect;
+  private appliedRect: NodeRect | null = null;
+
+  constructor(
+    private graphService: GraphService,
+    private nodeId: string,
+    private newShape: NodeShape,
+  ) {
+    const node = this.graphService.nodes().find(n => n.id === nodeId);
+    this.originalShape = effectiveNodeShape(node?.shape);
+    this.originalRect = {
+      x: node?.x ?? 0,
+      y: node?.y ?? 0,
+      width: node?.width ?? 0,
+      height: node?.height ?? 0,
+    };
+  }
+
+  execute(): void {
+    this.graphService.setNodeShape(this.nodeId, this.newShape);
+    if (this.appliedRect) {
+      this.graphService.resizeNode(this.nodeId, this.appliedRect);
+    }
+  }
+
+  recordAutoResize(nodeId: string, rect: NodeRect): void {
+    if (nodeId !== this.nodeId) return;
+    const node = this.graphService.nodes().find(item => item.id === nodeId);
+    if (node && effectiveNodeShape(node.shape) === this.newShape) {
+      this.appliedRect = { ...rect };
+    }
+  }
+
+  undo(): void {
+    this.graphService.setNodeShape(this.nodeId, this.originalShape);
+    this.graphService.resizeNode(this.nodeId, this.originalRect);
+  }
+}
+
 // Generic compound: executes parts in order, undoes them in reverse order.
 // Used for drops that change membership and sever Group/child connections.
 export class CompoundCommand implements Command {
@@ -599,6 +636,12 @@ export class CompoundCommand implements Command {
   undo(): void {
     for (let i = this.parts.length - 1; i >= 0; i--) {
       this.parts[i].undo();
+    }
+  }
+
+  recordAutoResize(nodeId: string, rect: NodeRect): void {
+    for (const part of this.parts) {
+      part.recordAutoResize?.(nodeId, rect);
     }
   }
 }
@@ -776,6 +819,22 @@ export function buildSetNodesColorCommand(
     })
     .map(id => new SetNodeColorCommand(graphService, id, color));
   return parts.length > 0 ? new CompoundCommand('Set Node Color', parts) : null;
+}
+
+/** Set every given regular Node's Shape as one undo step, skipping no-ops. */
+export function buildSetNodesShapeCommand(
+  graphService: GraphService,
+  nodeIds: readonly string[],
+  shape: NodeShape,
+): Command | null {
+  const nodes = graphService.nodes();
+  const parts = nodeIds
+    .filter(id => {
+      const node = nodes.find(n => n.id === id);
+      return node !== undefined && node.kind !== 'group' && effectiveNodeShape(node.shape) !== shape;
+    })
+    .map(id => new SetNodeShapeCommand(graphService, id, shape));
+  return parts.length > 0 ? new CompoundCommand('Set Node Shape', parts) : null;
 }
 
 /** Recolor every given Connection as one undo step, skipping no-ops. */

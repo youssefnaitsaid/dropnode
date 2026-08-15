@@ -14,6 +14,7 @@ import {
   MoveGroupCommand,
   ResizeNodeCommand,
   SetNodeColorCommand,
+  SetNodeShapeCommand,
   CompoundCommand,
   SetNodeTextCommand,
   SetConnectionTextCommand,
@@ -29,6 +30,7 @@ import {
   QuickAddNodeCommand,
   buildDeleteSelectionCommand,
   buildSetNodesColorCommand,
+  buildSetNodesShapeCommand,
   buildSetConnectionsColorCommand,
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
@@ -828,6 +830,28 @@ describe('Commands', () => {
     });
   });
 
+  describe('SetNodeShapeCommand', () => {
+    it('execute applies the Shape and undo restores the Shape and original rect', () => {
+      const node = graphService.createNode('N', 100, 80);
+      const original = { x: node.x, y: node.y, width: node.width, height: node.height };
+      const cmd = new SetNodeShapeCommand(graphService, node.id, 'diamond');
+
+      cmd.execute();
+      const grown = { x: 60, y: 80, width: 240, height: 48 };
+      graphService.resizeNode(node.id, grown);
+      cmd.recordAutoResize(node.id, grown);
+      expect(graphService.nodes()[0].shape).toBe('diamond');
+
+      cmd.undo();
+
+      expect(graphService.nodes()[0]).toMatchObject(original);
+      expect(graphService.nodes()[0].shape).toBeUndefined();
+
+      cmd.execute();
+      expect(graphService.nodes()[0]).toMatchObject({ shape: 'diamond', ...grown });
+    });
+  });
+
   describe('CompoundCommand', () => {
     it('sever-on-entry: one undo restores position, membership, and Connections with original ids', () => {
       const group = graphService.createGroup('G', 0, 0, 400, 300);
@@ -1191,6 +1215,39 @@ describe('Commands', () => {
       graphService.setNodeColor(a.id, NODE_PALETTE[1]);
 
       expect(buildSetNodesColorCommand(graphService, [a.id], NODE_PALETTE[1])).toBeNull();
+    });
+  });
+
+  describe('buildSetNodesShapeCommand', () => {
+    it('applies a Shape to regular Nodes, skips Groups and restores mixed values', () => {
+      const regular = graphService.createNode('A', 0, 0);
+      const already = graphService.createNode('B', 300, 0);
+      const group = graphService.createGroup('G', 600, 0);
+      graphService.setNodeShape(already.id, 'ellipse');
+
+      const cmd = buildSetNodesShapeCommand(
+        graphService,
+        [regular.id, already.id, group.id],
+        'diamond',
+      )!;
+      cmd.execute();
+
+      expect(graphService.nodes().find(n => n.id === regular.id)?.shape).toBe('diamond');
+      expect(graphService.nodes().find(n => n.id === already.id)?.shape).toBe('diamond');
+      expect(graphService.nodes().find(n => n.id === group.id)?.shape).toBeUndefined();
+
+      cmd.undo();
+
+      expect(graphService.nodes().find(n => n.id === regular.id)?.shape).toBeUndefined();
+      expect(graphService.nodes().find(n => n.id === already.id)?.shape).toBe('ellipse');
+    });
+
+    it('returns null when every regular Node already has the requested effective Shape', () => {
+      const regular = graphService.createNode('A', 0, 0);
+      const group = graphService.createGroup('G', 300, 0);
+      graphService.setNodeShape(regular.id, 'pill');
+
+      expect(buildSetNodesShapeCommand(graphService, [regular.id, group.id], 'pill')).toBeNull();
     });
   });
 

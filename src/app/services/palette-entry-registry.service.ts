@@ -7,7 +7,8 @@ import {
   STROKE_WEIGHTS,
 } from '../models/connection';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
-import { NODE_PALETTE } from '../models/node';
+import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE } from '../models/node';
+import { NODE_SHAPES, NodeShape } from '../models/node-shape';
 import {
   PaletteCategory,
   PaletteEntry,
@@ -26,6 +27,7 @@ import {
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
   buildSetNodesColorCommand,
+  buildSetNodesShapeCommand,
   buildTidyUpCommand,
 } from './commands';
 import { ClipboardService } from './clipboard.service';
@@ -83,6 +85,7 @@ type EntryOptions = {
   aliases?: readonly string[];
   shortcut?: string;
   swatch?: string;
+  sortOrder?: number;
 };
 
 /**
@@ -108,6 +111,10 @@ export class PaletteEntryRegistry {
   entries(): PaletteEntry[] {
     const selectedNodeIds = this.graphService.selectedNodeIds();
     const selectedConnectionIds = this.graphService.selectedConnectionIds();
+    const nodes = this.graphService.nodes();
+    const selectedRegularNodeIds = selectedNodeIds.filter(id =>
+      nodes.some(node => node.id === id && node.kind !== 'group'),
+    );
     const selectionSize = this.graphService.selectionSize();
     const currentProjectId = this.currentProjectId();
     const currentProject = currentProjectId
@@ -115,7 +122,7 @@ export class PaletteEntryRegistry {
       : undefined;
     const isScratch = !currentProjectId;
     const oneSelectedNode = selectedNodeIds.length === 1
-      ? this.graphService.nodes().find(node => node.id === selectedNodeIds[0])
+      ? nodes.find(node => node.id === selectedNodeIds[0])
       : undefined;
 
     return [
@@ -198,6 +205,7 @@ export class PaletteEntryRegistry {
         unavailableReason: 'Select one Group',
       }),
       ...this.nodeColorEntries(selectedNodeIds),
+      ...this.nodeShapeEntries(selectedRegularNodeIds),
 
       ...this.connectionColorEntries(selectedConnectionIds),
       ...this.connectionArrowheadEntries(selectedConnectionIds),
@@ -337,6 +345,7 @@ export class PaletteEntryRegistry {
       category,
       shortcut: options.shortcut,
       swatch: options.swatch,
+      sortOrder: options.sortOrder,
       available,
       disabledReason: available ? undefined : options.unavailableReason,
       execute,
@@ -357,6 +366,7 @@ export class PaletteEntryRegistry {
       {
         aliases: [`node ${color.name}`, `color nodes ${color.name}`],
         swatch: color.value,
+        sortOrder: 0,
         available,
         unavailableReason,
       },
@@ -369,9 +379,44 @@ export class PaletteEntryRegistry {
         const command = buildSetNodesColorCommand(this.graphService, this.graphService.selectedNodeIds(), null);
         if (command) this.historyService.execute(command);
       },
-      { aliases: ['default node color', 'remove node color'], available, unavailableReason },
+      {
+        aliases: ['default node color', 'remove node color'],
+        swatch: DEFAULT_NODE_BACKGROUND,
+        sortOrder: 0,
+        available,
+        unavailableReason,
+      },
     ));
     return entries;
+  }
+
+  private nodeShapeEntries(nodeIds: readonly string[]): PaletteEntry[] {
+    const available = nodeIds.length > 0;
+    const unavailableReason = 'Select a regular Node first';
+    return NODE_SHAPES.map((shape: NodeShape) => {
+      const name = this.titleCase(shape);
+      return this.action(
+        `node-shape-${shape}`,
+        `Set selected Nodes to ${name} shape`,
+        'Nodes & Groups',
+        () => {
+          const command = buildSetNodesShapeCommand(
+            this.graphService,
+            this.graphService.selectedNodeIds(),
+            shape,
+          );
+          if (command) this.historyService.execute(command);
+        },
+        {
+          aliases: shape === 'rectangle'
+            ? ['rectangle nodes', 'default node shape', 'reset node shape']
+            : [`${shape} nodes`, `node shape ${shape}`],
+          sortOrder: 1,
+          available,
+          unavailableReason,
+        },
+      );
+    });
   }
 
   private connectionColorEntries(connectionIds: readonly string[]): PaletteEntry[] {

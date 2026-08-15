@@ -41,6 +41,7 @@ describe('GraphService', () => {
 
       expect(node.width).toBe(200);
       expect(node.height).toBe(100);
+      expect(node.shape).toBeUndefined();
     });
   });
 
@@ -1358,6 +1359,18 @@ describe('GraphService', () => {
       expect(result.success).toBe(true);
       expect(service.connections()[0].text).toEqual(text);
     });
+
+    it('regular Node Shape survives an export/import round trip', () => {
+      const node = service.createNode('Decision', 0, 0);
+      service.setNodeShape(node.id, 'diamond');
+
+      const exported = service.exportGraph();
+      service.clearGraph();
+      const result = service.importGraph(exported);
+
+      expect(result.success).toBe(true);
+      expect(service.nodes()[0].shape).toBe('diamond');
+    });
   });
 
   describe('import migration and Text validation', () => {
@@ -1765,6 +1778,26 @@ describe('GraphService', () => {
     });
   });
 
+  describe('setNodeShape', () => {
+    it('stores non-default Shapes and removes the field for rectangle', () => {
+      const node = service.createNode('N', 0, 0);
+
+      service.setNodeShape(node.id, 'diamond');
+      expect(service.nodes().find(n => n.id === node.id)?.shape).toBe('diamond');
+
+      service.setNodeShape(node.id, 'rectangle');
+      expect(service.nodes().find(n => n.id === node.id)?.shape).toBeUndefined();
+    });
+
+    it('does not give a Group a Shape', () => {
+      const group = service.createGroup('G', 0, 0);
+
+      service.setNodeShape(group.id, 'ellipse');
+
+      expect(service.nodes().find(n => n.id === group.id)?.shape).toBeUndefined();
+    });
+  });
+
   describe('import validation for Groups and colors', () => {
     const baseNode = (over: Record<string, unknown>) => ({
       id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, ...over,
@@ -1856,6 +1889,49 @@ describe('GraphService', () => {
         connections: [],
       } as GraphState);
 
+      expect(service.nodes().map(n => n.id)).toEqual([keep.id]);
+    });
+  });
+
+  describe('import validation for Node Shapes', () => {
+    const node = (over: Record<string, unknown> = {}) => ({
+      id: 'n1', label: 'Node', x: 0, y: 0, width: 160, height: 48, ...over,
+    });
+    const group = (over: Record<string, unknown> = {}) => ({
+      id: 'g1', label: 'Group', x: 0, y: 0, width: 320, height: 200, kind: 'group', ...over,
+    });
+
+    it('accepts non-default Shapes and canonicalizes explicit rectangle', () => {
+      const result = service.importGraph({
+        nodes: [node({ shape: 'diamond' }), node({ id: 'n2', shape: 'rectangle' })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(true);
+      expect(service.nodes().find(n => n.id === 'n1')?.shape).toBe('diamond');
+      expect(service.nodes().find(n => n.id === 'n2')?.shape).toBeUndefined();
+    });
+
+    it.each([null, '', 'Diamond', 'circle'])('rejects invalid Shape %j', shape => {
+      const result = service.importGraph({
+        nodes: [node({ shape })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('shape must be rectangle, pill, diamond, or ellipse');
+    });
+
+    it('rejects Shape on a Group and keeps existing Graph State untouched', () => {
+      const keep = service.createNode('Keep', 0, 0);
+
+      const result = service.importGraph({
+        nodes: [group({ shape: 'pill' })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid node g1: a Group cannot carry shape');
       expect(service.nodes().map(n => n.id)).toEqual([keep.id]);
     });
   });

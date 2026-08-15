@@ -367,6 +367,29 @@ describe('CollectionService', () => {
       expect(service.getCollection(existing.id)).toBeDefined();
     });
 
+    it('canonicalizes explicit rectangle Shapes while importing a collection', () => {
+      const service = freshService();
+      const result = service.importCollection({
+        name: 'Imported',
+        projects: [{
+          name: 'Pill and rectangle',
+          graph: {
+            nodes: [
+              { id: 'rect', label: 'Rectangle', x: 0, y: 0, width: 160, height: 48, shape: 'rectangle' },
+              { id: 'diamond', label: 'Diamond', x: 240, y: 0, width: 200, height: 96, shape: 'diamond' },
+            ],
+            connections: [],
+          },
+        }],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const graph = service.getProjectGraph(service.projectsIn(result.collection.id)[0].id)!;
+      expect(graph.nodes.find(node => node.id === 'rect')?.shape).toBeUndefined();
+      expect(graph.nodes.find(node => node.id === 'diamond')?.shape).toBe('diamond');
+    });
+
     it('importing the same file twice produces two independent copies', () => {
       const service = freshService();
       const first = service.importCollection(validEnvelope());

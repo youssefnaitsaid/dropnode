@@ -33,6 +33,19 @@ describe('ClipboardService', () => {
       expect(graphService.selectedNodeId()).toBe(node.id);
     });
 
+    it('preserves a regular Node Shape through Paste and Duplicate', () => {
+      const node = graphService.createNode('Pill', 10, 20);
+      graphService.setNodeShape(node.id, 'pill');
+
+      service.copy(node.id);
+      service.pasteAt(400, 300);
+      service.duplicate(node.id);
+
+      const copies = graphService.nodes().filter(item => item.id !== node.id);
+      expect(copies).toHaveLength(2);
+      expect(copies.every(item => item.shape === 'pill')).toBe(true);
+    });
+
     it('copying a Group captures the Group, its children, and only internal Connections', () => {
       const group = graphService.createGroup('G', 0, 0, 400, 300);
       const childA = graphService.createNode('A', 20, 20);

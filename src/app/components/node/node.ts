@@ -2,7 +2,14 @@ import {
   Component, input, output, signal, computed, effect,
   ChangeDetectionStrategy, AfterViewInit, viewChild, ElementRef, inject,
 } from '@angular/core';
-import { GraphNode, HandleSide } from '../../models/node';
+import { DEFAULT_NODE_BACKGROUND, GraphNode, HandleSide } from '../../models/node';
+import {
+  effectiveNodeShape,
+  fitNodeShapeRect,
+  NodeRect,
+  NodeShape,
+  shapeMinimumSize,
+} from '../../models/node-shape';
 import { Text, isTextEmpty } from '../../models/text';
 import { HandleComponent } from '../handle/handle';
 import { TextViewComponent } from '../text-view/text-view';
@@ -11,8 +18,12 @@ import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
 
 export type GripCorner = 'nw' | 'ne' | 'sw' | 'se';
+export interface NodeSizeChangedEvent {
+  nodeId: string;
+  rect: NodeRect;
+  preserveCenter: boolean;
+}
 
-const DEFAULT_NODE_BACKGROUND = '#f0f0f5';
 // 30% alpha suffix so Group fills stay see-through over children
 const GROUP_FILL_ALPHA = '4D';
 
@@ -29,47 +40,61 @@ const GROUP_FILL_ALPHA = '4D';
       [class.editing]="isEditing()"
       [class.presenting]="presentationService.active()"
       [attr.data-node-id]="node().id"
+      [attr.data-shape]="isGroup() ? null : nodeShape()"
       [style.left.px]="node().x"
       [style.top.px]="node().y"
       [style.width.px]="node().width"
       [style.height.px]="node().height"
-      [style.background]="cardBackground()"
       [style.--selection-glow]="selectionGlow()"
       (mousedown)="onMouseDown($event)"
       (dblclick)="onDoubleClick($event)"
     >
-      @if (isGroup()) {
-        <div class="group-label-strip" (dblclick)="onLabelStripDoubleClick($event)">
-          @if (isEditing()) {
-            <input
-              #editInput
-              class="node-label-input group-label-input"
-              [value]="node().label"
-              (blur)="finishEdit($event)"
-              (keydown.enter)="finishEdit($event)"
-              (keydown.escape)="cancelEdit()"
-              (mousedown)="$event.stopPropagation()"
-              (contextmenu)="$event.stopPropagation()"
-            />
-          } @else {
-            <span class="group-label">{{ node().label }}</span>
-          }
-        </div>
-      } @else {
-        @if (isEditing()) {
-          <div class="node-text">
-            <app-text-editor
-              [text]="nodeText()"
-              (commit)="onTextCommit($event)"
-              (cancelled)="onTextCancel()"
-            />
+      <div
+        class="node-surface"
+        [class.group-card]="isGroup()"
+        [class.selected]="isSelected()"
+        [class.editing]="isEditing()"
+        [class.presenting]="presentationService.active()"
+        [class.shape-rectangle]="nodeShape() === 'rectangle'"
+        [class.shape-pill]="nodeShape() === 'pill'"
+        [class.shape-diamond]="nodeShape() === 'diamond'"
+        [class.shape-ellipse]="nodeShape() === 'ellipse'"
+        [attr.data-shape]="isGroup() ? null : nodeShape()"
+        [style.background]="cardBackground()"
+      >
+        @if (isGroup()) {
+          <div class="group-label-strip" (dblclick)="onLabelStripDoubleClick($event)">
+            @if (isEditing()) {
+              <input
+                #editInput
+                class="node-label-input group-label-input"
+                [value]="node().label"
+                (blur)="finishEdit($event)"
+                (keydown.enter)="finishEdit($event)"
+                (keydown.escape)="cancelEdit()"
+                (mousedown)="$event.stopPropagation()"
+                (contextmenu)="$event.stopPropagation()"
+              />
+            } @else {
+              <span class="group-label">{{ node().label }}</span>
+            }
           </div>
         } @else {
-          <div #textWrap class="node-text">
-            <app-text-view [text]="nodeText()" />
-          </div>
+          @if (isEditing()) {
+            <div class="node-text">
+              <app-text-editor
+                [text]="nodeText()"
+                (commit)="onTextCommit($event)"
+                (cancelled)="onTextCancel()"
+              />
+            </div>
+          } @else {
+            <div #textWrap class="node-text">
+              <app-text-view [text]="nodeText()" />
+            </div>
+          }
         }
-      }
+      </div>
 
       @for (side of handleSides; track side) {
         <app-handle
@@ -104,24 +129,40 @@ const GROUP_FILL_ALPHA = '4D';
     }
     .node-card {
       position: absolute;
-      background: #f0f0f5;
-      border: 1px solid rgba(15, 15, 18, 0.15);
-      border-radius: 10px;
-      padding: 8px 16px;
       cursor: grab;
       user-select: none;
+      box-sizing: border-box;
+      overflow: visible;
+    }
+    .node-surface {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-width: 120px;
-      min-height: 48px;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid rgba(15, 15, 18, 0.15);
+      border-radius: 10px;
+      padding: 8px 16px;
       box-sizing: border-box;
       overflow: visible;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
     }
-    .node-card:hover {
+    .node-card:hover .node-surface {
       box-shadow: 0 6px 20px rgba(124, 92, 255, 0.28);
+    }
+    .node-surface.shape-pill {
+      border-radius: 9999px;
+    }
+    .node-surface.shape-diamond {
+      border-radius: 0;
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+    }
+    .node-surface.shape-ellipse {
+      border-radius: 50%;
     }
     /* Present Mode: the card is a picture, not a control — no drag cursor,
        no hover glow, no Handles. Text links keep their own pointer events
@@ -129,14 +170,19 @@ const GROUP_FILL_ALPHA = '4D';
     .node-card.presenting {
       cursor: default;
     }
-    .node-card.presenting:hover {
+    .node-card.presenting:hover .node-surface {
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
     }
     .node-card.presenting app-handle {
       display: none;
     }
-    .node-card.selected {
+    .node-card.selected .node-surface {
       box-shadow: 0 0 0px 1px grey, 0 0 6px 2px var(--selection-glow, #f0f0f5);
+    }
+    .node-card.selected .node-surface.shape-diamond,
+    .node-card.selected .node-surface.shape-ellipse {
+      box-shadow: none;
+      filter: drop-shadow(0 0 1px grey) drop-shadow(0 0 6px var(--selection-glow, #f0f0f5));
     }
     /* Lift a selected node (and its glow) above neighbouring cards */
     :host:has(.node-card.selected) {
@@ -257,11 +303,13 @@ export class NodeComponent implements AfterViewInit {
   startResize = output<{ nodeId: string; corner: GripCorner; minWidth: number; minHeight: number; event: MouseEvent }>();
   createChild = output<{ parentId: string; clientX: number; clientY: number }>();
   private textWrap = viewChild<ElementRef<HTMLDivElement>>('textWrap');
-  sizeChanged = output<{ nodeId: string; width: number; height: number }>();
+  sizeChanged = output<NodeSizeChangedEvent>();
 
   private editInput = viewChild<ElementRef<HTMLInputElement>>('editInput');
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
+  private viewReady = false;
+  private measuredShape: NodeShape | null = null;
 
   constructor() {
     // autofocus doesn't fire for dynamically inserted inputs; focus and
@@ -289,6 +337,17 @@ export class NodeComponent implements AfterViewInit {
         this.contextMenuService.clearEditTextRequest();
       }
     });
+
+    // A shape change can require a larger safe bounding box. Wait for the
+    // shaped surface to render, then grow around the existing center.
+    effect(() => {
+      const shape = this.nodeShape();
+      if (!this.viewReady || !this.textWrap() || this.measuredShape === shape) return;
+      this.measuredShape = shape;
+      requestAnimationFrame(() => {
+        if (this.nodeShape() === shape) this.measureAndEmitSize(true);
+      });
+    });
   }
 
   isEditing = signal(false);
@@ -296,6 +355,10 @@ export class NodeComponent implements AfterViewInit {
   gripCorners: GripCorner[] = ['nw', 'ne', 'sw', 'se'];
 
   isGroup = computed(() => this.node().kind === 'group');
+
+  nodeShape = computed<NodeShape>(() =>
+    this.isGroup() ? 'rectangle' : effectiveNodeShape(this.node().shape)
+  );
 
   nodeText = computed<Text>(() => this.node().text ?? []);
 
@@ -383,22 +446,23 @@ export class NodeComponent implements AfterViewInit {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
+    const minimum = this.shapeMinimum();
     this.startResize.emit({
       nodeId: this.node().id,
       corner,
-      minWidth: this.minLabelWidth(),
-      minHeight: this.minTextHeight(),
+      minWidth: minimum.width,
+      minHeight: minimum.height,
       event,
     });
   }
 
-  // The Text-derived auto-size acts as the minimum rect when resizing
-  private minLabelWidth(): number {
-    return Math.max(120, this.measureMinContentWidth() ?? 0);
-  }
-
-  private minTextHeight(): number {
-    return Math.max(48, this.measureContentHeight() ?? 0);
+  // The Text-derived safe rectangle acts as the minimum rect when resizing.
+  private shapeMinimum(): { width: number; height: number } {
+    return shapeMinimumSize(
+      this.nodeShape(),
+      this.measureMinContentWidth() ?? 0,
+      this.measureContentHeight() ?? 0,
+    );
   }
 
   private paddings(): { h: number; v: number } | null {
@@ -446,21 +510,38 @@ export class NodeComponent implements AfterViewInit {
     return reference.getBoundingClientRect().width / layoutWidth;
   }
 
-  // Grow-only: wrapped Text raises the node's width floor (widest unbreakable
-  // line) and height, but never shrinks a manually grown node
-  private measureAndEmitSize(): void {
+  // Grow-only: wrapped Text raises the node's shape-safe floor, but never
+  // shrinks a manually grown node. Shape changes preserve the Node center;
+  // Text edits retain the existing top-left origin.
+  private measureAndEmitSize(preserveCenter = false): void {
     if (this.isGroup()) return;
     const minWidth = this.measureMinContentWidth();
     const minHeight = this.measureContentHeight();
     if (minWidth === null || minHeight === null) return;
-    const width = Math.max(120, minWidth, this.node().width);
-    const height = Math.max(48, minHeight, this.node().height);
-    if (width > this.node().width + 1 || height > this.node().height + 1) {
-      this.sizeChanged.emit({ nodeId: this.node().id, width, height });
+    const current = {
+      x: this.node().x,
+      y: this.node().y,
+      width: this.node().width,
+      height: this.node().height,
+    };
+    const fitted = preserveCenter
+      ? fitNodeShapeRect(current, this.nodeShape(), minWidth, minHeight)
+      : {
+          ...current,
+          width: Math.max(current.width, shapeMinimumSize(this.nodeShape(), minWidth, minHeight).width),
+          height: Math.max(current.height, shapeMinimumSize(this.nodeShape(), minWidth, minHeight).height),
+        };
+    if (fitted.width > current.width + 1 || fitted.height > current.height + 1) {
+      this.sizeChanged.emit({
+        nodeId: this.node().id,
+        rect: fitted,
+        preserveCenter,
+      });
     }
   }
 
   ngAfterViewInit(): void {
+    this.viewReady = true;
     requestAnimationFrame(() => this.measureAndEmitSize());
   }
 }

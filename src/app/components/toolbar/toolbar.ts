@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy, input } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -50,6 +50,7 @@ import { CommandPaletteService } from '../../services/command-palette.service';
 import {
   CreateGroupCommand,
   buildSetNodesColorCommand,
+  buildSetNodesShapeCommand,
   buildSetConnectionsColorCommand,
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
@@ -60,6 +61,7 @@ import {
 } from '../../services/commands';
 import { AlignKind, DistributeAxis } from '../../models/align-distribute';
 import { NODE_PALETTE } from '../../models/node';
+import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
 import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight } from '../../models/connection';
 
 @Component({
@@ -146,6 +148,33 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
                 [attr.aria-label]="color"
                 (click)="setColor(color)"
               ></button>
+            }
+          </div>
+        }
+        @if (selectedRegularNodes().length > 0) {
+          <hlm-separator orientation="vertical" class="mx-1" />
+          <div class="flex items-center gap-0.5" title="Node shape" aria-label="Node shape">
+            @for (option of shapeOptions; track option.shape) {
+              <button
+                type="button"
+                class="ah-btn shape-btn"
+                [class.active]="sharedNodeShape() === option.shape"
+                [title]="option.label"
+                [attr.aria-label]="option.label"
+                (click)="setShape(option.shape)"
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  @if (option.shape === 'rectangle') {
+                    <rect x="3" y="5" width="14" height="10" rx="2" />
+                  } @else if (option.shape === 'pill') {
+                    <rect x="2" y="6" width="16" height="8" rx="4" />
+                  } @else if (option.shape === 'diamond') {
+                    <polygon points="10,2 18,10 10,18 2,10" />
+                  } @else {
+                    <ellipse cx="10" cy="10" rx="7" ry="5" />
+                  }
+                </svg>
+              </button>
             }
           </div>
         }
@@ -412,6 +441,13 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       border-color: var(--primary);
       background: color-mix(in oklch, var(--primary) 15%, transparent);
     }
+    .shape-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+    }
     .flip-x {
       transform: scaleX(-1);
     }
@@ -437,6 +473,15 @@ export class ToolbarComponent {
   }
 
   palette = NODE_PALETTE;
+  selectedRegularNodes = computed(() =>
+    this.graphService.selectedNodes().filter(node => node.kind !== 'group')
+  );
+  shapeOptions: { shape: NodeShape; label: string }[] = [
+    { shape: 'rectangle', label: 'Rectangle' },
+    { shape: 'pill', label: 'Pill' },
+    { shape: 'diamond', label: 'Diamond' },
+    { shape: 'ellipse', label: 'Ellipse' },
+  ];
 
   // Start icons are the same glyphs flipped horizontally (see .flip-x) so they
   // point backward along the curve, teaching the source→target direction.
@@ -473,6 +518,13 @@ export class ToolbarComponent {
     return nodes.every(n => (n.color ?? null) === first) ? first : undefined;
   };
 
+  sharedNodeShape = (): NodeShape | undefined => {
+    const nodes = this.selectedRegularNodes();
+    if (nodes.length === 0) return undefined;
+    const first = effectiveNodeShape(nodes[0].shape);
+    return nodes.every(n => effectiveNodeShape(n.shape) === first) ? first : undefined;
+  };
+
   sharedConnectionColor = (): string | null | undefined => {
     const conns = this.graphService.selectedConnections();
     if (conns.length === 0) return undefined;
@@ -506,6 +558,13 @@ export class ToolbarComponent {
   setColor(color: string | null): void {
     const cmd = buildSetNodesColorCommand(
       this.graphService, this.graphService.selectedNodeIds(), color,
+    );
+    if (cmd) this.historyService.execute(cmd);
+  }
+
+  setShape(shape: NodeShape): void {
+    const cmd = buildSetNodesShapeCommand(
+      this.graphService, this.graphService.selectedNodeIds(), shape,
     );
     if (cmd) this.historyService.execute(cmd);
   }
