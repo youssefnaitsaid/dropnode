@@ -5,6 +5,7 @@ import {
   signal,
   viewChild,
   effect,
+  untracked,
   ElementRef,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
@@ -158,6 +159,17 @@ type PendingDelete =
 
       <hlm-separator orientation="horizontal" />
 
+      <!-- Kept mounted even when the Sidebar is collapsed so the Command
+           Palette can reuse the same Collection import flow. -->
+      <input
+        #collectionFileInput
+        data-collection-import
+        type="file"
+        accept=".json"
+        class="hidden"
+        (change)="onCollectionFileSelected($event)"
+      />
+
       <!-- Body: Collections -->
       <nav class="flex-1 min-h-0 overflow-y-auto" aria-label="Collections">
         @if (sidebar.collapsed()) {
@@ -204,14 +216,6 @@ type PendingDelete =
                 </button>
               </span>
             </div>
-            <input
-              #collectionFileInput
-              type="file"
-              accept=".json"
-              class="hidden"
-              (change)="onCollectionFileSelected($event)"
-            />
-
             @if (collectionService.collections().length === 0) {
               <div hlmEmpty class="border !p-6 mt-1 gap-2">
                 <div hlmEmptyHeader>
@@ -466,8 +470,13 @@ export class SidebarComponent {
   private renameCancelled = false;
 
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  private lastNewCollectionRequest: number;
 
   constructor() {
+    // Do not replay a request that was already handled before Present Mode
+    // temporarily removed and recreated the Sidebar.
+    this.lastNewCollectionRequest = this.sidebar.newCollectionRequest();
+
     // Focus and select the inline rename input the moment it renders.
     effect(() => {
       const input = this.renameInput()?.nativeElement;
@@ -475,6 +484,32 @@ export class SidebarComponent {
         input.focus();
         input.select();
       }
+    });
+
+    effect(() => {
+      const request = this.sidebar.newCollectionRequest();
+      if (request <= this.lastNewCollectionRequest) return;
+      this.lastNewCollectionRequest = request;
+      untracked(() => this.newCollection());
+    });
+
+    effect(() => {
+      const projectId = this.sidebar.projectRenameRequest();
+      if (!projectId) return;
+      untracked(() => {
+        if (this.collectionService.getProject(projectId)) this.startRename(projectId);
+        this.sidebar.clearProjectRenameRequest();
+      });
+    });
+
+    effect(() => {
+      const projectId = this.sidebar.projectDeleteRequest();
+      if (!projectId) return;
+      untracked(() => {
+        const project = this.collectionService.getProject(projectId);
+        if (project) this.requestDeleteProject(project);
+        this.sidebar.clearProjectDeleteRequest();
+      });
     });
   }
 

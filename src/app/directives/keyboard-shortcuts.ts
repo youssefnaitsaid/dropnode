@@ -4,6 +4,9 @@ import { HistoryService } from '../services/history.service';
 import { SidebarService } from '../services/sidebar.service';
 import { ClipboardService } from '../services/clipboard.service';
 import { PresentationService } from '../services/presentation.service';
+import { CommandPaletteService } from '../services/command-palette.service';
+import { KeyboardScopeService } from '../services/keyboard-scope.service';
+import { CanvasViewportService } from '../services/canvas-viewport.service';
 import {
   DeleteConnectionCommand, DeleteNodeCompoundCommand, buildDeleteSelectionCommand,
 } from '../services/commands';
@@ -18,14 +21,24 @@ export class KeyboardShortcuts {
   private sidebarService = inject(SidebarService);
   private clipboardService = inject(ClipboardService);
   private presentationService = inject(PresentationService);
+  private commandPaletteService = inject(CommandPaletteService);
+  private keyboardScope = inject(KeyboardScopeService);
+  private canvasViewport = inject(CanvasViewportService);
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
-    // Don't handle shortcuts when typing in an input
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    // The Palette owns the whole shell while open. Ctrl+K is its symmetric
+    // toggle even though focus is inside the search input.
+    if (this.commandPaletteService.isOpen()) {
+      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        this.commandPaletteService.close();
+      }
       return;
     }
+
+    // Don't handle shortcuts when typing in an input or contenteditable.
+    if (this.keyboardScope.isTypingTarget(event.target)) return;
 
     // Present Mode is a third keyboard context beside "canvas" and "editing
     // Text": only Step navigation and Escape live — every global shortcut
@@ -47,6 +60,17 @@ export class KeyboardShortcuts {
       } else if (event.key === 'Escape') {
         this.presentationService.exit();
       }
+      return;
+    }
+
+    // Ctrl+K is the only Command Palette opener in this version. It stays
+    // behind the same modal/present scope guard as the other global actions.
+    if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      const active = typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      this.commandPaletteService.open(active);
       return;
     }
 
@@ -107,7 +131,7 @@ export class KeyboardShortcuts {
       // Ctrl+V: Paste at the cursor, cascading on repeat pastes
       if (key === 'v') {
         event.preventDefault();
-        this.clipboardService.pasteAtCursor();
+        this.clipboardService.pasteAtCursor(this.canvasViewport.visibleCanvasCenter());
         return;
       }
 

@@ -7,12 +7,13 @@ import { SidebarComponent } from '../sidebar/sidebar';
 import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CommandPaletteComponent } from '../command-palette/command-palette';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, ToastComponent, ImportDialogComponent, ExportDialogComponent, SidebarComponent],
+  imports: [RouterOutlet, ToastComponent, ImportDialogComponent, ExportDialogComponent, SidebarComponent, CommandPaletteComponent],
   template: `
     <div class="app-frame">
       <!-- Present Mode hides all chrome; the canvas keeps the full width -->
@@ -26,6 +27,7 @@ import { PresentationService } from '../../services/presentation.service';
     <app-toast />
     <app-import-dialog #importDialog />
     <app-export-dialog #exportDialog />
+    <app-command-palette />
   `,
   styles: [`
     :host {
@@ -71,7 +73,8 @@ export class AppShellComponent {
       if (this.exportDialogService.openRequests() > 0) {
         const projectId = untracked(this.exportDialogService.projectId);
         const scope = untracked(this.exportDialogService.scope);
-        untracked(() => this.exportDialog()?.open(projectId, scope));
+        const format = untracked(this.exportDialogService.format);
+        untracked(() => this.exportDialog()?.open(projectId, scope, format));
       }
     });
   }

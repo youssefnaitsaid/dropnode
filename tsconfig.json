@@ -24,7 +24,9 @@
       "@spartan-ng/helm/empty": ["./src/app/ui/empty/src/index.ts"],
       "@spartan-ng/helm/sidebar": ["./src/app/ui/sidebar/src/index.ts"],
       "@spartan-ng/helm/sheet": ["./src/app/ui/sheet/src/index.ts"],
-      "@spartan-ng/helm/skeleton": ["./src/app/ui/skeleton/src/index.ts"]
+      "@spartan-ng/helm/skeleton": ["./src/app/ui/skeleton/src/index.ts"],
+      "@spartan-ng/helm/command": ["./src/app/ui/command/src/index.ts"],
+      "@spartan-ng/helm/input-group": ["./src/app/ui/input-group/src/index.ts"]
     }
   },
   "angularCompilerOptions": {
