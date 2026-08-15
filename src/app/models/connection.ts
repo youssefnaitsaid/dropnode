@@ -30,6 +30,15 @@ export const TEXT_POSITION_MIN = 0.1;
 export const TEXT_POSITION_MAX = 0.9;
 export const TEXT_POSITION_DEFAULT = 0.5;
 
+// Reroute Points are authored in absolute Canvas coordinates and belong to a
+// Connection's geometry rather than having identities of their own.
+export interface ReroutePoint {
+  x: number;
+  y: number;
+}
+
+export const MAX_REROUTE_POINTS = 32;
+
 export interface Connection {
   id: string;
   sourceNodeId: string;
@@ -38,9 +47,12 @@ export interface Connection {
   targetHandle: HandleSide;
   // Optional Text shown along the curve; absent means unannotated
   text?: Text;
-  // Bezier parameter where the Text card sits (ADR-0013); absent means the
-  // midpoint, and the field may only exist alongside text
+  // Bezier parameter where the Text card sits without Reroute Points, or
+  // normalized arc-length progress along the complete route with them
   textPosition?: number;
+  // Ordered user-authored route vertices in absolute Canvas coordinates;
+  // absent means the legacy single cubic route
+  reroutePoints?: ReroutePoint[];
   // Curve color from NODE_PALETTE; absent means the default stroke
   color?: string;
   // Arrowhead at the source endpoint; absent means DEFAULT_START_ARROWHEAD

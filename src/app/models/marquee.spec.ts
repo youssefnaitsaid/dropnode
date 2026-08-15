@@ -110,6 +110,15 @@ describe('marqueeSelection', () => {
     expect(result.connectionIds).toEqual(['c1']);
   });
 
+  it('selects a routed Connection when the Marquee touches a Reroute Point segment', () => {
+    const a = node('a', 0, 76);
+    const b = node('b', 460, 76);
+    const c = conn('c1', 'a', 'b', { reroutePoints: [{ x: 300, y: 220 }] });
+    const result = marqueeSelection([a, b], [c], { x: 292, y: 205, width: 16, height: 16 });
+
+    expect(result.connectionIds).toEqual(['c1']);
+  });
+
   it('selects a Connection via its Text card extent beside the curve', () => {
     const a = node('a', 0, 76); // right handle at (160, 100)
     const b = node('b', 460, 76); // left handle at (460, 100)

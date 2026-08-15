@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
-import { Connection, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
+import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
 import { GraphState } from '../models/graph-state';
 import { ViewportState, ZOOM_MIN, ZOOM_MAX } from '../models/viewport-state';
 import { Bounds, unionBounds, contentBounds, connectionBounds, frameViewport } from '../models/bounds';
@@ -344,6 +344,27 @@ export class GraphService {
     );
   }
 
+  // Reroute Point geometry is stored as one optional ordered array. Invalid
+  // transient writes are ignored; import validation is the wholesale rejection
+  // boundary for persisted Graph State.
+  setConnectionReroutePoints(id: string, points: readonly ReroutePoint[] | null): void {
+    const normalized = points && points.length > 0
+      ? points.map(point => ({ x: point.x, y: point.y }))
+      : null;
+    if (normalized && !validReroutePoints(normalized)) return;
+
+    this.connections.update(conns =>
+      conns.map(c => {
+        if (c.id !== id) return c;
+        if (!normalized) {
+          const { reroutePoints: _removed, ...rest } = c;
+          return rest;
+        }
+        return { ...c, reroutePoints: normalized };
+      })
+    );
+  }
+
   // Connection color: null (the "default" swatch) removes the field entirely
   setConnectionColor(id: string, color: string | null): void {
     this.connections.update(conns =>
@@ -594,6 +615,14 @@ export class GraphService {
     if (rest.strokeWeight === DEFAULT_STROKE_WEIGHT) delete rest.strokeWeight;
     // Same canonical form for textPosition: an explicit midpoint is absent
     if (rest.textPosition === TEXT_POSITION_DEFAULT) delete rest.textPosition;
+    // Empty Reroute Point arrays are the canonical absent form. Import has
+    // already validated the coordinates, so the copy here is only to avoid
+    // aliasing the caller's payload into Graph State.
+    if (rest.reroutePoints?.length === 0) {
+      delete rest.reroutePoints;
+    } else if (rest.reroutePoints) {
+      rest.reroutePoints = rest.reroutePoints.map(point => ({ x: point.x, y: point.y }));
+    }
     if (conn.text) return { ...rest, text: canonicalizeText(conn.text) };
     if (label !== undefined && label.trim() !== '') {
       return { ...rest, text: textFromString(label) };
@@ -748,6 +777,28 @@ export class GraphService {
       if (conn['strokeWeight'] !== undefined && !STROKE_WEIGHTS.includes(conn['strokeWeight'] as StrokeWeight)) {
         return { valid: false, error: `Invalid connection ${connId}: strokeWeight must be thin, normal, or thick` };
       }
+      if (conn['reroutePoints'] !== undefined) {
+        const points = conn['reroutePoints'];
+        if (!Array.isArray(points)) {
+          return { valid: false, error: `Invalid connection ${connId}: reroutePoints must be an array` };
+        }
+        if (points.length > MAX_REROUTE_POINTS) {
+          return { valid: false, error: `Invalid connection ${connId}: reroutePoints may contain at most ${MAX_REROUTE_POINTS} points` };
+        }
+        let previous: ReroutePoint | null = null;
+        for (let pointIndex = 0; pointIndex < points.length; pointIndex++) {
+          const point = points[pointIndex] as Record<string, unknown>;
+          if (!point || typeof point !== 'object' ||
+              typeof point['x'] !== 'number' || !Number.isFinite(point['x']) ||
+              typeof point['y'] !== 'number' || !Number.isFinite(point['y'])) {
+            return { valid: false, error: `Invalid connection ${connId}: reroute point ${pointIndex} must have finite numeric x and y` };
+          }
+          if (previous && point['x'] === previous.x && point['y'] === previous.y) {
+            return { valid: false, error: `Invalid connection ${connId}: consecutive reroute points must be distinct` };
+          }
+          previous = { x: point['x'] as number, y: point['y'] as number };
+        }
+      }
       // textPosition is geometry-determining like a handle side: one legal
       // shape, rejected wholesale otherwise (ADR-0013) — never repaired.
       if (conn['textPosition'] !== undefined) {
@@ -794,4 +845,15 @@ export class GraphService {
     this.connections.set([]);
     this.clearSelection();
   }
+}
+
+function validReroutePoints(points: readonly ReroutePoint[]): boolean {
+  if (points.length === 0 || points.length > MAX_REROUTE_POINTS) return false;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+    const previous = points[i - 1];
+    if (previous && point.x === previous.x && point.y === previous.y) return false;
+  }
+  return true;
 }

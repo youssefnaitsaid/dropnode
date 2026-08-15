@@ -1,6 +1,6 @@
 import { GraphNode } from './node';
 import { Connection, effectiveTextPosition } from './connection';
-import { Curve, Point, connectionCurve, handlePoint, pointAt } from './curve';
+import { ConnectionRoute, Curve, Point, connectionRoute, handlePoint, routePointAt, sampleRoute } from './curve';
 
 export type { Point };
 
@@ -79,9 +79,20 @@ function segmentTouchesRect(p1: Point, p2: Point, r: Rect): boolean {
 
 /** Whether the rect touches the curve itself (sampled as a short polyline). */
 export function curveTouchesRect(curve: Curve, rect: Rect): boolean {
-  let prev = curve.start;
-  for (let i = 1; i <= CURVE_SEGMENTS; i++) {
-    const next = pointAt(curve, i / CURVE_SEGMENTS);
+  return routeTouchesRect({
+    segments: [curve],
+    hasReroutePoints: false,
+    lengths: [],
+    totalLength: 0,
+  }, rect);
+}
+
+/** Whether any segment of a complete Connection route touches the rect. */
+export function routeTouchesRect(route: ConnectionRoute, rect: Rect): boolean {
+  const points = sampleRoute(route, CURVE_SEGMENTS);
+  let prev = points[0];
+  for (let i = 1; i < points.length; i++) {
+    const next = points[i];
     if (segmentTouchesRect(prev, next, rect)) return true;
     prev = next;
   }
@@ -118,15 +129,16 @@ export function marqueeSelection(
       const source = byId.get(conn.sourceNodeId);
       const target = byId.get(conn.targetNodeId);
       if (!source || !target) return false;
-      const curve = connectionCurve(
+      const route = connectionRoute(
         handlePoint(source, conn.sourceHandle),
         handlePoint(target, conn.targetHandle),
         conn.sourceHandle,
         conn.targetHandle,
+        conn.reroutePoints,
       );
-      if (curveTouchesRect(curve, rect)) return true;
+      if (routeTouchesRect(route, rect)) return true;
       if (!conn.text) return false;
-      const anchor = pointAt(curve, effectiveTextPosition(conn));
+      const anchor = routePointAt(route, effectiveTextPosition(conn));
       const card: Rect = {
         x: anchor.x - TEXT_CARD_HALF_WIDTH,
         y: anchor.y - TEXT_CARD_HALF_HEIGHT,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { connectionCurve, pointAt, textPositionFromPoint } from './curve';
+import { connectionCurve, connectionRoute, pointAt, routePointAt, routeProjection, textPositionFromPoint, textPositionFromRoute } from './curve';
 import { TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from './connection';
 
 // A horizontal right→left curve: start (0,0), end (100,0), distance 100,
@@ -26,6 +26,136 @@ describe('connectionCurve', () => {
     const curve = connectionCurve({ x: 0, y: 0 }, { x: 0, y: 100 }, 'bottom', 'top');
     expect(curve.cp1).toEqual({ x: 0, y: 40 });
     expect(curve.cp2).toEqual({ x: 0, y: 60 });
+  });
+});
+
+describe('connectionRoute', () => {
+  it('builds a piecewise curve through ordered Reroute Points', () => {
+    const start = { x: 0, y: 0 };
+    const first = { x: 100, y: 80 };
+    const second = { x: 220, y: -40 };
+    const end = { x: 320, y: 0 };
+
+    const route = connectionRoute(start, end, 'right', 'left', [first, second]);
+
+    expect(route.segments).toHaveLength(3);
+    expect(route.segments.map(segment => segment.start)).toEqual([start, first, second]);
+    expect(route.segments.map(segment => segment.end)).toEqual([first, second, end]);
+  });
+
+  it('uses normalized route progress for routed curves and preserves cubic t without points', () => {
+    const routed = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 100, y: 0 }, { x: 200, y: 0 }],
+    );
+
+    const routedMidpoint = routePointAt(routed, 0.5);
+    expect(routedMidpoint.x).toBeCloseTo(150, 4);
+    expect(routedMidpoint.y).toBeCloseTo(0, 4);
+
+    const unrouted = connectionRoute({ x: 0, y: 0 }, { x: 100, y: 0 }, 'right', 'left');
+    expect(routePointAt(unrouted, 0.5)).toEqual(pointAt(flatCurve(), 0.5));
+  });
+
+  it('keeps endpoint tangents aligned with the source and target Handles', () => {
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 120, y: 100 }],
+    );
+
+    expect(route.segments[0].cp1.x).toBeGreaterThan(route.segments[0].start.x);
+    expect(route.segments[route.segments.length - 1].cp2.x)
+      .toBeLessThan(route.segments[route.segments.length - 1].end.x);
+  });
+
+  it('keeps interior tangents continuous while bounding every segment control point', () => {
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 120, y: 140 }, { x: 180, y: -80 }],
+    );
+
+    const incoming = {
+      x: route.segments[0].end.x - route.segments[0].cp2.x,
+      y: route.segments[0].end.y - route.segments[0].cp2.y,
+    };
+    const outgoing = {
+      x: route.segments[1].cp1.x - route.segments[1].start.x,
+      y: route.segments[1].cp1.y - route.segments[1].start.y,
+    };
+    expect(outgoing.x).toBeCloseTo(incoming.x, 6);
+    expect(outgoing.y).toBeCloseTo(incoming.y, 6);
+
+    for (const segment of route.segments) {
+      for (const control of [segment.cp1, segment.cp2]) {
+        expect(control.x).toBeGreaterThanOrEqual(Math.min(segment.start.x, segment.end.x));
+        expect(control.x).toBeLessThanOrEqual(Math.max(segment.start.x, segment.end.x));
+        expect(control.y).toBeGreaterThanOrEqual(Math.min(segment.start.y, segment.end.y));
+        expect(control.y).toBeLessThanOrEqual(Math.max(segment.start.y, segment.end.y));
+      }
+    }
+  });
+
+  it('projects a point to the route segment and returns arc-length progress', () => {
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 100, y: 100 }, { x: 200, y: 0 }],
+    );
+
+    const projection = routeProjection(route, { x: 100, y: 100 });
+    expect(projection.segmentIndex).toBe(0);
+    expect(projection.point).toEqual({ x: 100, y: 100 });
+    expect(projection.progress).toBeGreaterThan(0);
+    expect(projection.progress).toBeLessThan(1);
+  });
+
+  it('chooses the earliest segment at a self-intersection tie', () => {
+    const diagonal = (start: { x: number; y: number }, end: { x: number; y: number }) => ({
+      start,
+      cp1: { x: start.x + (end.x - start.x) / 3, y: start.y + (end.y - start.y) / 3 },
+      cp2: { x: start.x + 2 * (end.x - start.x) / 3, y: start.y + 2 * (end.y - start.y) / 3 },
+      end,
+    });
+    const segments = [
+      diagonal({ x: 0, y: 0 }, { x: 100, y: 100 }),
+      diagonal({ x: 100, y: 100 }, { x: 0, y: 100 }),
+      diagonal({ x: 0, y: 100 }, { x: 100, y: 0 }),
+    ];
+    const route = {
+      segments,
+      hasReroutePoints: true,
+      lengths: [100, 100, 141.421356237],
+      totalLength: 341.421356237,
+    };
+
+    expect(routeProjection(route, { x: 50, y: 50 }).segmentIndex).toBe(0);
+  });
+
+  it('projects routed Text against the complete route using arc-length progress', () => {
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 80, y: 120 }, { x: 220, y: -120 }],
+    );
+    const point = route.segments[1].end;
+    const position = textPositionFromRoute(route, point);
+
+    expect(position).toBeGreaterThan(TEXT_POSITION_DEFAULT);
+    expect(position).toBeLessThan(TEXT_POSITION_MAX);
+    expect(routePointAt(route, position).x).toBeCloseTo(point.x, 0);
   });
 });
 
