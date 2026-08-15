@@ -177,6 +177,7 @@ describe('GraphService', () => {
       expect(conn!.sourceHandle).toBe('right');
       expect(conn!.targetNodeId).toBe(node2.id);
       expect(conn!.targetHandle).toBe('left');
+      expect('reroutePoints' in conn!).toBe(false);
       expect(service.connections().length).toBe(1);
     });
 
@@ -285,6 +286,19 @@ describe('GraphService', () => {
 
       expect('textPosition' in service.connections()[0]).toBe(false);
     });
+
+    it('clearing the Text preserves Reroute Points', () => {
+      const node1 = service.createNode('Node 1', 0, 0);
+      const node2 = service.createNode('Node 2', 300, 0);
+      const conn = service.createConnection(node1.id, 'right', node2.id, 'left')!;
+      const points = [{ x: 150, y: 120 }];
+      service.setConnectionReroutePoints(conn.id, points);
+      service.setConnectionText(conn.id, textFromString('depends on'));
+
+      service.setConnectionText(conn.id, null);
+
+      expect(service.connections()[0].reroutePoints).toEqual(points);
+    });
   });
 
   describe('setConnectionTextPosition', () => {
@@ -338,6 +352,44 @@ describe('GraphService', () => {
       makeAnnotatedConn();
       expect(() => service.setConnectionTextPosition('nonexistent', 0.8)).not.toThrow();
       expect('textPosition' in service.connections()[0]).toBe(false);
+    });
+  });
+
+  describe('setConnectionReroutePoints', () => {
+    it('stores ordered absolute points and removes the field when cleared', () => {
+      const n1 = service.createNode('N1', 0, 0);
+      const n2 = service.createNode('N2', 300, 0);
+      const conn = service.createConnection(n1.id, 'right', n2.id, 'left')!;
+      const points = [{ x: 120, y: 160 }, { x: 220, y: -20 }];
+
+      service.setConnectionReroutePoints(conn.id, points);
+
+      expect(service.connections()[0].reroutePoints).toEqual(points);
+      service.setConnectionReroutePoints(conn.id, null);
+      expect('reroutePoints' in service.connections()[0]).toBe(false);
+    });
+
+    it('keeps absolute points fixed when an endpoint Node moves', () => {
+      const n1 = service.createNode('N1', 0, 0);
+      const n2 = service.createNode('N2', 300, 0);
+      const conn = service.createConnection(n1.id, 'right', n2.id, 'left')!;
+      const points = [{ x: 120, y: 160 }];
+      service.setConnectionReroutePoints(conn.id, points);
+
+      service.updateNodePosition(n1.id, 80, 40);
+
+      expect(service.connections()[0].reroutePoints).toEqual(points);
+    });
+
+    it('ignores invalid runtime point writes', () => {
+      const n1 = service.createNode('N1', 0, 0);
+      const n2 = service.createNode('N2', 300, 0);
+      const conn = service.createConnection(n1.id, 'right', n2.id, 'left')!;
+      service.setConnectionReroutePoints(conn.id, [{ x: 120, y: 160 }]);
+
+      service.setConnectionReroutePoints(conn.id, [{ x: 1, y: 2 }, { x: 1, y: 2 }]);
+
+      expect(service.connections()[0].reroutePoints).toEqual([{ x: 120, y: 160 }]);
     });
   });
 
@@ -805,6 +857,22 @@ describe('GraphService', () => {
       expect(vp.panY).toBeCloseTo(345, 5);
     });
 
+    it('zoomToSelection frames the full routed Connection, including its Reroute Points', () => {
+      const a = service.createNode('a', 0, 0, 100, 100);
+      const b = service.createNode('b', 900, 0, 100, 100);
+      const conn = service.createConnection(a.id, 'right', b.id, 'left')!;
+      service.setConnectionReroutePoints(conn.id, [{ x: 500, y: 500 }]);
+      service.selectConnection(conn.id);
+
+      service.zoomToSelection(W, H);
+
+      const vp = service.viewportState();
+      // Routed bounds: x=100..900, y=50..500 → 800 x 450.
+      expect(vp.zoom).toBeCloseTo(0.9, 5);
+      expect(vp.panX).toBeCloseTo(-50, 5);
+      expect(vp.panY).toBeCloseTo(52.5, 5);
+    });
+
     it('zoomToSelection with nothing selected leaves the Viewport untouched', () => {
       service.setViewport({ panX: 5, panY: 6, zoom: 3 });
 
@@ -1145,6 +1213,43 @@ describe('GraphService', () => {
       const c = service.connections()[0];
       expect('strokePattern' in c).toBe(false);
       expect('strokeWeight' in c).toBe(false);
+    });
+
+    function reroutePayload(points: unknown) {
+      return {
+        nodes: [
+          { id: 'n1', label: 'Node 1', x: 0, y: 0, width: 160, height: 48 },
+          { id: 'n2', label: 'Node 2', x: 200, y: 0, width: 160, height: 48 },
+        ],
+        connections: [
+          {
+            id: 'c1', sourceNodeId: 'n1', sourceHandle: 'right', targetNodeId: 'n2', targetHandle: 'left',
+            reroutePoints: points,
+          },
+        ],
+      } as any;
+    }
+
+    it('imports ordered finite Reroute Points and canonicalizes an empty array', () => {
+      const points = [{ x: 100, y: 120 }, { x: 220, y: -20 }];
+      expect(service.importGraph(reroutePayload(points)).success).toBe(true);
+      expect(service.connections()[0].reroutePoints).toEqual(points);
+
+      expect(service.importGraph(reroutePayload([])).success).toBe(true);
+      expect('reroutePoints' in service.connections()[0]).toBe(false);
+    });
+
+    it('rejects malformed, non-finite, over-limit, and consecutive duplicate points wholesale', () => {
+      const kept = service.createNode('Kept', 0, 0);
+      const malformed = service.importGraph(reroutePayload([{ x: '100', y: 20 }]));
+      expect(malformed.success).toBe(false);
+      expect(service.nodes()[0].id).toBe(kept.id);
+
+      expect(service.importGraph(reroutePayload([{ x: Infinity, y: 20 }])).success).toBe(false);
+      expect(service.importGraph(reroutePayload(Array.from({ length: 33 }, (_, i) => ({ x: i, y: 0 })))).success)
+        .toBe(false);
+      expect(service.importGraph(reroutePayload([{ x: 1, y: 2 }, { x: 1, y: 2 }])).success).toBe(false);
+      expect(service.nodes()[0].id).toBe(kept.id);
     });
 
     function textPositionPayload(textPosition: unknown, withText = true) {

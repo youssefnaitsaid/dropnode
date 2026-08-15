@@ -1,7 +1,7 @@
 import { GraphNode } from './node';
 import { Connection } from './connection';
 import { ViewportState, ZOOM_MIN, ZOOM_MAX } from './viewport-state';
-import { Curve, connectionCurve, pointAt, handlePoint } from './curve';
+import { ConnectionRoute, Curve, connectionRoute, pointAt, handlePoint } from './curve';
 
 // A rectangle in Canvas units.
 export interface Bounds {
@@ -54,6 +54,11 @@ export function curveBounds(curve: Curve): Bounds {
   return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
 }
 
+/** Bounds of every segment in a complete Connection route. */
+export function routeBounds(route: ConnectionRoute): Bounds {
+  return unionBounds(route.segments.map(segment => curveBounds(segment)))!;
+}
+
 // The t values in (0,1) where a 1D cubic bezier's derivative is zero — its
 // interior extrema. B'(t)/3 = a*t^2 + b*t + c.
 function cubicExtremaTs(p0: number, p1: number, p2: number, p3: number): number[] {
@@ -79,13 +84,14 @@ export function connectionBounds(
   const source = nodeById.get(conn.sourceNodeId);
   const target = nodeById.get(conn.targetNodeId);
   if (!source || !target) return null;
-  const curve = connectionCurve(
+  const route = connectionRoute(
     handlePoint(source, conn.sourceHandle),
     handlePoint(target, conn.targetHandle),
     conn.sourceHandle,
     conn.targetHandle,
+    conn.reroutePoints,
   );
-  return curveBounds(curve);
+  return routeBounds(route);
 }
 
 /** Bounds of everything drawn — all Nodes plus every Connection's curve (which

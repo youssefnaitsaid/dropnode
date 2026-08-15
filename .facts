@@ -7,6 +7,7 @@
 - Formatting is applied via the Formatting Toolbar shown while editing Text; Groups carry a plain single-line Label instead of Text
 - a Group is a distinct kind of node (kind 'group') that visually and logically contains child nodes via their parentId; nesting is one level deep — a Group never contains another Group
 - a Connection is a directed curve linking a Handle on a source Node to a Handle on a target Node, identified by its four endpoint fields
+- a Reroute Point is a user-placed intermediate point that a Connection passes through; it belongs to the Connection's geometry and is not an independent Graph State element
 - a Handle is a connection anchor on one of the four edges of a Node (top, right, bottom, left); its position is derived from the Node's rect
 - a Resize Grip is a draggable control at one of the four corners of the selected node, used to change the node's size; distinct from a Handle
 - the Canvas is the unbounded workspace containing all Nodes and Connections
@@ -94,16 +95,53 @@
 - a selected or hovered Connection thickens by a fixed increment on top of its own Stroke Weight (hover +1px, selected +1.5px) and keeps its own-color glow; normal reproduces the pre-feature 2.5/3.5/4 widths exactly @implemented
 - label: every Connection renders an invisible solid 12px companion path that is the sole pointer target, so dotted and thin Connections stay exactly as clickable as solid ones; PNG export strips it (ADR-0020)
   command: grep -q 'connection-hit' src/app/components/connection-layer/connection-layer.ts && grep -q 'connection-hit' src/app/services/export-image-renderer.ts
-- a Connection carries optional Text; double-clicking the path or Text card opens the Text editor at the Text's position on the curve with the content focused and selected — blur or Ctrl+Enter commits, Escape cancels, and committing empty removes the Text (deliberate deviation from the Node rule)
+- a Connection carries optional Text; double-clicking its Text card opens the Text editor with the content focused and selected @implemented
+- Connection Text editing commits on blur or Ctrl+Enter, Escape cancels, and committing empty removes the Text (deliberate deviation from the Node rule) @implemented
 - setting or clearing Connection Text is one undoable SetConnectionTextCommand; committing unchanged content pushes nothing onto History; createConnection never sets Text
-- Connection Text renders on an opaque wrapping card (max-width 240px) centered at its position along the cubic bezier (default: the midpoint), moving with the curve; the card is part of the Connection's hit area
-- a Connection stores an optional textPosition — the bezier parameter where its Text card sits, clamped to [0.1, 0.9]; absent means the midpoint (0.5), and it may only exist alongside text (ADR-0013) @implemented
-- dragging a Connection Text card slides it along the curve: mousedown selects the Connection and arms the drag, movement beyond 2px becomes a drag with transient GraphService updates, and mouseup pushes one MoveConnectionTextCommand only if the threshold was crossed @implemented
+- Connection Text renders on an opaque wrapping card with a max-width of 240px @implemented
+- Connection Text cards center on their stored position along the complete Connection route and move with that route @implemented
+- a Connection Text card is part of the Connection's hit area @implemented
+- a Connection stores an optional textPosition @implemented
+- without Reroute Points, textPosition keeps the cubic Bézier parameter meaning; with Reroute Points, it means normalized arc-length progress along the composite curve (ADR-0013, ADR-0021) @implemented
+- textPosition is clamped to [0.1, 0.9] and absent means the route midpoint @implemented
+- textPosition may only exist alongside Text @implemented
+- dragging a Connection Text card selects the Connection and arms the drag on mousedown @implemented
+- Connection Text movement beyond 2px updates GraphService transiently and mouseup pushes one MoveConnectionTextCommand only when it moved @implemented
 - while dragging Connection Text, a projected point within 15 canvas units of the curve midpoint snaps to it; a drag ending snapped stores no textPosition @implemented
 - clearing Connection Text discards its textPosition; undoing the clear restores both text and position in one step; newly added Text always starts at the midpoint @implemented
 - Import rejects a payload wholesale when textPosition is not a number, is outside [0.1, 0.9], or is present on a Connection without text; Export emits textPosition only when present @implemented
-- Connections render as cubic beziers; control points extend perpendicular to each Handle's edge, offset clamped between 40 and 150 (distance x 0.4)
+- Connections without Reroute Points render as the existing cubic Bézier @implemented
+- a Connection with Reroute Points renders as a bounded piecewise cubic Bézier through its source Handle, every ordered Reroute Point, and its target Handle @implemented
+- routed Connection endpoint tangents follow their Handles @implemented
 - Handle positions are the midpoints of the Node's four edges, computed from x, y, width, height
+- a Connection may carry 1–32 ordered Reroute Points as absolute Canvas coordinates `{x, y}` @implemented
+- Reroute Point coordinates are finite @implemented
+- absent Reroute Points mean no route, and an empty imported array canonicalizes to absent @implemented
+- Import rejects malformed Reroute Point coordinates wholesale and leaves existing Graph State untouched @implemented
+- Import rejects non-finite Reroute Point coordinates wholesale and leaves existing Graph State untouched @implemented
+- Import rejects more than 32 Reroute Points wholesale and leaves existing Graph State untouched @implemented
+- Import rejects consecutive duplicate Reroute Points wholesale and leaves existing Graph State untouched @implemented
+- moving an endpoint Node leaves a Connection's absolute Reroute Points fixed @implemented
+- Reroute Point order never reorders automatically @implemented
+- Reroute Point self-intersection is allowed @implemented
+- double-clicking a Connection curve projects onto the nearest composite curve position and inserts one Reroute Point in route order @implemented
+- at a Connection self-intersection, the earliest route segment wins for projection @implemented
+- double-clicking a visible Reroute Point removes it @implemented
+- dragging a Reroute Point selects its parent Connection and uses the 2px threshold @implemented
+- Reroute Point dragging updates transiently and commits one undoable Command only when the point moves @implemented
+- Reroute Point markers appear only for a selected or actively dragged Connection @implemented
+- Reroute Points are Connection subparts, never Selection members @implemented
+- Ctrl+clicking a Reroute Point toggles the parent Connection without starting a drag @implemented
+- right-clicking a Reroute Point opens the parent Connection's Context Menu @implemented
+- Reroute Point markers are hidden in Present Mode @implemented
+- Reroute Point markers are stripped from PNG Export @implemented
+- Reroute Point dragging has no Alignment Snap or Handle Snap Zone @implemented
+- Reroute Point dragging has no obstacle collision or automatic rerouting @implemented
+- Tidy up preserves Reroute Points exactly @implemented
+- Copy, Paste, Duplicate, and Alt+drag translate copied Reroute Points by the graph fragment's Canvas delta @implemented
+- rendering, hit-testing, and Marquee selection use the complete routed curve @implemented
+- Zoom to Fit, Zoom to Selection, Connection Text projection, and PNG bounds use the complete routed curve @implemented
+- creating a Connection and Quick-add never invent Reroute Points @implemented
 
 ## alignment
 

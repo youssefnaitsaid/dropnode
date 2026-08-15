@@ -1,7 +1,7 @@
 import { Component, computed, effect, input, output, signal, ChangeDetectionStrategy, inject } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE, oppositeHandle } from '../../models/node';
 import { Connection, ArrowheadType, effectiveArrowhead, effectiveTextPosition, effectiveStrokePattern, effectiveStrokeWeight, strokeWidthPx, strokeDasharray } from '../../models/connection';
-import { Curve, connectionCurve, pointAt, textPositionFromPoint } from '../../models/curve';
+import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, textPositionFromRoute } from '../../models/curve';
 import { Text, isTextEmpty } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
 import { ContextMenuService } from '../../services/context-menu.service';
@@ -51,7 +51,7 @@ interface DragState {
           [attr.data-connection-id]="conn.id"
           class="connection-hit"
           (mousedown)="onConnectionMouseDown(conn, $event)"
-          (dblclick)="onConnectionDoubleClick(conn, $event)"
+          (dblclick)="onConnectionCurveDoubleClick(conn, $event)"
         />
         <path
           [attr.d]="getConnectionPath(conn)"
@@ -65,6 +65,22 @@ interface DragState {
           [attr.stroke-linecap]="strokeDash(conn) ? 'round' : null"
           [style.filter]="isSelected(conn.id) ? glowFilter(conn) : null"
         />
+
+        @if (!presentationService.active() && (isSelected(conn.id) || reroutePointDraggingConnectionId() === conn.id)) {
+          @for (point of conn.reroutePoints ?? []; track $index) {
+            <circle
+              class="reroute-point"
+              [attr.r]="6"
+              [attr.cx]="point.x"
+              [attr.cy]="point.y"
+              [style.stroke]="strokeColor(conn)"
+              [attr.data-connection-id]="conn.id"
+              [attr.data-reroute-point-index]="$index"
+              (mousedown)="onReroutePointMouseDown(conn, $index, $event)"
+              (dblclick)="onReroutePointDoubleClick(conn, $index, $event)"
+            />
+          }
+        }
       }
 
       @if (dragState()) {
@@ -101,7 +117,7 @@ interface DragState {
             [style.left.px]="getTextCardPosition(conn).x"
             [style.top.px]="getTextCardPosition(conn).y"
             (mousedown)="onTextCardMouseDown(conn, $event)"
-            (dblclick)="onConnectionDoubleClick(conn, $event)"
+            (dblclick)="onTextCardDoubleClick(conn, $event)"
           >
             <app-text-view [text]="conn.text" />
           </div>
@@ -156,6 +172,16 @@ interface DragState {
       stroke-dasharray: 8 4;
       opacity: 0.7;
       pointer-events: none;
+    }
+    .reroute-point {
+      fill: #1c1c22;
+      stroke: #7c5cff;
+      stroke-width: 2px;
+      pointer-events: all;
+      cursor: grab;
+    }
+    .reroute-point:active {
+      cursor: grabbing;
     }
     .label-layer {
       position: absolute;
@@ -266,6 +292,7 @@ export class ConnectionLayerComponent {
 
   // Connection whose Text is being edited inline, if any
   editingConnectionId = signal<string | null>(null);
+  reroutePointDraggingConnectionId = signal<string | null>(null);
 
   private contextMenuService = inject(ContextMenuService);
 
@@ -286,6 +313,9 @@ export class ConnectionLayerComponent {
   textDragStart = output<{ connectionId: string; event: MouseEvent }>();
   // null means the Text was cleared (committing empty removes it)
   textCommit = output<{ connectionId: string; newText: Text | null }>();
+  reroutePointAdd = output<{ connectionId: string; clientX: number; clientY: number }>();
+  reroutePointDragStart = output<{ connectionId: string; pointIndex: number; event: MouseEvent }>();
+  reroutePointRemove = output<{ connectionId: string; pointIndex: number }>();
 
   snapTarget = computed(() => {
     const state = this.dragState();
@@ -298,13 +328,13 @@ export class ConnectionLayerComponent {
   }
 
   getConnectionPath(conn: Connection): string {
-    return this.formatBezier(this.getCurve(conn));
+    return this.formatRoute(this.getRoute(conn));
   }
 
   // The Text card centers on the bezier point at the Connection's stored
   // position (absent means the midpoint, ADR-0013)
   getTextCardPosition(conn: Connection): { x: number; y: number } {
-    return pointAt(this.getCurve(conn), effectiveTextPosition(conn));
+    return routePointAt(this.getRoute(conn), effectiveTextPosition(conn));
   }
 
   // Cursor→position projection for the Text card drag, delegated to the pure
@@ -312,13 +342,24 @@ export class ConnectionLayerComponent {
   textPositionAtPoint(connectionId: string, canvasX: number, canvasY: number): number | null {
     const conn = this.connections().find(c => c.id === connectionId);
     if (!conn) return null;
-    return textPositionFromPoint(this.getCurve(conn), { x: canvasX, y: canvasY });
+    return textPositionFromRoute(this.getRoute(conn), { x: canvasX, y: canvasY });
   }
 
-  private getCurve(conn: Connection): Curve {
+  projectReroutePoint(connectionId: string, canvasX: number, canvasY: number): { index: number; point: { x: number; y: number } } | null {
+    const conn = this.connections().find(c => c.id === connectionId);
+    if (!conn) return null;
+    const projection = routeProjection(this.getRoute(conn), { x: canvasX, y: canvasY });
+    return { index: projection.segmentIndex, point: projection.point };
+  }
+
+  setReroutePointDragging(connectionId: string | null): void {
+    this.reroutePointDraggingConnectionId.set(connectionId);
+  }
+
+  private getRoute(conn: Connection): ConnectionRoute {
     const start = this.getHandlePos(conn.sourceNodeId, conn.sourceHandle);
     const end = this.getHandlePos(conn.targetNodeId, conn.targetHandle);
-    return connectionCurve(start, end, conn.sourceHandle, conn.targetHandle);
+    return connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints);
   }
 
   isSelected(connectionId: string): boolean {
@@ -331,12 +372,15 @@ export class ConnectionLayerComponent {
     const start = this.getHandlePos(state.sourceNodeId, state.sourceHandle);
     const end = { x: state.currentX, y: state.currentY };
     const endHandle = state.targetHandle ?? oppositeHandle(state.sourceHandle);
-    return this.formatBezier(connectionCurve(start, end, state.sourceHandle, endHandle));
+    return this.formatRoute(connectionRoute(start, end, state.sourceHandle, endHandle));
   }
 
-  private formatBezier(curve: Curve): string {
-    const { start, cp1, cp2, end } = curve;
-    return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${end.x} ${end.y}`;
+  private formatRoute(route: ConnectionRoute): string {
+    return route.segments.map((segment, index) => {
+      const { start, cp1, cp2, end } = segment;
+      const prefix = index === 0 ? `M ${start.x} ${start.y} ` : '';
+      return `${prefix}C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${end.x} ${end.y}`;
+    }).join(' ');
   }
 
   // Public API for CanvasComponent
@@ -415,9 +459,33 @@ export class ConnectionLayerComponent {
     }
   }
 
-  onConnectionDoubleClick(conn: Connection, event: MouseEvent): void {
+  onConnectionCurveDoubleClick(conn: Connection, event: MouseEvent): void {
+    event.stopPropagation();
+    this.reroutePointAdd.emit({
+      connectionId: conn.id,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+  }
+
+  onTextCardDoubleClick(conn: Connection, event: MouseEvent): void {
     event.stopPropagation();
     this.editingConnectionId.set(conn.id);
+  }
+
+  onReroutePointMouseDown(conn: Connection, pointIndex: number, event: MouseEvent): void {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    this.connectionSelect.emit({ connectionId: conn.id, additive: event.ctrlKey });
+    if (!event.ctrlKey) {
+      this.reroutePointDraggingConnectionId.set(conn.id);
+      this.reroutePointDragStart.emit({ connectionId: conn.id, pointIndex, event });
+    }
+  }
+
+  onReroutePointDoubleClick(conn: Connection, pointIndex: number, event: MouseEvent): void {
+    event.stopPropagation();
+    this.reroutePointRemove.emit({ connectionId: conn.id, pointIndex });
   }
 
   // Unlike Node Text, committing empty is meaningful: it removes the Text.

@@ -46,6 +46,7 @@ export class ClipboardService {
   // A pending Alt+drag duplicate, created transiently and committed on drop
   private spawned: {
     nodes: GraphNode[]; connections: Connection[]; rootIds: string[]; sourceIds: string[];
+    baseConnections: Connection[];
   } | null = null;
 
   /**
@@ -109,6 +110,7 @@ export class ClipboardService {
       node.x += dx;
       node.y += dy;
     }
+    translateConnections(materialized.connections, dx, dy);
 
     this.historyService.execute(new InsertElementsCommand(
       this.graphService, 'Paste', materialized.nodes, materialized.connections,
@@ -181,6 +183,7 @@ export class ClipboardService {
       connections: materialized.connections,
       rootIds: materialized.rootIds,
       sourceIds,
+      baseConnections: structuredClone(materialized.connections),
     };
     this.graphService.nodes.update(nodes => [...nodes, ...materialized.nodes]);
     if (materialized.connections.length > 0) {
@@ -191,6 +194,29 @@ export class ClipboardService {
     const primaryId = materialized.idMap.get(grabbedId ?? sourceIds[0]) ?? materialized.rootIds[0];
     const isGroup = materialized.nodes.find(n => n.id === primaryId)?.kind === 'group';
     return { primaryId, rootIds: materialized.rootIds, isGroup };
+  }
+
+  /** Keep absolute Reroute Points attached to an Alt+drag duplicate while the
+   * copied graph fragment is moved transiently by the Canvas. */
+  moveSpawnedDuplicate(dx: number, dy: number): void {
+    const spawned = this.spawned;
+    if (!spawned) return;
+    const baseById = new Map(spawned.baseConnections.map(conn => [conn.id, conn]));
+    this.graphService.connections.update(conns => conns.map(conn => {
+      const base = baseById.get(conn.id);
+      if (!base) return conn;
+      if (!base.reroutePoints) {
+        const { reroutePoints: _removed, ...rest } = conn;
+        return rest;
+      }
+      return {
+        ...conn,
+        reroutePoints: base.reroutePoints.map(point => ({
+          x: point.x + dx,
+          y: point.y + dy,
+        })),
+      };
+    }));
   }
 
   /**
@@ -246,6 +272,7 @@ export class ClipboardService {
       node.x += dx;
       node.y += dy;
     }
+    translateConnections(materialized.connections, dx, dy);
     return materialized;
   }
 
@@ -332,4 +359,14 @@ export class ClipboardService {
 
 function toArray(nodeIds: string | readonly string[]): string[] {
   return typeof nodeIds === 'string' ? [nodeIds] : [...nodeIds];
+}
+
+function translateConnections(connections: Connection[], dx: number, dy: number): void {
+  for (const connection of connections) {
+    if (!connection.reroutePoints) continue;
+    connection.reroutePoints = connection.reroutePoints.map(point => ({
+      x: point.x + dx,
+      y: point.y + dy,
+    }));
+  }
 }

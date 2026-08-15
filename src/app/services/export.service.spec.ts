@@ -170,6 +170,27 @@ describe('ExportService', () => {
       expect(graphService.exportGraph()).toEqual(exported);
     });
 
+    it('round-trips ordered absolute Reroute Points through a shared link', async () => {
+      const node1 = graphService.createNode('Alpha', 0, 0);
+      const node2 = graphService.createNode('Beta', 400, 0);
+      const connection = graphService.createConnection(node1.id, 'right', node2.id, 'left')!;
+      graphService.setConnectionReroutePoints(connection.id, [
+        { x: 160, y: 140 },
+        { x: 280, y: -30 },
+      ]);
+      const exported = graphService.exportGraph();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+      await service.copyLink();
+      const link = writeText.mock.calls[0][0] as string;
+      window.history.pushState({}, '', link);
+      graphService.clearGraph();
+
+      expect(graphService.loadFromUrlParam().loaded).toBe(true);
+      expect(graphService.exportGraph()).toEqual(exported);
+    });
+
     it('drops any existing query parameters from the copied link', async () => {
       window.history.pushState({}, '', '/?data=old&foo=1');
       const writeText = vi.fn().mockResolvedValue(undefined);

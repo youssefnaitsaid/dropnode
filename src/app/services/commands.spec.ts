@@ -18,6 +18,9 @@ import {
   SetNodeTextCommand,
   SetConnectionTextCommand,
   MoveConnectionTextCommand,
+  AddConnectionReroutePointCommand,
+  MoveConnectionReroutePointCommand,
+  RemoveConnectionReroutePointCommand,
   SetConnectionColorCommand,
   SetConnectionArrowheadCommand,
   SetConnectionStrokePatternCommand,
@@ -447,6 +450,58 @@ describe('Commands', () => {
       cmd.undo();
 
       expect(graphService.connections()[0].textPosition).toBe(0.3);
+    });
+  });
+
+  describe('Reroute Point Commands', () => {
+    function makeConnection() {
+      const n1 = graphService.createNode('N1', 0, 0);
+      const n2 = graphService.createNode('N2', 300, 0);
+      const conn = graphService.createConnection(n1.id, 'right', n2.id, 'left')!;
+      graphService.setConnectionReroutePoints(conn.id, [{ x: 100, y: 120 }, { x: 220, y: -20 }]);
+      return conn;
+    }
+
+    it('adds, undoes, and redoes a point at the requested route index', () => {
+      const conn = makeConnection();
+      const cmd = new AddConnectionReroutePointCommand(graphService, conn.id, { x: 160, y: 80 }, 1);
+
+      cmd.execute();
+      expect(graphService.connections()[0].reroutePoints).toEqual([
+        { x: 100, y: 120 }, { x: 160, y: 80 }, { x: 220, y: -20 },
+      ]);
+      cmd.undo();
+      expect(graphService.connections()[0].reroutePoints).toEqual([
+        { x: 100, y: 120 }, { x: 220, y: -20 },
+      ]);
+      cmd.execute();
+      expect(graphService.connections()[0].reroutePoints?.length).toBe(3);
+    });
+
+    it('moves one point and restores the full prior route on undo', () => {
+      const conn = makeConnection();
+      const original = graphService.connections()[0].reroutePoints!;
+      const cmd = new MoveConnectionReroutePointCommand(
+        graphService, conn.id, 1, { x: 250, y: 50 }, original,
+      );
+
+      graphService.setConnectionReroutePoints(conn.id, [{ x: 100, y: 120 }, { x: 250, y: 50 }]);
+      cmd.undo();
+      expect(graphService.connections()[0].reroutePoints).toEqual(original);
+      cmd.execute();
+      expect(graphService.connections()[0].reroutePoints?.[1]).toEqual({ x: 250, y: 50 });
+    });
+
+    it('removes a point and undo restores its route order', () => {
+      const conn = makeConnection();
+      const cmd = new RemoveConnectionReroutePointCommand(graphService, conn.id, 0);
+
+      cmd.execute();
+      expect(graphService.connections()[0].reroutePoints).toEqual([{ x: 220, y: -20 }]);
+      cmd.undo();
+      expect(graphService.connections()[0].reroutePoints).toEqual([
+        { x: 100, y: 120 }, { x: 220, y: -20 },
+      ]);
     });
   });
 

@@ -1,6 +1,6 @@
 import { Command } from '../models/command';
 import { GraphNode, HandleSide, oppositeHandle } from '../models/node';
-import { Connection, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT } from '../models/connection';
+import { Connection, ReroutePoint, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT } from '../models/connection';
 import { Text } from '../models/text';
 import { AlignKind, DistributeAxis, RootRect, TargetPosition, alignRects, distributeRects } from '../models/align-distribute';
 import { TidyResult, applyTidyToState, isTidyEmpty, tidyLayout } from '../models/tidy-layout';
@@ -150,7 +150,7 @@ export class DeleteNodeCommand implements Command {
     if (this.removedConnections.length > 0) {
       this.graphService.connections.update(conns => [
         ...conns,
-        ...this.removedConnections.map(c => ({ ...c })),
+        ...structuredClone(this.removedConnections),
       ]);
     }
   }
@@ -196,12 +196,13 @@ export class DeleteConnectionCommand implements Command {
   ) {}
 
   execute(): void {
-    this.deletedConnection = this.graphService.deleteConnection(this.connectionId) ?? null;
+    const deleted = this.graphService.deleteConnection(this.connectionId);
+    this.deletedConnection = deleted ? structuredClone(deleted) : null;
   }
 
   undo(): void {
     if (!this.deletedConnection) return;
-    this.graphService.connections.update(conns => [...conns, { ...this.deletedConnection! }]);
+    this.graphService.connections.update(conns => [...conns, structuredClone(this.deletedConnection!)]);
   }
 }
 
@@ -262,6 +263,91 @@ export class MoveConnectionTextCommand implements Command {
   undo(): void {
     // A null original means the Text sat at the midpoint (absent field)
     this.graphService.setConnectionTextPosition(this.connectionId, this.originalPosition);
+  }
+}
+
+// Reroute Point edits snapshot the whole ordered array so undo/redo preserves
+// route order and the optional absent/empty canonical form exactly.
+export class AddConnectionReroutePointCommand implements Command {
+  description = 'Add Reroute Point';
+  private originalPoints: ReroutePoint[];
+  private nextPoints: ReroutePoint[];
+
+  constructor(
+    private graphService: GraphService,
+    private connectionId: string,
+    point: ReroutePoint,
+    index: number,
+  ) {
+    const conn = this.graphService.connections().find(c => c.id === connectionId);
+    this.originalPoints = structuredClone(conn?.reroutePoints ?? []);
+    this.nextPoints = structuredClone(this.originalPoints);
+    const insertionIndex = Math.min(Math.max(index, 0), this.nextPoints.length);
+    this.nextPoints.splice(insertionIndex, 0, { x: point.x, y: point.y });
+  }
+
+  execute(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.nextPoints);
+  }
+
+  undo(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.originalPoints);
+  }
+}
+
+export class MoveConnectionReroutePointCommand implements Command {
+  description = 'Move Reroute Point';
+  private originalPoints: ReroutePoint[];
+  private nextPoints: ReroutePoint[];
+
+  constructor(
+    private graphService: GraphService,
+    private connectionId: string,
+    private pointIndex: number,
+    point: ReroutePoint,
+    explicitOriginalPoints?: readonly ReroutePoint[],
+  ) {
+    const conn = this.graphService.connections().find(c => c.id === connectionId);
+    this.originalPoints = structuredClone([...(explicitOriginalPoints ?? conn?.reroutePoints ?? [])]);
+    this.nextPoints = structuredClone(this.originalPoints);
+    if (this.pointIndex >= 0 && this.pointIndex < this.nextPoints.length) {
+      this.nextPoints[this.pointIndex] = { x: point.x, y: point.y };
+    }
+  }
+
+  execute(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.nextPoints);
+  }
+
+  undo(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.originalPoints);
+  }
+}
+
+export class RemoveConnectionReroutePointCommand implements Command {
+  description = 'Remove Reroute Point';
+  private originalPoints: ReroutePoint[];
+  private nextPoints: ReroutePoint[];
+
+  constructor(
+    private graphService: GraphService,
+    private connectionId: string,
+    pointIndex: number,
+  ) {
+    const conn = this.graphService.connections().find(c => c.id === connectionId);
+    this.originalPoints = structuredClone(conn?.reroutePoints ?? []);
+    this.nextPoints = structuredClone(this.originalPoints);
+    if (pointIndex >= 0 && pointIndex < this.nextPoints.length) {
+      this.nextPoints.splice(pointIndex, 1);
+    }
+  }
+
+  execute(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.nextPoints);
+  }
+
+  undo(): void {
+    this.graphService.setConnectionReroutePoints(this.connectionId, this.originalPoints);
   }
 }
 

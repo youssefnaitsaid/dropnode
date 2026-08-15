@@ -393,6 +393,34 @@ describe('ClipboardService', () => {
       historyService.undo();
       expect(graphService.nodes().length).toBe(2);
     });
+
+    it('translates copied Connection Reroute Points during an Alt+drag', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const connection = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      graphService.setConnectionReroutePoints(connection.id, [{ x: 180, y: 120 }]);
+
+      const spawn = service.spawnDuplicate([a.id, b.id], a.id)!;
+      service.moveSpawnedDuplicate(50, 70);
+
+      const copied = graphService.connections().find(c => c.id !== connection.id)!;
+      expect(copied.reroutePoints).toEqual([{ x: 230, y: 190 }]);
+      service.cancelSpawnedDuplicate();
+      expect(spawn.rootIds.length).toBe(2);
+    });
+
+    it('translates copied Connection Reroute Points by the pasted fragment delta', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const connection = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      graphService.setConnectionReroutePoints(connection.id, [{ x: 180, y: 120 }]);
+      service.copy([a.id, b.id]);
+
+      service.pasteAt(1000, 1000);
+
+      const pasted = graphService.connections().find(c => c.id !== connection.id)!;
+      expect(pasted.reroutePoints).toEqual([{ x: 950, y: 1096 }]);
+    });
   });
 
   // Multi-Selection Clipboard (ADR-0015): the entry generalizes to a set;

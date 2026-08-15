@@ -296,4 +296,18 @@ describe('tidyLayout', () => {
 
     expect(second).toEqual({ nodePositions: [], groupRects: [], handleAssignments: [] });
   });
+
+  it('preserves absolute Reroute Points while applying Node and Handle changes', () => {
+    const nodes = [node('a', 200, 0), node('b', -100, 200)];
+    const points = [{ x: 40, y: 80 }, { x: 180, y: 260 }];
+    const connections: Connection[] = [{
+      ...conn('c1', 'a', 'right', 'b', 'left'),
+      reroutePoints: points,
+    }];
+
+    const result = tidyLayout(nodes, connections);
+    const applied = applyTidyToState(nodes, connections, result);
+
+    expect(applied.connections[0].reroutePoints).toEqual(points);
+  });
 });

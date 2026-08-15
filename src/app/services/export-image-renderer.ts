@@ -84,7 +84,7 @@ export class ExportImageRenderer {
 
   /** An artifact, not a screenshot: no Handles, Resize Grips, selection or drag chrome. */
   private stripEditorChrome(clone: HTMLElement): void {
-    clone.querySelectorAll('app-handle, .grip, .connection-ghost, .connection-hit').forEach(el => el.remove());
+    clone.querySelectorAll('app-handle, .grip, .connection-ghost, .connection-hit, .reroute-point').forEach(el => el.remove());
     clone.querySelectorAll('.node-card.selected').forEach(el => el.classList.remove('selected'));
     clone.querySelectorAll<SVGElement>('.connection-path').forEach(el => {
       el.classList.remove('selected', 'hovered');

@@ -67,6 +67,19 @@ describe('exportBounds', () => {
     expect(bounds.y).toBeCloseTo(-112.5 - EXPORT_PADDING, 5);
     expect(bounds.height).toBeCloseTo(212.5 + EXPORT_PADDING * 2, 5);
   });
+
+  it('encloses authored Reroute Points in the export bounds', () => {
+    const nodes = [node('A', 0, 0, 100, 100), node('B', 900, 0, 100, 100)];
+    const conns: Connection[] = [{
+      id: 'c1', sourceNodeId: 'A', sourceHandle: 'right', targetNodeId: 'B', targetHandle: 'left',
+      reroutePoints: [{ x: 500, y: 300 }],
+    }];
+
+    const bounds = exportBounds(nodes, conns);
+
+    expect(bounds.y).toBeCloseTo(-EXPORT_PADDING, 5);
+    expect(bounds.height).toBeCloseTo(300 + EXPORT_PADDING * 2, 5);
+  });
 });
 
 describe('expandExportScope', () => {

@@ -34,13 +34,16 @@ import {
   SetNodeTextCommand,
   SetConnectionTextCommand,
   MoveConnectionTextCommand,
+  AddConnectionReroutePointCommand,
+  MoveConnectionReroutePointCommand,
+  RemoveConnectionReroutePointCommand,
   QuickAddNodeCommand,
   NodeRect,
 } from '../../services/commands';
 import { NodeComponent, GripCorner } from '../node/node';
 import { ConnectionLayerComponent } from '../connection-layer/connection-layer';
 import { HandleSide, GraphNode } from '../../models/node';
-import { TEXT_POSITION_DEFAULT } from '../../models/connection';
+import { MAX_REROUTE_POINTS, ReroutePoint, TEXT_POSITION_DEFAULT } from '../../models/connection';
 import { Rect, normalizedRect, marqueeSelection, rectsOverlap } from '../../models/marquee';
 import { computeAlignment, computeResizeAlignment, ALIGNMENT_SNAP_THRESHOLD, AlignmentGuide, MovingEdges } from '../../models/alignment';
 import { Text } from '../../models/text';
@@ -104,6 +107,9 @@ import { Text } from '../../models/text';
             (connectionSelect)="onConnectionSelect($event)"
             (textDragStart)="onConnectionTextDragStart($event)"
             (textCommit)="onConnectionTextCommit($event)"
+            (reroutePointAdd)="onReroutePointAdd($event)"
+            (reroutePointDragStart)="onReroutePointDragStart($event)"
+            (reroutePointRemove)="onReroutePointRemove($event)"
           />
 
           <div class="nodes-container">
@@ -441,6 +447,16 @@ export class CanvasComponent {
   private textDragOriginalPosition: number | null = null;
   private textDragMoved = false;
 
+  // Reroute Point drag state — direct Canvas movement with no snapping; the
+  // full ordered array is captured so one undo restores the exact route.
+  private isDraggingReroutePoint = false;
+  private reroutePointConnectionId: string | null = null;
+  private reroutePointIndex = -1;
+  private reroutePointStartClientX = 0;
+  private reroutePointStartClientY = 0;
+  private reroutePointOriginalPoints: ReroutePoint[] = [];
+  private reroutePointMoved = false;
+
   transformStyle = () => {
     const vp = this.graphService.viewportState();
     return `translate(${vp.panX}px, ${vp.panY}px) scale(${vp.zoom})`;
@@ -743,6 +759,56 @@ export class CanvasComponent {
     this.textDragMoved = false;
   }
 
+  onReroutePointAdd(event: { connectionId: string; clientX: number; clientY: number }): void {
+    if (this.presentationService.active()) return;
+    const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
+    const layer = this.connectionLayer();
+    const conn = this.graphService.connections().find(c => c.id === event.connectionId);
+    if (!canvasPos || !layer || !conn) return;
+
+    const points = conn.reroutePoints ?? [];
+    if (points.length >= MAX_REROUTE_POINTS) return;
+    const projection = layer.projectReroutePoint(conn.id, canvasPos.x, canvasPos.y);
+    if (!projection) return;
+
+    const previous = points[projection.index - 1];
+    const next = points[projection.index];
+    if (sameCanvasPoint(previous, projection.point) || sameCanvasPoint(next, projection.point)) return;
+
+    this.historyService.execute(new AddConnectionReroutePointCommand(
+      this.graphService,
+      conn.id,
+      projection.point,
+      projection.index,
+    ));
+  }
+
+  onReroutePointDragStart(event: { connectionId: string; pointIndex: number; event: MouseEvent }): void {
+    if (this.presentationService.active()) return;
+    const conn = this.graphService.connections().find(c => c.id === event.connectionId);
+    if (!conn?.reroutePoints || !conn.reroutePoints[event.pointIndex]) return;
+
+    this.isDraggingReroutePoint = true;
+    this.reroutePointConnectionId = event.connectionId;
+    this.reroutePointIndex = event.pointIndex;
+    this.reroutePointStartClientX = event.event.clientX;
+    this.reroutePointStartClientY = event.event.clientY;
+    this.reroutePointOriginalPoints = structuredClone(conn.reroutePoints);
+    this.reroutePointMoved = false;
+    this.connectionLayer()?.setReroutePointDragging(event.connectionId);
+  }
+
+  onReroutePointRemove(event: { connectionId: string; pointIndex: number }): void {
+    if (this.presentationService.active()) return;
+    const conn = this.graphService.connections().find(c => c.id === event.connectionId);
+    if (!conn?.reroutePoints?.[event.pointIndex]) return;
+    this.historyService.execute(new RemoveConnectionReroutePointCommand(
+      this.graphService,
+      event.connectionId,
+      event.pointIndex,
+    ));
+  }
+
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent): void {
     // Raw client coordinates only — the canvas-coordinate conversion happens
@@ -778,6 +844,9 @@ export class CanvasComponent {
         } else {
           this.graphService.updateNodePosition(root.id, newX, newY);
         }
+      }
+      if (this.dragIsSpawnedDuplicate && this.hasMoved) {
+        this.clipboardService.moveSpawnedDuplicate(dx, dy);
       }
     }
 
@@ -908,6 +977,24 @@ export class CanvasComponent {
           if (t !== null) {
             this.graphService.setConnectionTextPosition(this.textDragConnectionId, t);
           }
+        }
+      }
+    }
+
+    if (this.isDraggingReroutePoint && this.reroutePointConnectionId) {
+      const vp = this.graphService.viewportState();
+      const dx = (event.clientX - this.reroutePointStartClientX) / vp.zoom;
+      const dy = (event.clientY - this.reroutePointStartClientY) / vp.zoom;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        this.reroutePointMoved = true;
+      }
+      if (this.reroutePointMoved) {
+        const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
+        if (canvasPos) {
+          const points = structuredClone(this.reroutePointOriginalPoints);
+          points[this.reroutePointIndex] = canvasPos;
+          // Transient, bypassing History — the move Command comes on mouseup.
+          this.graphService.setConnectionReroutePoints(this.reroutePointConnectionId, points);
         }
       }
     }
@@ -1143,6 +1230,29 @@ export class CanvasComponent {
       this.textDragOriginalPosition = null;
       this.textDragMoved = false;
     }
+
+    // Finish a Reroute Point drag — one MoveConnectionReroutePointCommand only
+    // after the existing 2px threshold and only when the point really moved.
+    if (this.isDraggingReroutePoint && this.reroutePointConnectionId) {
+      const conn = this.graphService.connections().find(c => c.id === this.reroutePointConnectionId);
+      const currentPoint = conn?.reroutePoints?.[this.reroutePointIndex];
+      if (this.reroutePointMoved && currentPoint &&
+          !sameCanvasPoint(currentPoint, this.reroutePointOriginalPoints[this.reroutePointIndex])) {
+        this.historyService.pushWithoutExecute(new MoveConnectionReroutePointCommand(
+          this.graphService,
+          this.reroutePointConnectionId,
+          this.reroutePointIndex,
+          currentPoint,
+          this.reroutePointOriginalPoints,
+        ));
+      }
+      this.connectionLayer()?.setReroutePointDragging(null);
+      this.isDraggingReroutePoint = false;
+      this.reroutePointConnectionId = null;
+      this.reroutePointIndex = -1;
+      this.reroutePointOriginalPoints = [];
+      this.reroutePointMoved = false;
+    }
   }
 
   // Group Label rename (Groups only)
@@ -1198,4 +1308,8 @@ function unionRect(rects: Rect[]): Rect {
   const maxX = Math.max(...rects.map(r => r.x + r.width));
   const maxY = Math.max(...rects.map(r => r.y + r.height));
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function sameCanvasPoint(a: ReroutePoint | undefined, b: ReroutePoint | undefined): boolean {
+  return !!a && !!b && Math.abs(a.x - b.x) < 1e-3 && Math.abs(a.y - b.y) < 1e-3;
 }
