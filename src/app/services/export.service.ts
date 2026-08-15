@@ -3,7 +3,10 @@ import { GraphService } from './graph.service';
 import { CollectionService } from './collection.service';
 import { ExportImageRenderer } from './export-image-renderer';
 import { GraphState } from '../models/graph-state';
-import { exportBounds, EXPORT_THEMES, ExportTheme } from '../models/export-image';
+import {
+  exportBounds, EXPORT_THEMES, ExportScope, ExportScopeInput, ExportScopeRequest, ExportTheme,
+  expandExportScope, normalizeExportScopeRequest,
+} from '../models/export-image';
 import { ToastService } from '../components/toast/toast';
 
 @Injectable({ providedIn: 'root' })
@@ -67,17 +70,46 @@ export class ExportService {
   // ── PNG export (ADR-0014: snapshots the on-screen graph) ─────────
 
   /** Real snapshot of the rendered graph — the preview and the download share this. */
-  renderPng(theme: ExportTheme): Promise<Blob> {
+  renderPng(theme: ExportTheme, scopeInput?: ExportScopeInput): Promise<Blob> {
+    return this.renderPngWithScope(theme, scopeInput).blob;
+  }
+
+  private renderPngWithScope(
+    theme: ExportTheme,
+    scopeInput?: ExportScopeInput,
+  ): { blob: Promise<Blob>; scope?: ExportScope; request?: Required<ExportScopeRequest> } {
     const nodes = this.graphService.nodes();
     const connections = this.graphService.connections();
-    return this.imageRenderer.render(exportBounds(nodes, connections), EXPORT_THEMES[theme], nodes);
+    if (scopeInput === undefined) {
+      return {
+        blob: this.imageRenderer.render(exportBounds(nodes, connections), EXPORT_THEMES[theme], nodes),
+      };
+    }
+
+    const request = normalizeExportScopeRequest(scopeInput);
+    const scope = expandExportScope(request.rootIds, nodes, connections);
+    return {
+      blob: this.imageRenderer.render(
+        exportBounds(scope.nodes, scope.connections), EXPORT_THEMES[theme], scope.nodes, scope,
+      ),
+      scope,
+      request,
+    };
   }
 
   /** Named after the Project when given its id, else the Scratch Canvas default. */
-  async exportPngToFile(theme: ExportTheme, projectId?: string): Promise<void> {
+  async exportPngToFile(
+    theme: ExportTheme,
+    projectId?: string,
+    scopeInput?: ExportScopeInput,
+  ): Promise<void> {
     try {
-      const blob = await this.renderPng(theme);
-      this.downloadBlob(blob, this.filenameBase(projectId) + '.png');
+      const rendered = this.renderPngWithScope(theme, scopeInput);
+      const blob = await rendered.blob;
+      const filename = scopeInput === undefined
+        ? this.filenameBase(projectId) + '.png'
+        : this.scopedFilename(rendered.scope!, rendered.request!);
+      this.downloadBlob(blob, filename);
       this.toastService.show('Graph exported to file', 'success');
     } catch {
       this.toastService.show('Failed to export PNG', 'error');
@@ -89,6 +121,16 @@ export class ExportService {
     if (!projectId) return 'dropnode-graph';
     const project = this.collectionService.getProject(projectId);
     return this.slug(project?.name ?? '', 'project');
+  }
+
+  /** A scoped PNG is named after exactly one labeled Group, otherwise generically. */
+  private scopedFilename(scope: ExportScope, request: { isMultiSelection: boolean }): string {
+    if (request.isMultiSelection) return 'dropnode-selection.png';
+    const root = scope.roots.length === 1 ? scope.roots[0] : undefined;
+    if (root?.kind === 'group' && root.label?.trim()) {
+      return this.slug(root.label, 'dropnode-selection') + '.png';
+    }
+    return 'dropnode-selection.png';
   }
 
   // ── Stored project graphs (Sidebar row actions, no navigation) ───

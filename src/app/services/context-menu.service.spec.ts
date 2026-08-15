@@ -3,6 +3,7 @@ import { ContextMenuService } from './context-menu.service';
 import { ClipboardService } from './clipboard.service';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
+import { ExportDialogService } from './export-dialog.service';
 import { textFromString } from '../models/text';
 
 describe('ContextMenuService', () => {
@@ -10,6 +11,7 @@ describe('ContextMenuService', () => {
   let clipboardService: ClipboardService;
   let graphService: GraphService;
   let historyService: HistoryService;
+  let exportDialogService: ExportDialogService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
@@ -17,6 +19,7 @@ describe('ContextMenuService', () => {
     clipboardService = TestBed.inject(ClipboardService);
     graphService = TestBed.inject(GraphService);
     historyService = TestBed.inject(HistoryService);
+    exportDialogService = TestBed.inject(ExportDialogService);
   });
 
   describe('openFor selection rules', () => {
@@ -171,6 +174,47 @@ describe('ContextMenuService', () => {
 
       expect(graphService.connections().length).toBe(0);
       expect(graphService.nodes().length).toBe(2);
+    });
+  });
+
+  describe('scoped PNG export', () => {
+    it('forwards a single Node as frozen root ids without touching History', () => {
+      const node = graphService.createNode('A', 0, 0);
+
+      service.openFor({ kind: 'node', nodeId: node.id }, 10, 10);
+      service.exportPng();
+
+      expect(exportDialogService.openRequests()).toBe(1);
+      expect(exportDialogService.projectId()).toBeUndefined();
+      expect(exportDialogService.scopeRootIds()).toEqual([node.id]);
+      expect(historyService.canUndo()).toBe(false);
+    });
+
+    it('freezes all node roots when right-clicking a member of a multi-Selection', () => {
+      const first = graphService.createNode('A', 0, 0);
+      const second = graphService.createNode('B', 300, 0);
+      const later = graphService.createNode('C', 600, 0);
+      graphService.setSelection([first.id, second.id], []);
+
+      service.openFor({ kind: 'node', nodeId: first.id }, 10, 10);
+      graphService.setSelection([later.id], []);
+      service.exportPng();
+
+      expect(exportDialogService.scopeRootIds()).toEqual([first.id, second.id]);
+      expect(exportDialogService.scope()?.isMultiSelection).toBe(true);
+    });
+
+    it('does not open a scoped export for a lone Connection or empty Canvas', () => {
+      const first = graphService.createNode('A', 0, 0);
+      const second = graphService.createNode('B', 300, 0);
+      const connection = graphService.createConnection(first.id, 'right', second.id, 'left')!;
+
+      service.openFor({ kind: 'connection', connectionId: connection.id }, 10, 10);
+      service.exportPng();
+      service.openFor({ kind: 'canvas' }, 10, 10);
+      service.exportPng();
+
+      expect(exportDialogService.openRequests()).toBe(0);
     });
   });
 

@@ -70,7 +70,8 @@ export class AppShellComponent {
     effect(() => {
       if (this.exportDialogService.openRequests() > 0) {
         const projectId = untracked(this.exportDialogService.projectId);
-        untracked(() => this.exportDialog()?.open(projectId));
+        const scope = untracked(this.exportDialogService.scope);
+        untracked(() => this.exportDialog()?.open(projectId, scope));
       }
     });
   }

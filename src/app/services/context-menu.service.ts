@@ -2,11 +2,13 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { ClipboardService } from './clipboard.service';
+import { ExportDialogService } from './export-dialog.service';
 import {
   CreateNodeCommand, CreateGroupCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
   buildDeleteSelectionCommand, buildAlignSelectionCommand, buildDistributeSelectionCommand,
 } from './commands';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
+import { ExportScopeRequest } from '../models/export-image';
 
 /** What a right-click landed on, and — for the empty Canvas — nothing more. */
 export type ContextTarget =
@@ -26,12 +28,16 @@ export class ContextMenuService {
   private graphService = inject(GraphService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
+  private exportDialogService = inject(ExportDialogService);
 
   // The context the currently-open menu acts on, plus the canvas-coordinate
   // point of the right-click (where empty-Canvas creations are centered).
   private target = signal<ContextTarget | null>(null);
   private pointX = 0;
   private pointY = 0;
+  // Captured after openFor applies the target/Selection keep-or-collapse rule;
+  // later graph or Selection changes cannot change the requested artifact.
+  private exportScopeRequest: ExportScopeRequest = { rootIds: [], isMultiSelection: false };
 
   // Requests for the thin UI to open an existing inline editor. The Node and
   // Connection-Layer components watch these and clear them once consumed.
@@ -88,6 +94,14 @@ export class ContextMenuService {
         this.graphService.clearSelection();
         break;
     }
+
+    const isMultiSelection = this.menuKind() === 'multi';
+    this.exportScopeRequest = {
+      rootIds: isMultiSelection
+        ? [...this.graphService.selectedNodeIds()]
+        : target.kind === 'node' ? [target.nodeId] : [],
+      isMultiSelection,
+    };
   }
 
   /**
@@ -208,6 +222,13 @@ export class ContextMenuService {
 
   clearConnectionTextRequest(): void {
     this.connectionTextRequest.set(null);
+  }
+
+  /** Open the existing Export as… dialog for the frozen Node/Group roots. */
+  exportPng(): void {
+    const kind = this.menuKind();
+    if (kind !== 'node' && kind !== 'multi') return;
+    this.exportDialogService.requestOpen(undefined, this.exportScopeRequest);
   }
 
   // Multi-Selection menu actions (ADR-0015): each acts on the whole

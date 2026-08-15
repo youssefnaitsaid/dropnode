@@ -19,6 +19,69 @@ export interface ExportBounds {
   outputHeight: number;
 }
 
+/**
+ * The live members of a scoped PNG Export. Roots are kept separately so the
+ * ExportService can apply the single-Group filename rule without rebuilding
+ * the membership decision.
+ */
+export interface ExportScope {
+  rootIds: string[];
+  roots: GraphNode[];
+  nodes: GraphNode[];
+  connections: Connection[];
+}
+
+/** Frozen scope metadata carried from a Context Menu into the Export dialog. */
+export interface ExportScopeRequest {
+  rootIds: readonly string[];
+  isMultiSelection?: boolean;
+}
+
+export type ExportScopeInput = ExportScopeRequest | readonly string[];
+
+/** Normalize the public array shorthand while preserving Selection provenance. */
+export function normalizeExportScopeRequest(input: ExportScopeInput): Required<ExportScopeRequest> {
+  if ('rootIds' in input) {
+    return { rootIds: [...input.rootIds], isMultiSelection: input.isMultiSelection ?? false };
+  }
+  return { rootIds: [...input], isMultiSelection: false };
+}
+
+/**
+ * Expand frozen root ids into the current Export Scope. Missing roots are
+ * skipped; a surviving Group brings its current children, while Connections
+ * only survive when both endpoint Nodes are in the resulting set.
+ */
+export function expandExportScope(
+  rootIds: readonly string[],
+  nodes: readonly GraphNode[],
+  connections: readonly Connection[] = [],
+): ExportScope {
+  const nodesById = new Map(nodes.map(node => [node.id, node]));
+  const candidates = [...new Set(rootIds)]
+    .map(id => nodesById.get(id))
+    .filter((node): node is GraphNode => node !== undefined);
+  const candidateIds = new Set(candidates.map(node => node.id));
+  const roots = candidates.filter(node => !node.parentId || !candidateIds.has(node.parentId));
+
+  const includedIds = new Set(roots.map(node => node.id));
+  for (const root of roots) {
+    if (root.kind !== 'group') continue;
+    for (const node of nodes) {
+      if (node.parentId === root.id) includedIds.add(node.id);
+    }
+  }
+
+  return {
+    rootIds: roots.map(node => node.id),
+    roots,
+    nodes: nodes.filter(node => includedIds.has(node.id)),
+    connections: connections.filter(
+      connection => includedIds.has(connection.sourceNodeId) && includedIds.has(connection.targetNodeId),
+    ),
+  };
+}
+
 /** Capture box: all Nodes and every Connection's curve plus padding; an empty
  *  graph yields just the padded origin. */
 export function exportBounds(
