@@ -200,6 +200,9 @@
   command: sh -c "grep -q 'EXPORT_PADDING = 40' src/app/models/export-image.ts && grep -q 'EXPORT_SCALE = 2' src/app/models/export-image.ts"
 - label: PNG is download-only (clipboard, link, and Drive stay JSON-only), named dropnode-graph.png on the Scratch Canvas or after the Project (slugged, fallback project.png), with a success toast; a failed render shows "Failed to export PNG" and downloads nothing
   command: grep -q "'.png'" src/app/services/export.service.ts
+- label: a scoped PNG Export renders only its frozen root Nodes and Groups, each included Group's current children, and Connections whose two endpoints are inside that set; missing roots are skipped and a vanished scope renders the padded empty background @implemented
+- scoped PNG Export uses the same 40 canvas-unit padding, 2x scale, Export Theme rules, and selection-chrome stripping as whole-graph PNG; it hides out-of-scope Nodes, Group chrome, Connection curves, and Connection Text @implemented
+- a scoped PNG Export with exactly one labeled Group uses that Label's slug as the filename; a Node, multi-Selection, unlabeled Group, or other scope uses dropnode-selection.png @implemented
 - the PNG preview runs the same renderPng pipeline as the download, regenerating debounced when the Export Theme changes; the JSON preview shows the exact pretty-printed payload
 - label: Export downloads pretty-printed 2-space JSON named dropnode-graph.json with a success toast; Copy JSON copies the same JSON to the clipboard with a success/error toast
   command: sh -c "grep -q \"'dropnode-graph'\" src/app/services/export.service.ts && grep -q \"'.json'\" src/app/services/export.service.ts"
@@ -263,6 +266,7 @@
 - label: the Context Menu is built on @angular/cdk/menu CdkContextMenuTrigger and reuses the styled Helm dropdown-menu content; its logic lives in ContextMenuService, never in components
   command: grep -q 'CdkContextMenuTrigger' src/app/components/canvas/canvas.ts && grep -q 'ContextMenuService' src/app/services/context-menu.service.ts
 - right-clicking a target that is part of a multi-Selection keeps the whole Selection and opens the multi menu; any other target collapses the Selection to itself before the menu opens; right-clicking empty Canvas clears the Selection and never starts a pan — panning is Space+left-drag or middle-mouse only
+- label: Node, Group, and multi-Selection Context Menus offer Export as PNG above Delete; a lone Connection and empty Canvas do not, and the action freezes the surviving Selection roots before opening the scoped Export dialog @implemented
 - Add node and Add group create centered on the right-click point (Node offset 60/24, Group offset 160/100); Add node on a Group creates a child of that Group at the point
 - menu Edit text opens the target Node's or Connection's Text editor; menu Rename opens a Group's inline Label editor — all reuse the double-click editors and their commit rules
 - menu Delete runs the same Commands as the Delete/Backspace shortcut, with identical cascade and undo behavior; opening or dismissing a menu never touches History

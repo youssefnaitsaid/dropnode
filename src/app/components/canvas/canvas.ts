@@ -7,6 +7,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
   lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
+  lucideImageDown,
   lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
   lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
   lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
@@ -57,6 +58,7 @@ import { Text } from '../../models/text';
     provideIcons({
       lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
       lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
+      lucideImageDown,
       lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
       lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
       lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
@@ -200,6 +202,10 @@ import { Text } from '../../models/text';
               <ng-icon name="lucideCopyPlus" />
               <span>Duplicate</span>
             </button>
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.exportPng()">
+              <ng-icon name="lucideImageDown" />
+              <span>Export as PNG</span>
+            </button>
             <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteTarget()">
               <ng-icon name="lucideTrash2" />
               <span>Delete</span>
@@ -235,6 +241,10 @@ import { Text } from '../../models/text';
                 <hlm-dropdown-menu-item-sub-indicator />
               </button>
             }
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.exportPng()">
+              <ng-icon name="lucideImageDown" />
+              <span>Export as PNG</span>
+            </button>
             <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteSelection()">
               <ng-icon name="lucideTrash2" />
               <span>Delete</span>

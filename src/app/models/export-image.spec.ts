@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   exportBounds, EXPORT_PADDING, EXPORT_SCALE,
-  EXPORT_THEMES, themedNodeBackground,
+  EXPORT_THEMES, themedNodeBackground, expandExportScope,
 } from './export-image';
 import { GraphNode } from './node';
 import { Connection } from './connection';
@@ -66,6 +66,52 @@ describe('exportBounds', () => {
     // started at y=-40 with height 180.
     expect(bounds.y).toBeCloseTo(-112.5 - EXPORT_PADDING, 5);
     expect(bounds.height).toBeCloseTo(212.5 + EXPORT_PADDING * 2, 5);
+  });
+});
+
+describe('expandExportScope', () => {
+  it('survives missing roots, expands Group children, and keeps only contained Connections', () => {
+    const group: GraphNode = {
+      id: 'group', kind: 'group', label: 'Cluster', x: 0, y: 0, width: 320, height: 200,
+    };
+    const childA = { ...node('child-a', 40, 60, 120, 48), parentId: group.id };
+    const childB = { ...node('child-b', 220, 60, 120, 48), parentId: group.id };
+    const outside = node('outside', 600, 0, 160, 48);
+    const nodes = [group, childA, childB, outside];
+    const inside: Connection = {
+      id: 'inside', sourceNodeId: childA.id, sourceHandle: 'right',
+      targetNodeId: childB.id, targetHandle: 'left',
+    };
+    const boundary: Connection = {
+      id: 'boundary', sourceNodeId: childA.id, sourceHandle: 'right',
+      targetNodeId: outside.id, targetHandle: 'left',
+    };
+
+    const scope = expandExportScope(['missing', group.id], nodes, [inside, boundary]);
+
+    expect(scope.rootIds).toEqual([group.id]);
+    expect(scope.nodes.map(n => n.id)).toEqual([group.id, childA.id, childB.id]);
+    expect(scope.connections.map(c => c.id)).toEqual([inside.id]);
+  });
+
+  it('returns an empty scope when every frozen root has vanished', () => {
+    const present = node('present', 0, 0, 160, 48);
+
+    expect(expandExportScope(['gone'], [present], [])).toEqual({
+      rootIds: [], roots: [], nodes: [], connections: [],
+    });
+  });
+
+  it('keeps an individually exported child without its parent Group', () => {
+    const group: GraphNode = {
+      id: 'group', kind: 'group', label: 'Cluster', x: 0, y: 0, width: 320, height: 200,
+    };
+    const child = { ...node('child', 40, 60, 120, 48), parentId: group.id };
+
+    const scope = expandExportScope([child.id], [group, child], []);
+
+    expect(scope.rootIds).toEqual([child.id]);
+    expect(scope.nodes.map(n => n.id)).toEqual([child.id]);
   });
 });
 

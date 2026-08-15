@@ -6,7 +6,9 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX, lucideDownload } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { ExportService } from '../../services/export.service';
-import { ExportTheme } from '../../models/export-image';
+import {
+  ExportScopeInput, ExportScopeRequest, ExportTheme, normalizeExportScopeRequest,
+} from '../../models/export-image';
 
 type ExportFormat = 'png' | 'json';
 
@@ -16,8 +18,8 @@ const PREVIEW_DEBOUNCE_MS = 150;
  * The "Export as…" dialog (issue #15): format (PNG | JSON), Export Theme
  * (dark | light, PNG only), and a live preview fed by the real snapshot
  * pipeline — preview and download share renderPng, so they only differ if
- * the graph changes in between. Thin shell: every decision lives in
- * ExportService and the export-image model.
+ * the graph changes in between. Scoped requests hide JSON and carry their
+ * frozen root ids through the same PNG pipeline.
  */
 @Component({
   selector: 'app-export-dialog',
@@ -44,23 +46,25 @@ const PREVIEW_DEBOUNCE_MS = 150;
           </div>
 
           <div class="flex items-center gap-6 mb-4">
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-muted-foreground">Export as</span>
-              <div class="flex gap-1 rounded-lg bg-muted p-1">
-                <button
-                  hlmBtn
-                  [variant]="format() === 'png' ? 'secondary' : 'ghost'"
-                  size="sm"
-                  (click)="setFormat('png')"
-                >PNG</button>
-                <button
-                  hlmBtn
-                  [variant]="format() === 'json' ? 'secondary' : 'ghost'"
-                  size="sm"
-                  (click)="setFormat('json')"
-                >JSON</button>
+            @if (!isScoped()) {
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-muted-foreground">Export as</span>
+                <div class="flex gap-1 rounded-lg bg-muted p-1">
+                  <button
+                    hlmBtn
+                    [variant]="format() === 'png' ? 'secondary' : 'ghost'"
+                    size="sm"
+                    (click)="setFormat('png')"
+                  >PNG</button>
+                  <button
+                    hlmBtn
+                    [variant]="format() === 'json' ? 'secondary' : 'ghost'"
+                    size="sm"
+                    (click)="setFormat('json')"
+                  >JSON</button>
+                </div>
               </div>
-            </div>
+            }
 
             @if (format() === 'png') {
               <div class="flex items-center gap-2">
@@ -116,8 +120,11 @@ export class ExportDialogComponent implements OnDestroy {
   isOpen = signal(false);
   format = signal<ExportFormat>('png');
   theme = signal<ExportTheme>('dark');
+  scopeRequest = signal<Required<ExportScopeRequest> | undefined>(undefined);
   previewUrl = signal<string | null>(null);
   previewError = signal<string | null>(null);
+  scopeRootIds = computed(() => this.scopeRequest()?.rootIds);
+  isScoped = computed(() => this.scopeRequest() !== undefined);
 
   /** Filename context: set when opened from the open Project's Sidebar row. */
   private projectId: string | undefined;
@@ -134,7 +141,8 @@ export class ExportDialogComponent implements OnDestroy {
     effect(() => {
       if (!this.isOpen() || this.format() !== 'png') return;
       const theme = this.theme();
-      this.schedulePreview(theme);
+      const scope = this.scopeRequest();
+      this.schedulePreview(theme, scope);
     });
 
     // Move focus into the dialog on open, so Escape/Tab land inside it.
@@ -149,8 +157,11 @@ export class ExportDialogComponent implements OnDestroy {
   }
 
   /** Stateless dialog: every open resets to PNG + dark (spec decision). */
-  open(projectId?: string): void {
+  open(projectId?: string, scopeInput?: ExportScopeInput): void {
     this.projectId = projectId;
+    this.scopeRequest.set(
+      scopeInput === undefined ? undefined : normalizeExportScopeRequest(scopeInput),
+    );
     this.format.set('png');
     this.theme.set('dark');
     this.clearPreview();
@@ -159,12 +170,13 @@ export class ExportDialogComponent implements OnDestroy {
 
   close(): void {
     this.isOpen.set(false);
+    this.scopeRequest.set(undefined);
     this.cancelPending();
     this.clearPreview();
   }
 
   setFormat(format: ExportFormat): void {
-    this.format.set(format);
+    this.format.set(this.isScoped() ? 'png' : format);
   }
 
   setTheme(theme: ExportTheme): void {
@@ -172,22 +184,27 @@ export class ExportDialogComponent implements OnDestroy {
   }
 
   download(): void {
-    if (this.format() === 'json') {
+    if (this.format() === 'json' && !this.isScoped()) {
       // Always the live graph — exactly what the preview showed; the
       // projectId only names the file (auto-save can lag the editor).
       this.exportService.exportToFile(this.projectId);
     } else {
-      this.exportService.exportPngToFile(this.theme(), this.projectId);
+      const scope = this.scopeRequest();
+      if (scope === undefined) {
+        this.exportService.exportPngToFile(this.theme(), this.projectId);
+      } else {
+        this.exportService.exportPngToFile(this.theme(), undefined, scope);
+      }
     }
     this.close();
   }
 
-  private schedulePreview(theme: ExportTheme): void {
+  private schedulePreview(theme: ExportTheme, scope?: Required<ExportScopeRequest>): void {
     this.cancelPending();
     const ticket = ++this.renderTicket;
     this.debounceId = setTimeout(async () => {
       try {
-        const blob = await this.exportService.renderPng(theme);
+        const blob = await this.exportService.renderPng(theme, scope);
         if (ticket !== this.renderTicket) return; // superseded by a newer request
         this.replacePreviewUrl(URL.createObjectURL(blob));
         this.previewError.set(null);

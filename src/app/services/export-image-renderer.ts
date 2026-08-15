@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import {
-  ExportBounds, ExportThemeColors, EXPORT_SCALE, themedNodeBackground,
+  ExportBounds, ExportScope, ExportThemeColors, EXPORT_SCALE, themedNodeBackground,
 } from '../models/export-image';
 import { GraphNode } from '../models/node';
 
@@ -22,11 +22,12 @@ export class ExportImageRenderer {
     bounds: ExportBounds,
     colors: ExportThemeColors,
     nodes: readonly GraphNode[],
+    scope?: ExportScope,
   ): Promise<Blob> {
     const layer = document.querySelector<HTMLElement>('.canvas-transform');
     if (!layer) throw new Error('Canvas is not on screen');
 
-    const svgMarkup = this.buildSvg(layer, bounds, colors, nodes);
+    const svgMarkup = this.buildSvg(layer, bounds, colors, nodes, scope);
     const image = await this.loadImage(svgMarkup);
     return this.rasterize(image, bounds, colors);
   }
@@ -38,8 +39,10 @@ export class ExportImageRenderer {
     bounds: ExportBounds,
     colors: ExportThemeColors,
     nodes: readonly GraphNode[],
+    scope?: ExportScope,
   ): string {
     const clone = layer.cloneNode(true) as HTMLElement;
+    if (scope) this.hideOutsideScope(clone, scope);
     this.stripEditorChrome(clone);
     this.applyTheme(clone, colors, nodes);
 
@@ -90,6 +93,25 @@ export class ExportImageRenderer {
     });
     clone.querySelectorAll('.connection-text-card.selected')
       .forEach(el => el.classList.remove('selected'));
+  }
+
+  /** Scoped PNGs are artifacts of their Scope, never camera crops. */
+  private hideOutsideScope(clone: HTMLElement, scope: ExportScope): void {
+    const nodeIds = new Set(scope.nodes.map(node => node.id));
+    clone.querySelectorAll<HTMLElement>('.node-card').forEach(card => {
+      if (!nodeIds.has(card.getAttribute('data-node-id') ?? '')) card.remove();
+    });
+
+    const connectionIds = new Set(scope.connections.map(connection => connection.id));
+    clone.querySelectorAll<SVGElement>('.connection-hit').forEach(hit => {
+      if (connectionIds.has(hit.getAttribute('data-connection-id') ?? '')) return;
+      const path = hit.nextElementSibling;
+      hit.remove();
+      if (path?.classList.contains('connection-path')) path.remove();
+    });
+    clone.querySelectorAll<HTMLElement>('.connection-text-card').forEach(card => {
+      if (!connectionIds.has(card.getAttribute('data-connection-id') ?? '')) card.remove();
+    });
   }
 
   /** Export Theme overrides for defaults that only work on the dark canvas. */

@@ -392,6 +392,29 @@ describe('ExportService', () => {
       expect(render).toHaveBeenCalledWith(exportBounds([]), EXPORT_THEMES.light, []);
     });
 
+    it('renderPng hands the renderer only the live Export Scope and its bounds', async () => {
+      const group = graphService.createGroup('Cluster', 0, 0, 400, 300);
+      const childA = graphService.createNode('A', 40, 60);
+      const childB = graphService.createNode('B', 220, 60);
+      const outside = graphService.createNode('Outside', 700, 0);
+      graphService.setNodeParent(childA.id, group.id);
+      graphService.setNodeParent(childB.id, group.id);
+      const inside = graphService.createConnection(childA.id, 'right', childB.id, 'left')!;
+      graphService.createConnection(childA.id, 'bottom', outside.id, 'top');
+
+      await service.renderPng('dark', [group.id]);
+
+      expect(render).toHaveBeenCalledTimes(1);
+      const [bounds, colors, scopedNodes, scope] = render.mock.calls[0];
+      expect(bounds).toEqual(exportBounds([group, childA, childB], [inside]));
+      expect(colors).toBe(EXPORT_THEMES.dark);
+      expect(scopedNodes.map((node: { id: string }) => node.id)).toEqual([
+        group.id, childA.id, childB.id,
+      ]);
+      expect(scope.rootIds).toEqual([group.id]);
+      expect(scope.connections.map((connection: { id: string }) => connection.id)).toEqual([inside.id]);
+    });
+
     it('exportPngToFile downloads the rendered blob as dropnode-graph.png with a success toast', async () => {
       graphService.createNode('N', 10, 10);
 
@@ -419,6 +442,40 @@ describe('ExportService', () => {
       await service.exportPngToFile('dark', proj.id);
 
       expect(clickedAnchor?.download).toBe('project.png');
+    });
+
+    it('scoped export names a single labeled Group after its slugged Label', async () => {
+      const group = graphService.createGroup('Onboarding Flow!', 0, 0);
+
+      await service.exportPngToFile('dark', undefined, [group.id]);
+
+      expect(clickedAnchor?.download).toBe('onboarding-flow.png');
+    });
+
+    it('scoped multi-Selection export uses the generic selection filename', async () => {
+      const first = graphService.createNode('First', 0, 0);
+      const second = graphService.createNode('Second', 300, 0);
+
+      await service.exportPngToFile('dark', undefined, [first.id, second.id]);
+
+      expect(clickedAnchor?.download).toBe('dropnode-selection.png');
+    });
+
+    it('does not use the Group filename when a multi-Selection also contains a Connection', async () => {
+      const group = graphService.createGroup('Cluster', 0, 0, 400, 300);
+      const first = graphService.createNode('First', 40, 60);
+      const second = graphService.createNode('Second', 220, 60);
+      graphService.setNodeParent(first.id, group.id);
+      graphService.setNodeParent(second.id, group.id);
+      const connection = graphService.createConnection(first.id, 'right', second.id, 'left')!;
+
+      await service.exportPngToFile('dark', undefined, {
+        rootIds: [group.id],
+        isMultiSelection: true,
+      });
+
+      expect(connection.id).toBeTruthy();
+      expect(clickedAnchor?.download).toBe('dropnode-selection.png');
     });
 
     it('shows an error toast and downloads nothing when rendering fails', async () => {
