@@ -485,6 +485,10 @@ export class CreateGroupCommand implements Command {
       this.graphService.deleteNode(this.group.id);
     }
   }
+
+  getGroup(): GraphNode | null {
+    return this.group;
+  }
 }
 
 export class ChangeParentCommand implements Command {

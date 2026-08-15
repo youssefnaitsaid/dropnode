@@ -4,6 +4,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideUndo2,
   lucideRedo2,
+  lucideCommand,
   lucideZoomIn,
   lucideZoomOut,
   lucideScan,
@@ -45,6 +46,7 @@ import { CollectionService } from '../../services/collection.service';
 import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CommandPaletteService } from '../../services/command-palette.service';
 import {
   CreateGroupCommand,
   buildSetNodesColorCommand,
@@ -69,6 +71,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
     provideIcons({
       lucideUndo2,
       lucideRedo2,
+      lucideCommand,
       lucideZoomIn,
       lucideZoomOut,
       lucideScan,
@@ -108,6 +111,21 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         </button>
         <button hlmBtn variant="ghost" size="icon" (click)="redo()" [disabled]="!historyService.canRedo()" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
           <ng-icon name="lucideRedo2" />
+        </button>
+        <button
+          hlmBtn
+          variant="outline"
+          size="sm"
+          class="command-trigger ml-1 gap-1.5"
+          (click)="openPalette($event)"
+          [disabled]="presentationService.active()"
+          title="Commands (Ctrl+K)"
+          aria-label="Open Commands (Ctrl+K)"
+          aria-haspopup="dialog"
+        >
+          <ng-icon name="lucideCommand" />
+          <span>Commands</span>
+          <kbd>Ctrl K</kbd>
         </button>
         @if (graphService.selectedNodes().length > 0) {
           <hlm-separator orientation="vertical" class="mx-1" />
@@ -335,6 +353,16 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
     :host {
       display: block;
     }
+    .command-trigger kbd {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--muted);
+      color: var(--muted-foreground);
+      font-family: inherit;
+      font-size: 10px;
+      line-height: 1;
+      padding: 3px 4px;
+    }
     .swatch {
       width: 18px;
       height: 18px;
@@ -398,9 +426,15 @@ export class ToolbarComponent {
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
   private router = inject(Router);
+  private commandPaletteService = inject(CommandPaletteService);
 
   /** True on `/` — Import/Export/Save-as-project only exist for the Scratch Canvas. */
   scratchMode = input<boolean>(false);
+
+  openPalette(event: Event): void {
+    const target = event.currentTarget;
+    this.commandPaletteService.open(target instanceof HTMLElement ? target : null);
+  }
 
   palette = NODE_PALETTE;
 

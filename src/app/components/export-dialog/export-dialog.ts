@@ -6,11 +6,10 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX, lucideDownload } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { ExportService } from '../../services/export.service';
+import type { ExportFormat } from '../../services/export-dialog.service';
 import {
   ExportScopeInput, ExportScopeRequest, ExportTheme, normalizeExportScopeRequest,
 } from '../../models/export-image';
-
-type ExportFormat = 'png' | 'json';
 
 const PREVIEW_DEBOUNCE_MS = 150;
 
@@ -156,13 +155,13 @@ export class ExportDialogComponent implements OnDestroy {
     if (this.isOpen()) this.close();
   }
 
-  /** Stateless dialog: every open resets to PNG + dark (spec decision). */
-  open(projectId?: string, scopeInput?: ExportScopeInput): void {
+  /** Stateless dialog: every open resets theme and applies the requested format. */
+  open(projectId?: string, scopeInput?: ExportScopeInput, requestedFormat: ExportFormat = 'png'): void {
     this.projectId = projectId;
     this.scopeRequest.set(
       scopeInput === undefined ? undefined : normalizeExportScopeRequest(scopeInput),
     );
-    this.format.set('png');
+    this.format.set(scopeInput === undefined ? requestedFormat : 'png');
     this.theme.set('dark');
     this.clearPreview();
     this.isOpen.set(true);

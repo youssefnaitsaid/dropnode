@@ -16,10 +16,13 @@ import { ToastService } from '../toast/toast';
   template: `
     @if (isOpen()) {
       <div class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 p-4" (click)="close()">
-        <div
-          class="w-[480px] max-w-[90vw] rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl"
-          (click)="$event.stopPropagation()"
-        >
+          <div
+            class="w-[480px] max-w-[90vw] rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl"
+            (click)="$event.stopPropagation()"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Import Graph"
+          >
           <div class="flex items-center justify-between mb-5">
             <h2 class="text-lg font-semibold">Import Graph</h2>
             <button hlmBtn variant="ghost" size="icon-sm" (click)="close()" aria-label="Close">

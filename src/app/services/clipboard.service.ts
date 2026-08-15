@@ -39,6 +39,7 @@ export class ClipboardService {
   // coordinates lazily at paste time, keeping mousemove reflow-free.
   private cursorX = 0;
   private cursorY = 0;
+  private hasCursorPosition = false;
   private cursorResolver: ((point: { x: number; y: number }) => { x: number; y: number } | null) | null = null;
   private lastPasteAnchor: { x: number; y: number } | null = null;
   private cascadeCount = 0;
@@ -121,6 +122,7 @@ export class ClipboardService {
   setCursorPosition(x: number, y: number): void {
     this.cursorX = x;
     this.cursorY = y;
+    this.hasCursorPosition = true;
   }
 
   /** Converts the raw cursor point to canvas coordinates at paste time. */
@@ -135,17 +137,21 @@ export class ClipboardService {
    * at an unchanged cursor cascade by +24,+24 so copies never stack
    * invisibly. Canvas paste — parent references are stripped.
    */
-  pasteAtCursor(): void {
+  pasteAtCursor(fallbackPoint?: { x: number; y: number }): void {
     if (!this.entry()) return;
 
+    const useFallback = !this.hasCursorPosition && fallbackPoint !== undefined;
+    const cursorX = useFallback ? fallbackPoint.x : this.cursorX;
+    const cursorY = useFallback ? fallbackPoint.y : this.cursorY;
+
     const anchor = this.lastPasteAnchor;
-    if (anchor && anchor.x === this.cursorX && anchor.y === this.cursorY) {
+    if (anchor && anchor.x === cursorX && anchor.y === cursorY) {
       this.cascadeCount++;
     } else {
       this.cascadeCount = 0;
-      this.lastPasteAnchor = { x: this.cursorX, y: this.cursorY };
+      this.lastPasteAnchor = { x: cursorX, y: cursorY };
     }
-    const raw = { x: this.cursorX, y: this.cursorY };
+    const raw = { x: cursorX, y: cursorY };
     const point = this.cursorResolver ? this.cursorResolver(raw) : raw;
     if (!point) return;
     const offset = this.cascadeCount * DUPLICATE_OFFSET;

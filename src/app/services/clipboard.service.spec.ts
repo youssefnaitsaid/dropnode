@@ -228,6 +228,17 @@ describe('ClipboardService', () => {
       expect(pasted.y).toBe(276);
     });
 
+    it('falls back to a supplied visible Canvas center before the first cursor move', () => {
+      const node = graphService.createNode('A', 0, 0);
+      service.copy(node.id);
+
+      service.pasteAtCursor({ x: 400, y: 300 });
+
+      const pasted = graphService.nodes().find(n => n.id !== node.id)!;
+      expect(pasted.x).toBe(320);
+      expect(pasted.y).toBe(276);
+    });
+
     it('repeated cursor pastes without mouse movement cascade by +24,+24', () => {
       const node = graphService.createNode('A', 0, 0);
       service.copy(node.id);

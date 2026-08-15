@@ -166,6 +166,11 @@ export class ContextMenuService {
     this.renameRequest.set(null);
   }
 
+  /** Request an inline Group Label editor without opening a Context Menu. */
+  requestRename(nodeId: string): void {
+    if (this.isGroup(nodeId)) this.renameRequest.set(nodeId);
+  }
+
   /** Ask the UI to open the target Node's or Connection's Text editor. */
   editText(): void {
     const target = this.target();
@@ -174,6 +179,17 @@ export class ContextMenuService {
     } else if (target?.kind === 'connection') {
       this.connectionTextRequest.set(target.connectionId);
     }
+  }
+
+  /** Request an inline Text editor without opening a Context Menu. */
+  requestEditText(nodeId: string): void {
+    if (this.isGroup(nodeId)) return;
+    this.editTextRequest.set(nodeId);
+  }
+
+  /** Request an inline Connection Text editor without opening a Context Menu. */
+  requestConnectionText(connectionId: string): void {
+    this.connectionTextRequest.set(connectionId);
   }
 
   // Clipboard actions apply to Nodes and Groups only — a Connection or the

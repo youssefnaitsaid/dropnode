@@ -15,6 +15,11 @@ export const SIDEBAR_COLLAPSED_COLLECTIONS_KEY = 'dropnode:sidebar-collapsed-col
 export class SidebarService {
   private readonly _collapsed = signal<boolean>(this.readStoredState());
 
+  private readonly _newCollectionRequest = signal(0);
+  readonly newCollectionRequest = this._newCollectionRequest.asReadonly();
+  readonly projectRenameRequest = signal<string | null>(null);
+  readonly projectDeleteRequest = signal<string | null>(null);
+
   /** True when the Sidebar is collapsed to the icon rail. Defaults to expanded. */
   readonly collapsed: Signal<boolean> = this._collapsed.asReadonly();
 
@@ -25,6 +30,26 @@ export class SidebarService {
   setCollapsed(collapsed: boolean): void {
     this._collapsed.set(collapsed);
     this.persist(collapsed);
+  }
+
+  requestNewCollection(): void {
+    this._newCollectionRequest.update(count => count + 1);
+  }
+
+  requestProjectRename(projectId: string): void {
+    this.projectRenameRequest.set(projectId);
+  }
+
+  requestProjectDelete(projectId: string): void {
+    this.projectDeleteRequest.set(projectId);
+  }
+
+  clearProjectRenameRequest(): void {
+    this.projectRenameRequest.set(null);
+  }
+
+  clearProjectDeleteRequest(): void {
+    this.projectDeleteRequest.set(null);
   }
 
   // ── Per-Collection expand/collapse (default expanded) ────────────
