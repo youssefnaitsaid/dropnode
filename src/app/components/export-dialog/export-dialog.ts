@@ -86,6 +86,18 @@ const PREVIEW_DEBOUNCE_MS = 150;
             }
           </div>
 
+          @if (format() === 'png') {
+            <label class="mb-4 flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                class="size-4 accent-[#7c5cff]"
+                [checked]="includePins()"
+                (change)="setIncludePins($any($event.target).checked)"
+              />
+              <span>Include Pins</span>
+            </label>
+          }
+
           <!-- Preview: the artifact itself, never an approximation -->
           <div class="mb-5 h-[320px] overflow-auto rounded-lg border border-border bg-background/60 p-2">
             @if (format() === 'png') {
@@ -119,6 +131,8 @@ export class ExportDialogComponent implements OnDestroy {
   isOpen = signal(false);
   format = signal<ExportFormat>('png');
   theme = signal<ExportTheme>('dark');
+  /** PNG-only, default off, reset on every open — the dialog persists nothing. */
+  includePins = signal(false);
   scopeRequest = signal<Required<ExportScopeRequest> | undefined>(undefined);
   previewUrl = signal<string | null>(null);
   previewError = signal<string | null>(null);
@@ -136,12 +150,13 @@ export class ExportDialogComponent implements OnDestroy {
 
   constructor() {
     // Regenerate the PNG preview (debounced) whenever the dialog is open in
-    // PNG mode and the Export Theme changes.
+    // PNG mode and the Export Theme or Pins inclusion changes.
     effect(() => {
       if (!this.isOpen() || this.format() !== 'png') return;
       const theme = this.theme();
       const scope = this.scopeRequest();
-      this.schedulePreview(theme, scope);
+      const includePins = this.includePins();
+      this.schedulePreview(theme, scope, { includePins });
     });
 
     // Move focus into the dialog on open, so Escape/Tab land inside it.
@@ -155,7 +170,7 @@ export class ExportDialogComponent implements OnDestroy {
     if (this.isOpen()) this.close();
   }
 
-  /** Stateless dialog: every open resets theme and applies the requested format. */
+  /** Stateless dialog: every open resets theme, Pins inclusion, and applies the requested format. */
   open(projectId?: string, scopeInput?: ExportScopeInput, requestedFormat: ExportFormat = 'png'): void {
     this.projectId = projectId;
     this.scopeRequest.set(
@@ -163,6 +178,7 @@ export class ExportDialogComponent implements OnDestroy {
     );
     this.format.set(scopeInput === undefined ? requestedFormat : 'png');
     this.theme.set('dark');
+    this.includePins.set(false);
     this.clearPreview();
     this.isOpen.set(true);
   }
@@ -182,6 +198,10 @@ export class ExportDialogComponent implements OnDestroy {
     this.theme.set(theme);
   }
 
+  setIncludePins(include: boolean): void {
+    this.includePins.set(include);
+  }
+
   download(): void {
     if (this.format() === 'json' && !this.isScoped()) {
       // Always the live graph — exactly what the preview showed; the
@@ -189,21 +209,26 @@ export class ExportDialogComponent implements OnDestroy {
       this.exportService.exportToFile(this.projectId);
     } else {
       const scope = this.scopeRequest();
+      const options = { includePins: this.includePins() };
       if (scope === undefined) {
-        this.exportService.exportPngToFile(this.theme(), this.projectId);
+        this.exportService.exportPngToFile(this.theme(), this.projectId, undefined, options);
       } else {
-        this.exportService.exportPngToFile(this.theme(), undefined, scope);
+        this.exportService.exportPngToFile(this.theme(), undefined, scope, options);
       }
     }
     this.close();
   }
 
-  private schedulePreview(theme: ExportTheme, scope?: Required<ExportScopeRequest>): void {
+  private schedulePreview(
+    theme: ExportTheme,
+    scope?: Required<ExportScopeRequest>,
+    options: { includePins?: boolean } = {},
+  ): void {
     this.cancelPending();
     const ticket = ++this.renderTicket;
     this.debounceId = setTimeout(async () => {
       try {
-        const blob = await this.exportService.renderPng(theme, scope);
+        const blob = await this.exportService.renderPng(theme, scope, options);
         if (ticket !== this.renderTicket) return; // superseded by a newer request
         this.replacePreviewUrl(URL.createObjectURL(blob));
         this.previewError.set(null);

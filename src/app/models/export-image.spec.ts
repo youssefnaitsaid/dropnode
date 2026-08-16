@@ -6,10 +6,14 @@ import {
 import { GraphNode } from './node';
 import { Connection } from './connection';
 import { NODE_PALETTE } from './node';
+import { Pin } from './pin';
+import { pinPoints } from './pin';
 
 const node = (id: string, x: number, y: number, width: number, height: number): GraphNode => ({
   id, x, y, width, height,
 });
+
+const pin = (id: string, anchor: Pin['anchor'], message = 'Note'): Pin => ({ id, anchor, message });
 
 describe('exportBounds', () => {
   it('wraps a single node in fixed padding and reports 2x output dimensions', () => {
@@ -111,7 +115,7 @@ describe('expandExportScope', () => {
     const present = node('present', 0, 0, 160, 48);
 
     expect(expandExportScope(['gone'], [present], [])).toEqual({
-      rootIds: [], roots: [], nodes: [], connections: [],
+      rootIds: [], roots: [], nodes: [], connections: [], pins: [],
     });
   });
 
@@ -164,5 +168,56 @@ describe('Export Theme mapping', () => {
       expect(themedNodeBackground(color, EXPORT_THEMES.dark)).toBe(color);
       expect(themedNodeBackground(color, EXPORT_THEMES.light)).toBe(color);
     }
+  });
+});
+
+describe('Pins in export', () => {
+  it('pinPoints resolves Canvas anchors to their point and Node anchors to node + offset', () => {
+    const nodes = [node('n1', 100, 200, 160, 48)];
+    const pins = [
+      pin('p1', { kind: 'canvas', x: 12, y: 34 }),
+      pin('p2', { kind: 'node', nodeId: 'n1', offsetX: 10, offsetY: 20 }),
+      pin('p3', { kind: 'node', nodeId: 'gone', offsetX: 0, offsetY: 0 }),
+    ];
+
+    expect(pinPoints(pins, nodes)).toEqual([
+      { x: 12, y: 34 },
+      { x: 110, y: 220 },
+    ]);
+  });
+
+  it('exportBounds unions the given pin points into the capture box', () => {
+    const bounds = exportBounds(
+      [node('n1', 0, 0, 100, 100)],
+      [],
+      [{ x: 500, y: -200 }],
+    );
+
+    expect(bounds.x).toBe(-EXPORT_PADDING);
+    expect(bounds.y).toBe(-200 - EXPORT_PADDING);
+    expect(bounds.width).toBe(500 + EXPORT_PADDING * 2);
+    expect(bounds.height).toBe(300 + EXPORT_PADDING * 2);
+  });
+
+  it('exportBounds without pin points is unchanged', () => {
+    const bounds = exportBounds([node('n1', 0, 0, 100, 100)]);
+    expect(bounds.x).toBe(-EXPORT_PADDING);
+    expect(bounds.width).toBe(100 + EXPORT_PADDING * 2);
+  });
+
+  it('expandExportScope includes only Pins anchored to in-scope Nodes; Canvas Pins never ride a Scope', () => {
+    const group = { ...node('g1', 0, 0, 400, 300), kind: 'group' as const };
+    const child = { ...node('c1', 10, 10, 100, 48), parentId: 'g1' };
+    const outsider = node('n9', 1000, 1000, 100, 48);
+    const pins = [
+      pin('p1', { kind: 'node', nodeId: 'g1', offsetX: 0, offsetY: 0 }),
+      pin('p2', { kind: 'node', nodeId: 'c1', offsetX: 0, offsetY: 0 }),
+      pin('p3', { kind: 'node', nodeId: 'n9', offsetX: 0, offsetY: 0 }),
+      pin('p4', { kind: 'canvas', x: 50, y: 50 }),
+    ];
+
+    const scope = expandExportScope(['g1'], [group, child, outsider], [], pins);
+
+    expect(scope.pins.map(p => p.id)).toEqual(['p1', 'p2']);
   });
 });

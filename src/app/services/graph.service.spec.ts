@@ -2108,4 +2108,260 @@ describe('GraphService', () => {
       expect(service.selectionSize()).toBe(0);
     });
   });
+
+  describe('pins', () => {
+    it('creates a Canvas-anchored Pin with a pin_ id, message, and point anchor', () => {
+      const pin = service.createPin({ kind: 'canvas', x: 40, y: 70 }, 'Check this later');
+
+      expect(pin).not.toBeNull();
+      expect(pin!.id).toMatch(/^pin_\d+_\d+$/);
+      expect(pin!.message).toBe('Check this later');
+      expect(pin!.anchor).toEqual({ kind: 'canvas', x: 40, y: 70 });
+      expect(service.pins().length).toBe(1);
+    });
+
+    it('creates a Node-anchored Pin and resolves its position from the Node', () => {
+      const node = service.createNode('A', 100, 200);
+      const pin = service.createPin(
+        { kind: 'node', nodeId: node.id, offsetX: 160, offsetY: -10 },
+        'Follows the node',
+      );
+
+      expect(service.pinPoint(pin!.id)).toEqual({ x: 260, y: 190 });
+
+      service.updateNodePosition(node.id, 500, 600);
+      expect(service.pinPoint(pin!.id)).toEqual({ x: 660, y: 590 });
+    });
+
+    it('resolves a Canvas-anchored Pin to its stored point', () => {
+      const pin = service.createPin({ kind: 'canvas', x: 12, y: 34 }, 'Note');
+
+      expect(service.pinPoint(pin!.id)).toEqual({ x: 12, y: 34 });
+    });
+
+    it('returns null from createPin for an empty or whitespace-only message', () => {
+      expect(service.createPin({ kind: 'canvas', x: 0, y: 0 }, '')).toBeNull();
+      expect(service.createPin({ kind: 'canvas', x: 0, y: 0 }, '   ')).toBeNull();
+      expect(service.pins().length).toBe(0);
+    });
+
+    it('returns null from createPin when the anchor Node does not exist', () => {
+      expect(service.createPin({ kind: 'node', nodeId: 'node_missing', offsetX: 0, offsetY: 0 }, 'Nope')).toBeNull();
+    });
+
+    it('allows anchoring to a Group', () => {
+      const group = service.createGroup('Section', 0, 0);
+      const pin = service.createPin({ kind: 'node', nodeId: group.id, offsetX: 320, offsetY: 0 }, 'Section note');
+
+      expect(pin).not.toBeNull();
+      expect(service.pinPoint(pin!.id)).toEqual({ x: 320, y: 0 });
+    });
+
+    it('sets a Pin message', () => {
+      const pin = service.createPin({ kind: 'canvas', x: 0, y: 0 }, 'First');
+
+      service.setPinMessage(pin!.id, 'Second');
+
+      expect(service.pins()[0].message).toBe('Second');
+    });
+
+    it('sets a Pin anchor', () => {
+      const node = service.createNode('A', 0, 0);
+      const pin = service.createPin({ kind: 'canvas', x: 10, y: 10 }, 'Note');
+
+      service.setPinAnchor(pin!.id, { kind: 'node', nodeId: node.id, offsetX: 5, offsetY: 5 });
+
+      expect(service.pins()[0].anchor).toEqual({ kind: 'node', nodeId: node.id, offsetX: 5, offsetY: 5 });
+    });
+
+    it('deletes a Pin and returns it', () => {
+      const pin = service.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Note');
+
+      const removed = service.deletePin(pin!.id);
+
+      expect(removed?.id).toBe(pin!.id);
+      expect(service.pins().length).toBe(0);
+      expect(service.deletePin(pin!.id)).toBeUndefined();
+    });
+
+    it('deleting a Node cascade-deletes its anchored Pins and reports them', () => {
+      const node = service.createNode('A', 0, 0);
+      const other = service.createNode('B', 500, 500);
+      const anchored = service.createPin({ kind: 'node', nodeId: node.id, offsetX: 0, offsetY: 0 }, 'On A');
+      const onOther = service.createPin({ kind: 'node', nodeId: other.id, offsetX: 0, offsetY: 0 }, 'On B');
+      const loose = service.createPin({ kind: 'canvas', x: 9, y: 9 }, 'Loose');
+
+      const result = service.deleteNode(node.id);
+
+      expect(result.removedPins.map(p => p.id)).toEqual([anchored!.id]);
+      expect(service.pins().map(p => p.id).sort()).toEqual([onOther!.id, loose!.id].sort());
+    });
+
+    it('deleting a Group kills only its own Pins; children and their Pins survive', () => {
+      const group = service.createGroup('G', 0, 0);
+      const child = service.createNode('Child', 10, 10);
+      service.setNodeParent(child.id, group.id);
+      const groupPin = service.createPin({ kind: 'node', nodeId: group.id, offsetX: 0, offsetY: 0 }, 'On group');
+      const childPin = service.createPin({ kind: 'node', nodeId: child.id, offsetX: 0, offsetY: 0 }, 'On child');
+
+      service.deleteNode(group.id);
+
+      const ids = service.pins().map(p => p.id);
+      expect(ids).not.toContain(groupPin!.id);
+      expect(ids).toContain(childPin!.id);
+    });
+
+    it('exportGraph carries the pins array when Pins exist and omits it when none do', () => {
+      service.createPin({ kind: 'canvas', x: 1, y: 2 }, 'Note');
+
+      const withPins = service.exportGraph();
+      expect(withPins.pins?.length).toBe(1);
+      expect(withPins.pins?.[0].message).toBe('Note');
+
+      service.deletePin(withPins.pins![0].id);
+      expect(service.exportGraph().pins).toBeUndefined();
+    });
+
+    it('clearGraph clears Pins', () => {
+      service.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Note');
+      service.clearGraph();
+      expect(service.pins().length).toBe(0);
+    });
+
+    it('imports a valid pins array, anchoring to Groups included', () => {
+      const result = service.importGraph({
+        nodes: [
+          { id: 'n1', text: textFromString('A'), x: 0, y: 0, width: 100, height: 48 },
+          { id: 'g1', kind: 'group', label: 'G', x: 200, y: 0, width: 300, height: 200 },
+        ],
+        connections: [],
+        pins: [
+          { id: 'p1', anchor: { kind: 'canvas', x: 5, y: 6 }, message: 'Loose' },
+          { id: 'p2', anchor: { kind: 'node', nodeId: 'g1', offsetX: 10, offsetY: 20 }, message: 'On group' },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(service.pins().map(p => p.id).sort()).toEqual(['p1', 'p2']);
+      expect(service.pinPoint('p2')).toEqual({ x: 210, y: 20 });
+    });
+
+    it('imports a payload without a pins key as pin-less', () => {
+      const result = service.importGraph({ nodes: [], connections: [] });
+      expect(result.success).toBe(true);
+      expect(service.pins()).toEqual([]);
+    });
+
+    it('imports an empty pins array as pin-less (canonical absent form)', () => {
+      const result = service.importGraph({ nodes: [], connections: [], pins: [] });
+      expect(result.success).toBe(true);
+      expect(service.pins()).toEqual([]);
+      expect(service.exportGraph().pins).toBeUndefined();
+    });
+
+    it('rejects a non-array pins value wholesale', () => {
+      const result = service.importGraph({ nodes: [], connections: [], pins: 'nope' } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid graph state: pins must be an array');
+    });
+
+    it('rejects a pin that is not an object', () => {
+      const result = service.importGraph({ nodes: [], connections: [], pins: [42] } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin at index 0: not an object');
+    });
+
+    it('rejects a pin with a missing or non-string id', () => {
+      const result = service.importGraph({ nodes: [], connections: [], pins: [{ message: 'x' }] } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin at index 0: missing or invalid id');
+    });
+
+    it('rejects duplicate pin ids', () => {
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [
+          { id: 'p1', anchor: { kind: 'canvas', x: 0, y: 0 }, message: 'a' },
+          { id: 'p1', anchor: { kind: 'canvas', x: 1, y: 1 }, message: 'b' },
+        ],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Duplicate pin id: p1');
+    });
+
+    it('rejects a non-string message', () => {
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'canvas', x: 0, y: 0 }, message: 7 }],
+      } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin p1: message must be a non-empty string');
+    });
+
+    it('rejects an empty or whitespace-only message', () => {
+      const empty = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'canvas', x: 0, y: 0 }, message: '' }],
+      });
+      expect(empty.success).toBe(false);
+      expect(empty.error).toBe('Invalid pin p1: message must be a non-empty string');
+
+      const blank = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'canvas', x: 0, y: 0 }, message: '   ' }],
+      });
+      expect(blank.success).toBe(false);
+      expect(blank.error).toBe('Invalid pin p1: message must be a non-empty string');
+    });
+
+    it('rejects an unknown anchor kind', () => {
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'connection' }, message: 'x' }],
+      } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin p1: anchor must be canvas or node');
+    });
+
+    it('rejects non-finite canvas anchor coordinates', () => {
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'canvas', x: Number.NaN, y: 0 }, message: 'x' }],
+      } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin p1: canvas anchor must have finite numeric x and y');
+    });
+
+    it('rejects a node anchor referencing a node absent from the payload', () => {
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'node', nodeId: 'gone', offsetX: 0, offsetY: 0 }, message: 'x' }],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin p1: anchor references non-existent node');
+    });
+
+    it('rejects non-finite node anchor offsets', () => {
+      const result = service.importGraph({
+        nodes: [{ id: 'n1', text: textFromString('A'), x: 0, y: 0, width: 100, height: 48 }],
+        connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'node', nodeId: 'n1', offsetX: Number.POSITIVE_INFINITY, offsetY: 0 }, message: 'x' }],
+      } as unknown as GraphState);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid pin p1: node anchor must have finite numeric offsetX and offsetY');
+    });
+
+    it('a rejected payload leaves existing Pins untouched', () => {
+      service.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Keep me');
+
+      const result = service.importGraph({
+        nodes: [], connections: [],
+        pins: [{ id: 'p1', anchor: { kind: 'canvas', x: 0, y: 0 }, message: '' }],
+      });
+
+      expect(result.success).toBe(false);
+      expect(service.pins().length).toBe(1);
+      expect(service.pins()[0].message).toBe('Keep me');
+    });
+  });
 });

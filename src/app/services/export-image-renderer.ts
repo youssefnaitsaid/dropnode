@@ -7,6 +7,14 @@ import { GraphNode } from '../models/node';
 // Mirrors the node component's translucent Group fill (30% alpha suffix)
 const GROUP_FILL_ALPHA = '4D';
 
+/** Render-time options for the snapshot; none are ever stored in Graph State. */
+export interface RenderOptions {
+  /** PNG-only: render the pin layer instead of stripping it (default off).
+   *  Reveals Pins even when the on-screen visibility toggle hides them — the
+   *  checkbox is the explicit decision. */
+  includePins?: boolean;
+}
+
 /**
  * The foreignObject snapshot pipeline (ADR-0014): photographs the live
  * `.canvas-transform` layer (DOM nodes + Connection SVG), restyles it for the
@@ -23,11 +31,12 @@ export class ExportImageRenderer {
     colors: ExportThemeColors,
     nodes: readonly GraphNode[],
     scope?: ExportScope,
+    options: RenderOptions = {},
   ): Promise<Blob> {
     const layer = document.querySelector<HTMLElement>('.canvas-transform');
     if (!layer) throw new Error('Canvas is not on screen');
 
-    const svgMarkup = this.buildSvg(layer, bounds, colors, nodes, scope);
+    const svgMarkup = this.buildSvg(layer, bounds, colors, nodes, scope, options);
     const image = await this.loadImage(svgMarkup);
     return this.rasterize(image, bounds, colors);
   }
@@ -40,8 +49,14 @@ export class ExportImageRenderer {
     colors: ExportThemeColors,
     nodes: readonly GraphNode[],
     scope?: ExportScope,
+    options: RenderOptions = {},
   ): string {
     const clone = layer.cloneNode(true) as HTMLElement;
+    if (!options.includePins) {
+      this.stripPinLayer(clone);
+    } else {
+      this.revealPinLayer(clone);
+    }
     if (scope) this.hideOutsideScope(clone, scope);
     this.stripEditorChrome(clone);
     this.applyTheme(clone, colors, nodes);
@@ -82,9 +97,10 @@ export class ExportImageRenderer {
     );
   }
 
-  /** An artifact, not a screenshot: no Handles, Resize Grips, selection or drag chrome. */
+  /** An artifact, not a screenshot: no Handles, Resize Grips, selection or drag
+   *  chrome — and never an open Pin popover, even when Pins are included. */
   private stripEditorChrome(clone: HTMLElement): void {
-    clone.querySelectorAll('app-handle, .grip, .connection-ghost, .connection-hit, .reroute-point').forEach(el => el.remove());
+    clone.querySelectorAll('app-handle, .grip, .connection-ghost, .connection-hit, .reroute-point, .pin-popover').forEach(el => el.remove());
     clone.querySelectorAll('.node-card.selected, .node-surface.selected')
       .forEach(el => el.classList.remove('selected'));
     clone.querySelectorAll<SVGElement>('.connection-path').forEach(el => {
@@ -94,6 +110,19 @@ export class ExportImageRenderer {
     });
     clone.querySelectorAll('.connection-text-card.selected')
       .forEach(el => el.classList.remove('selected'));
+  }
+
+  /** Pins are omitted from PNG Export unless the export says otherwise. */
+  private stripPinLayer(clone: HTMLElement): void {
+    clone.querySelectorAll('.pin-layer, .pin').forEach(el => el.remove());
+  }
+
+  /** An include-Pins snapshot reveals the layer even when the on-screen
+   *  visibility toggle hid it — the class rules travel with collectCss. */
+  private revealPinLayer(clone: HTMLElement): void {
+    clone.querySelectorAll<HTMLElement>('.pin-layer').forEach(el =>
+      el.classList.remove('pin-layer-hidden'),
+    );
   }
 
   /** Scoped PNGs are artifacts of their Scope, never camera crops. */
@@ -112,6 +141,18 @@ export class ExportImageRenderer {
     });
     clone.querySelectorAll<HTMLElement>('.connection-text-card').forEach(card => {
       if (!connectionIds.has(card.getAttribute('data-connection-id') ?? '')) card.remove();
+    });
+
+    // Pins ride their Node's membership; a Canvas Pin's subject is the whole
+    // graph, so it never belongs to a Scope
+    clone.querySelectorAll<HTMLElement>('.pin').forEach(el => {
+      const kind = el.getAttribute('data-pin-kind');
+      if (kind === 'canvas') {
+        el.remove();
+        return;
+      }
+      const anchorId = el.getAttribute('data-pin-node-id') ?? '';
+      if (!nodeIds.has(anchorId)) el.remove();
     });
   }
 

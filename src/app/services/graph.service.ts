@@ -7,6 +7,7 @@ import { ViewportState, ZOOM_MIN, ZOOM_MAX } from '../models/viewport-state';
 import { Bounds, unionBounds, contentBounds, connectionBounds, frameViewport } from '../models/bounds';
 import { handlePoint } from '../models/curve';
 import { Text, textFromString, isTextEmpty, validateText, canonicalizeText } from '../models/text';
+import { Pin, PinAnchor, pinAnchorPoint } from '../models/pin';
 
 @Injectable({ providedIn: 'root' })
 export class GraphService {
@@ -20,6 +21,7 @@ export class GraphService {
   // Core state signals
   readonly nodes = signal<GraphNode[]>([]);
   readonly connections = signal<Connection[]>([]);
+  readonly pins = signal<Pin[]>([]);
   readonly viewportState = signal<ViewportState>({ panX: 0, panY: 0, zoom: 1 });
 
   // The Selection (ADR-0015): one set freely mixing Nodes and Connections.
@@ -74,6 +76,10 @@ export class GraphService {
 
   generateConnectionId(): string {
     return this.generateId('conn');
+  }
+
+  generatePinId(): string {
+    return this.generateId('pin');
   }
 
   // Node operations
@@ -247,21 +253,27 @@ export class GraphService {
     );
   }
 
-  deleteNode(id: string): { node: GraphNode; removedConnections: Connection[]; releasedChildIds: string[] } {
+  deleteNode(id: string): { node: GraphNode; removedConnections: Connection[]; releasedChildIds: string[]; removedPins: Pin[] } {
     const node = this.nodes().find(n => n.id === id);
     if (!node) throw new Error(`Node ${id} not found`);
 
     const removedConnections = this.connections().filter(
       c => c.sourceNodeId === id || c.targetNodeId === id
     );
-    // Deleting a Group releases its children in place
+    // Deleting a Group releases its children in place; only Pins anchored to
+    // the deleted Node itself cascade away with it
     const releasedChildIds = this.nodes()
       .filter(n => n.parentId === id)
       .map(n => n.id);
+    const removedPins = this.pins().filter(
+      p => p.anchor.kind === 'node' && p.anchor.nodeId === id
+    );
+    const removedPinIds = new Set(removedPins.map(p => p.id));
 
     this.connections.update(conns =>
       conns.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id)
     );
+    this.pins.update(pins => pins.filter(p => !removedPinIds.has(p.id)));
     this.nodes.update(nodes =>
       nodes
         .filter(n => n.id !== id)
@@ -279,7 +291,7 @@ export class GraphService {
       this.selectedConnectionIds.update(ids => ids.filter(connId => !removedIds.has(connId)));
     }
 
-    return { node, removedConnections, releasedChildIds };
+    return { node, removedConnections, releasedChildIds, removedPins };
   }
 
   // Connection operations
@@ -323,6 +335,46 @@ export class GraphService {
     this.connections.update(conns => conns.filter(c => c.id !== id));
     this.selectedConnectionIds.update(ids => ids.filter(connId => connId !== id));
     return conn;
+  }
+
+  // Pin operations (ADR-0025). A Pin always carries a non-empty message —
+  // createPin refuses anything else (and a missing anchor Node) by returning
+  // null, the createConnection precedent for invalid operations.
+  createPin(anchor: PinAnchor, message: string): Pin | null {
+    if (message.trim() === '') return null;
+    if (anchor.kind === 'node' && !this.nodes().some(n => n.id === anchor.nodeId)) return null;
+    const pin: Pin = {
+      id: this.generateId('pin'),
+      anchor: clonePinAnchor(anchor),
+      message,
+    };
+    this.pins.update(pins => [...pins, pin]);
+    return pin;
+  }
+
+  setPinMessage(id: string, message: string): void {
+    this.pins.update(pins => pins.map(p => p.id === id ? { ...p, message } : p));
+  }
+
+  setPinAnchor(id: string, anchor: PinAnchor): void {
+    this.pins.update(pins => pins.map(p =>
+      p.id === id ? { ...p, anchor: clonePinAnchor(anchor) } : p
+    ));
+  }
+
+  deletePin(id: string): Pin | undefined {
+    const pin = this.pins().find(p => p.id === id);
+    if (!pin) return undefined;
+    this.pins.update(pins => pins.filter(p => p.id !== id));
+    return pin;
+  }
+
+  // Where a Pin renders: its stored Canvas point, or its Node's top-left plus
+  // offset. Null when a Node-anchored Pin lost its Node (only possible
+  // transiently — deletion cascades).
+  pinPoint(pinId: string): { x: number; y: number } | null {
+    const pin = this.pins().find(p => p.id === pinId);
+    return pin ? pinAnchorPoint(pin.anchor, this.nodes()) : null;
   }
 
   // Connection Text: committing null or an empty Text removes the field entirely.
@@ -609,16 +661,26 @@ export class GraphService {
     const canonical = this.canonicalizeGraphState(state);
     this.nodes.set(canonical.nodes);
     this.connections.set(canonical.connections);
+    this.pins.set(canonical.pins ?? []);
     this.clearSelection();
     return { success: true };
   }
 
   /** Apply the same legacy migration and default canonicalization as Import. */
   canonicalizeGraphState(state: GraphState): GraphState {
-    return structuredClone({
+    const canonical: GraphState = structuredClone({
       nodes: state.nodes.map(node => this.migrateNode(node)),
       connections: state.connections.map(connection => this.migrateConnection(connection)),
+      pins: (state.pins ?? []).map(pin => ({
+        ...pin,
+        anchor: pin.anchor.kind === 'canvas'
+          ? { kind: 'canvas' as const, x: pin.anchor.x, y: pin.anchor.y }
+          : { ...pin.anchor },
+      })),
     });
+    // The canonical absent form: no key when there are no Pins
+    if (canonical.pins !== undefined && canonical.pins.length === 0) delete canonical.pins;
+    return canonical;
   }
 
   /** Canonicalize only Shape defaults for collection envelopes. */
@@ -677,9 +739,11 @@ export class GraphService {
 
   exportGraph(): GraphState {
     // Deep copy: Text blocks are nested arrays, a shallow copy would alias them
+    const pins = this.pins();
     return structuredClone({
       nodes: this.nodes(),
       connections: this.connections(),
+      ...(pins.length > 0 ? { pins } : {}),
     });
   }
 
@@ -697,6 +761,11 @@ export class GraphService {
     }
     if (!Array.isArray(s['connections'])) {
       return { valid: false, error: 'Invalid graph state: connections must be an array' };
+    }
+    // Absent means pin-less; present-but-not-an-array rejects wholesale
+    const pinsRaw = s['pins'];
+    if (pinsRaw !== undefined && !Array.isArray(pinsRaw)) {
+      return { valid: false, error: 'Invalid graph state: pins must be an array' };
     }
 
     const nodesArr = s['nodes'] as unknown[];
@@ -870,6 +939,50 @@ export class GraphService {
       }
     }
 
+    // Pins (ADR-0025): validated wholesale like everything else. Groups are
+    // valid anchors; Connections never are (no anchor kind for them exists).
+    if (pinsRaw !== undefined) {
+      const pinIds = new Set<string>();
+      for (let i = 0; i < pinsRaw.length; i++) {
+        const pin = pinsRaw[i] as Record<string, unknown>;
+        if (!pin || typeof pin !== 'object') {
+          return { valid: false, error: `Invalid pin at index ${i}: not an object` };
+        }
+        if (typeof pin['id'] !== 'string' || !pin['id']) {
+          return { valid: false, error: `Invalid pin at index ${i}: missing or invalid id` };
+        }
+        const pinId = pin['id'] as string;
+        if (pinIds.has(pinId)) {
+          return { valid: false, error: `Duplicate pin id: ${pinId}` };
+        }
+        if (typeof pin['message'] !== 'string' || (pin['message'] as string).trim() === '') {
+          return { valid: false, error: `Invalid pin ${pinId}: message must be a non-empty string` };
+        }
+        const anchor = pin['anchor'];
+        if (!anchor || typeof anchor !== 'object') {
+          return { valid: false, error: `Invalid pin ${pinId}: anchor must be canvas or node` };
+        }
+        const a = anchor as Record<string, unknown>;
+        if (a['kind'] === 'canvas') {
+          if (typeof a['x'] !== 'number' || !Number.isFinite(a['x']) ||
+              typeof a['y'] !== 'number' || !Number.isFinite(a['y'])) {
+            return { valid: false, error: `Invalid pin ${pinId}: canvas anchor must have finite numeric x and y` };
+          }
+        } else if (a['kind'] === 'node') {
+          if (typeof a['nodeId'] !== 'string' || !nodeIds.has(a['nodeId'] as string)) {
+            return { valid: false, error: `Invalid pin ${pinId}: anchor references non-existent node` };
+          }
+          if (typeof a['offsetX'] !== 'number' || !Number.isFinite(a['offsetX']) ||
+              typeof a['offsetY'] !== 'number' || !Number.isFinite(a['offsetY'])) {
+            return { valid: false, error: `Invalid pin ${pinId}: node anchor must have finite numeric offsetX and offsetY` };
+          }
+        } else {
+          return { valid: false, error: `Invalid pin ${pinId}: anchor must be canvas or node` };
+        }
+        pinIds.add(pinId);
+      }
+    }
+
     return { valid: true };
   }
 
@@ -896,6 +1009,7 @@ export class GraphService {
   clearGraph(): void {
     this.nodes.set([]);
     this.connections.set([]);
+    this.pins.set([]);
     this.clearSelection();
   }
 }
@@ -909,4 +1023,11 @@ function validReroutePoints(points: readonly ReroutePoint[]): boolean {
     if (previous && point.x === previous.x && point.y === previous.y) return false;
   }
   return true;
+}
+
+// Defensive copy so a caller's anchor object can't alias into Graph State
+function clonePinAnchor(anchor: PinAnchor): PinAnchor {
+  return anchor.kind === 'canvas'
+    ? { kind: 'canvas', x: anchor.x, y: anchor.y }
+    : { ...anchor };
 }

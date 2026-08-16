@@ -5,16 +5,19 @@ import { ClipboardService } from './clipboard.service';
 import { ExportDialogService } from './export-dialog.service';
 import {
   CreateNodeCommand, CreateGroupCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
+  DeletePinCommand,
   buildDeleteSelectionCommand, buildAlignSelectionCommand, buildDistributeSelectionCommand,
 } from './commands';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
 import { ExportScopeRequest } from '../models/export-image';
+import { PinAnchor } from '../models/pin';
 
 /** What a right-click landed on, and — for the empty Canvas — nothing more. */
 export type ContextTarget =
   | { kind: 'canvas' }
   | { kind: 'node'; nodeId: string }
-  | { kind: 'connection'; connectionId: string };
+  | { kind: 'connection'; connectionId: string }
+  | { kind: 'pin'; pinId: string };
 
 // New Node / New Group placement, centered on the right-click point. The Node
 // x-offset is 60 (matching the existing double-click create), not width/2.
@@ -44,6 +47,12 @@ export class ContextMenuService {
   readonly renameRequest = signal<string | null>(null);
   readonly editTextRequest = signal<string | null>(null);
   readonly connectionTextRequest = signal<string | null>(null);
+
+  // Ghost-pin creation (ADR-0025): the anchor the Pin popover component
+  // should open at. Nothing enters Graph State until a non-empty commit —
+  // that commit is the CreatePinCommand.
+  readonly pinCreateRequest = signal<PinAnchor | null>(null);
+  readonly pinEditRequest = signal<string | null>(null);
 
   // Which menu the thin UI should render for the currently-open context.
   // Right-clicking a member of a multi-Selection keeps the set and shows the
@@ -93,6 +102,9 @@ export class ContextMenuService {
       case 'canvas':
         this.graphService.clearSelection();
         break;
+      case 'pin':
+        // Pins never join the Selection — the current Selection stays as-is
+        break;
     }
 
     const isMultiSelection = this.menuKind() === 'multi';
@@ -138,6 +150,57 @@ export class ContextMenuService {
 
   private isGroup(nodeId: string): boolean {
     return this.graphService.nodes().find(n => n.id === nodeId)?.kind === 'group';
+  }
+
+  /**
+   * Request a ghost-pin at the right-click point: anchored to the Canvas, or
+   * to the Node/Group target at an offset from its top-left. The popover
+   * opens; Graph State and History stay untouched until a non-empty commit.
+   */
+  addPin(): void {
+    const target = this.target();
+    if (!target) return;
+    if (target.kind === 'canvas') {
+      this.pinCreateRequest.set({ kind: 'canvas', x: this.pointX, y: this.pointY });
+      return;
+    }
+    if (target.kind === 'node') {
+      const node = this.graphService.nodes().find(n => n.id === target.nodeId);
+      if (!node) return;
+      this.pinCreateRequest.set({
+        kind: 'node', nodeId: node.id,
+        offsetX: this.pointX - node.x, offsetY: this.pointY - node.y,
+      });
+    }
+  }
+
+  /** Request ghost-pin creation without opening a Context Menu (Palette path). */
+  requestCreatePin(anchor: PinAnchor): void {
+    this.pinCreateRequest.set(anchor);
+  }
+
+  clearPinCreateRequest(): void {
+    this.pinCreateRequest.set(null);
+  }
+
+  /** Ask the UI to open the target Pin's editor (Popover component consumes). */
+  editPin(): void {
+    const target = this.target();
+    if (target?.kind === 'pin') {
+      this.pinEditRequest.set(target.pinId);
+    }
+  }
+
+  clearPinEditRequest(): void {
+    this.pinEditRequest.set(null);
+  }
+
+  /** Delete the target Pin — the same removal Command an empty commit runs. */
+  deletePin(): void {
+    const target = this.target();
+    if (target?.kind === 'pin') {
+      this.historyService.execute(new DeletePinCommand(this.graphService, target.pinId));
+    }
   }
 
   /**

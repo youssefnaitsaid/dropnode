@@ -40,6 +40,7 @@ import { ExportService } from './export.service';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { MinimapService } from './minimap.service';
+import { PinVisibilityService } from './pin-visibility.service';
 import { ImportDialogService } from './import-dialog.service';
 import { PresentationService } from './presentation.service';
 import { SidebarService } from './sidebar.service';
@@ -107,6 +108,7 @@ export class PaletteEntryRegistry {
   private readonly presentationService = inject(PresentationService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
+  private readonly pinVisibilityService = inject(PinVisibilityService);
   private readonly paletteService = inject(CommandPaletteService);
   private readonly router = inject(Router);
 
@@ -192,6 +194,10 @@ export class PaletteEntryRegistry {
       }),
       this.action('add-group', 'Add Group', 'Nodes & Groups', () => this.addGroup(), {
         aliases: ['new group', 'create group'],
+      }),
+      this.action('add-pin', 'Add pin', 'Nodes & Groups', () => this.addPin(), {
+        // "Comment" is a hidden alias: the Figma lineage word users will type
+        aliases: ['new pin', 'create pin', 'comment', 'add comment'],
       }),
       this.action('edit-text', 'Edit Text', 'Nodes & Groups', () => this.editText(), {
         aliases: ['edit label', 'rename text'],
@@ -310,6 +316,9 @@ export class PaletteEntryRegistry {
       }),
       this.action('toggle-minimap', 'Toggle Minimap', 'Application', () => this.minimapService.toggle(), {
         aliases: ['show minimap', 'hide minimap'],
+      }),
+      this.action('toggle-pins', 'Toggle Pins', 'Application', () => this.pinVisibilityService.toggle(), {
+        aliases: ['show pins', 'hide pins', 'toggle comments'],
       }),
     ];
   }
@@ -543,6 +552,24 @@ export class PaletteEntryRegistry {
     this.historyService.execute(command);
     const group = command.getGroup();
     if (group) this.contextMenuService.requestRename(group.id);
+  }
+
+  // Ghost-pin (ADR-0025): anchors to the single selected Node at its
+  // top-right corner, else drops Canvas-anchored at the Viewport center.
+  // The popover opens; nothing enters Graph State until a non-empty commit.
+  private addPin(): void {
+    const selectedNodeIds = this.graphService.selectedNodeIds();
+    if (selectedNodeIds.length === 1 && this.graphService.selectionSize() === 1) {
+      const node = this.graphService.nodes().find(n => n.id === selectedNodeIds[0]);
+      if (node) {
+        this.contextMenuService.requestCreatePin({
+          kind: 'node', nodeId: node.id, offsetX: node.width, offsetY: 0,
+        });
+        return;
+      }
+    }
+    const center = this.canvasViewport.visibleCanvasCenter();
+    this.contextMenuService.requestCreatePin({ kind: 'canvas', x: center.x, y: center.y });
   }
 
   private editText(): void {

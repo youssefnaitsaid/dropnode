@@ -6,6 +6,7 @@ import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { ContextMenuService } from './context-menu.service';
 import { ExportDialogService } from './export-dialog.service';
+import { PinVisibilityService } from './pin-visibility.service';
 
 @Component({ standalone: true, template: '' })
 class TestRoute {}
@@ -144,5 +145,51 @@ describe('PaletteEntryRegistry', () => {
     await router.navigateByUrl('/p/project-1');
     expect(find('export-json').label).toBe('Export current Project as JSON');
     expect(find('save-as-project').available).toBe(false);
+  });
+
+  it('exposes Add pin with comment as a hidden search alias', () => {
+    const addPin = find('add-pin');
+    expect(addPin.label).toBe('Add pin');
+    expect(addPin.category).toBe('Nodes & Groups');
+    expect(addPin.aliases).toContain('comment');
+    expect(addPin.available).toBe(true);
+  });
+
+  it('Add pin anchors to the single selected Node at its top-right corner', () => {
+    const node = graphService.createNode('A', 100, 200);
+    graphService.selectNode(node.id);
+
+    registry.execute('add-pin');
+
+    expect(contextMenuService.pinCreateRequest()).toEqual({
+      kind: 'node', nodeId: node.id, offsetX: node.width, offsetY: 0,
+    });
+  });
+
+  it('Add pin with no single Node selected drops a Canvas anchor at the Viewport center', () => {
+    registry.execute('add-pin');
+
+    const request = contextMenuService.pinCreateRequest();
+    expect(request?.kind).toBe('canvas');
+    expect(typeof request?.kind === 'canvas' ? request.x : 0).toBeTypeOf('number');
+    expect(contextMenuService.pinCreateRequest()).not.toBeNull();
+    // Ghost-pin: nothing entered Graph State or History
+    expect(graphService.pins().length).toBe(0);
+    expect(historyService.canUndo()).toBe(false);
+  });
+
+  it('exposes Toggle Pins in Application and it flips the visibility', () => {
+    const togglePins = find('toggle-pins');
+    const pinVisibility = TestBed.inject(PinVisibilityService);
+
+    expect(togglePins.label).toBe('Toggle Pins');
+    expect(togglePins.category).toBe('Application');
+    expect(togglePins.aliases).toContain('hide pins');
+
+    expect(pinVisibility.hidden()).toBe(false);
+    registry.execute('toggle-pins');
+    expect(pinVisibility.hidden()).toBe(true);
+    registry.execute('toggle-pins');
+    expect(pinVisibility.hidden()).toBe(false);
   });
 });
