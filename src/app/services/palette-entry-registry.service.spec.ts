@@ -61,6 +61,48 @@ describe('PaletteEntryRegistry', () => {
     expect(styleIds.slice(9).every(id => id.startsWith('node-shape-'))).toBe(true);
   });
 
+  it('gives every entry exactly one leading visual (swatch, icon, or line preview)', () => {
+    const offenders = registry.entries()
+      .filter(entry => [entry.swatch, entry.icon, entry.linePreview].filter(Boolean).length !== 1)
+      .map(entry => entry.id);
+    expect(offenders).toEqual([]);
+
+    expect(find('undo').icon).toBe('lucideUndo2');
+    expect(find('connection-color-default').icon).toBe('lucideEraser');
+    expect(find('connection-pattern-dashed').linePreview).toEqual({ dash: '6 4' });
+    expect(find('connection-weight-thick').linePreview).toEqual({ width: 3.5 });
+  });
+
+  it('orders Connection entries Reset → colors → patterns → weights → arrowheads', () => {
+    const ids = registry.search('')
+      .filter(entry => entry.category === 'Connections')
+      .map(entry => entry.id);
+
+    expect(ids).toEqual([
+      'connection-color-default',
+      'connection-color-cyan',
+      'connection-color-green',
+      'connection-color-lavender',
+      'connection-color-peach',
+      'connection-color-periwinkle',
+      'connection-color-pink',
+      'connection-color-rose',
+      'connection-color-yellow',
+      'connection-pattern-dashed',
+      'connection-pattern-dotted',
+      'connection-pattern-solid',
+      'connection-weight-thin',
+      'connection-weight-normal',
+      'connection-weight-thick',
+      'connection-arrowhead-start-none',
+      'connection-arrowhead-start-arrow',
+      'connection-arrowhead-start-triangle',
+      'connection-arrowhead-end-none',
+      'connection-arrowhead-end-arrow',
+      'connection-arrowhead-end-triangle',
+    ]);
+  });
+
   it('keeps prerequisite-dependent entries visible but unavailable', () => {
     const clear = find('clear-selection');
     const paste = find('paste');

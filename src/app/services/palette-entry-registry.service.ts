@@ -3,8 +3,11 @@ import { Router } from '@angular/router';
 import {
   ARROWHEAD_TYPES,
   ArrowheadEnd,
+  ArrowheadType,
   STROKE_PATTERNS,
   STROKE_WEIGHTS,
+  StrokePattern,
+  StrokeWeight,
 } from '../models/connection';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
 import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE } from '../models/node';
@@ -83,10 +86,58 @@ const SHORTCUTS = {
   zoomToSelection: 'Shift+2',
 } as const;
 
+// Leading glyphs reuse the Context Menu / toolbar vocabulary for the same
+// intent so the same operation reads the same everywhere.
+const SHAPE_ICONS: Record<NodeShape, string> = {
+  rectangle: 'lucideSquare',
+  pill: 'lucidePill',
+  diamond: 'lucideDiamond',
+  ellipse: 'lucideCircle',
+};
+
+const ALIGN_ICONS: Record<AlignKind, string> = {
+  left: 'lucideAlignStartVertical',
+  center: 'lucideAlignCenterVertical',
+  right: 'lucideAlignEndVertical',
+  top: 'lucideAlignStartHorizontal',
+  middle: 'lucideAlignCenterHorizontal',
+  bottom: 'lucideAlignEndHorizontal',
+};
+
+const ARROWHEAD_ICONS: Record<ArrowheadType, string> = {
+  none: 'lucideMinus',
+  arrow: 'lucideArrowRight',
+  triangle: 'lucidePlay',
+};
+
+// Mirrors the toolbar's segmented previews so both show the stroke itself.
+const PATTERN_PREVIEWS: Record<StrokePattern, { dash?: string; width?: number }> = {
+  solid: {},
+  dashed: { dash: '6 4' },
+  dotted: { dash: '0.1 4' },
+};
+
+const WEIGHT_PREVIEWS: Record<StrokeWeight, { dash?: string; width?: number }> = {
+  thin: { width: 1 },
+  normal: { width: 2 },
+  thick: { width: 3.5 },
+};
+
+// Connections category display order: Reset (0), colors (1), patterns (2),
+// weights (3–5), then Arrowheads (start group before end). Patterns and
+// colors share one step; the label tiebreak orders them alphabetically.
+const CONNECTION_WEIGHT_ORDER: Record<StrokeWeight, number> = {
+  thin: 3,
+  normal: 4,
+  thick: 5,
+};
+
 type EntryOptions = {
   aliases?: readonly string[];
   shortcut?: string;
   swatch?: string;
+  icon?: string;
+  linePreview?: { dash?: string; width?: number };
   sortOrder?: number;
 };
 
@@ -131,41 +182,41 @@ export class PaletteEntryRegistry {
 
     return [
       this.action('undo', 'Undo', 'History', () => this.historyService.undo(), {
-        aliases: ['reverse', 'step back'], shortcut: SHORTCUTS.undo,
+        aliases: ['reverse', 'step back'], shortcut: SHORTCUTS.undo, icon: 'lucideUndo2',
         available: this.historyService.canUndo(), unavailableReason: 'Nothing to undo',
       }),
       this.action('redo', 'Redo', 'History', () => this.historyService.redo(), {
-        aliases: ['repeat', 'step forward'], shortcut: SHORTCUTS.redo,
+        aliases: ['repeat', 'step forward'], shortcut: SHORTCUTS.redo, icon: 'lucideRedo2',
         available: this.historyService.canRedo(), unavailableReason: 'Nothing to redo',
       }),
 
       this.action('select-all', 'Select All', 'Selection', () => this.graphService.selectAll(), {
-        aliases: ['select everything'], shortcut: SHORTCUTS.selectAll,
+        aliases: ['select everything'], shortcut: SHORTCUTS.selectAll, icon: 'lucideSquareCheckBig',
       }),
       this.action('clear-selection', 'Clear Selection', 'Selection', () => this.graphService.clearSelection(), {
-        aliases: ['deselect', 'clear selected'],
+        aliases: ['deselect', 'clear selected'], icon: 'lucideSquareX',
         available: selectionSize > 0, unavailableReason: 'Nothing is selected',
       }),
       this.action('cut', 'Cut', 'Selection', () => this.clipboardService.cut(selectedNodeIds, selectedConnectionIds), {
-        aliases: ['remove to clipboard'], shortcut: SHORTCUTS.cut,
+        aliases: ['remove to clipboard'], shortcut: SHORTCUTS.cut, icon: 'lucideScissors',
         available: selectedNodeIds.length > 0, unavailableReason: 'Select a Node or Group first',
       }),
       this.action('copy', 'Copy', 'Selection', () => this.clipboardService.copy(selectedNodeIds), {
-        aliases: ['copy selected'], shortcut: SHORTCUTS.copy,
+        aliases: ['copy selected'], shortcut: SHORTCUTS.copy, icon: 'lucideCopy',
         available: selectedNodeIds.length > 0, unavailableReason: 'Select a Node or Group first',
       }),
       this.action('paste', 'Paste', 'Selection', () => {
         this.clipboardService.pasteAtCursor(this.canvasViewport.visibleCanvasCenter());
       }, {
-        aliases: ['insert', 'paste from clipboard'], shortcut: SHORTCUTS.paste,
+        aliases: ['insert', 'paste from clipboard'], shortcut: SHORTCUTS.paste, icon: 'lucideClipboardPaste',
         available: this.clipboardService.canPaste(), unavailableReason: 'Clipboard is empty',
       }),
       this.action('duplicate', 'Duplicate', 'Selection', () => this.clipboardService.duplicate(selectedNodeIds), {
-        aliases: ['clone', 'make a copy'], shortcut: SHORTCUTS.duplicate,
+        aliases: ['clone', 'make a copy'], shortcut: SHORTCUTS.duplicate, icon: 'lucideCopyPlus',
         available: selectedNodeIds.length > 0, unavailableReason: 'Select a Node or Group first',
       }),
       this.action('delete', 'Delete', 'Selection', () => this.deleteSelection(), {
-        aliases: ['remove', 'trash'],
+        aliases: ['remove', 'trash'], icon: 'lucideTrash2',
         available: selectionSize > 0, unavailableReason: 'Nothing is selected',
       }),
       ...ALIGNMENTS.map(({ kind, label }) => this.action(
@@ -174,6 +225,7 @@ export class PaletteEntryRegistry {
           if (command) this.historyService.execute(command);
         }, {
           aliases: ['align', `align ${kind}`],
+          icon: ALIGN_ICONS[kind],
           available: selectedNodeIds.length >= 2,
           unavailableReason: 'Select at least two Nodes or Groups',
         },
@@ -184,23 +236,24 @@ export class PaletteEntryRegistry {
           if (command) this.historyService.execute(command);
         }, {
           aliases: ['distribute', `distribute ${axis}`],
+          icon: axis === 'horizontal' ? 'lucideAlignHorizontalSpaceBetween' : 'lucideAlignVerticalSpaceBetween',
           available: selectedNodeIds.length >= 3,
           unavailableReason: 'Select at least three Nodes or Groups',
         },
       )),
 
       this.action('add-node', 'Add Node', 'Nodes & Groups', () => this.addNode(), {
-        aliases: ['new node', 'create node'],
+        aliases: ['new node', 'create node'], icon: 'lucideSquarePlus',
       }),
       this.action('add-group', 'Add Group', 'Nodes & Groups', () => this.addGroup(), {
-        aliases: ['new group', 'create group'],
+        aliases: ['new group', 'create group'], icon: 'lucideGroup',
       }),
       this.action('add-pin', 'Add pin', 'Nodes & Groups', () => this.addPin(), {
         // "Comment" is a hidden alias: the Figma lineage word users will type
-        aliases: ['new pin', 'create pin', 'comment', 'add comment'],
+        aliases: ['new pin', 'create pin', 'comment', 'add comment'], icon: 'lucideMessageCircle',
       }),
       this.action('edit-text', 'Edit Text', 'Nodes & Groups', () => this.editText(), {
-        aliases: ['edit label', 'rename text'],
+        aliases: ['edit label', 'rename text'], icon: 'lucidePencil',
         available: selectionSize === 1 &&
           ((!!oneSelectedNode && oneSelectedNode.kind !== 'group') || selectedConnectionIds.length === 1),
         unavailableReason: 'Select one Node or Connection',
@@ -208,7 +261,7 @@ export class PaletteEntryRegistry {
       this.action('rename-group', 'Rename', 'Nodes & Groups', () => {
         if (oneSelectedNode?.kind === 'group') this.contextMenuService.requestRename(oneSelectedNode.id);
       }, {
-        aliases: ['rename group', 'edit group label'],
+        aliases: ['rename group', 'edit group label'], icon: 'lucidePencil',
         available: oneSelectedNode?.kind === 'group' && selectionSize === 1,
         unavailableReason: 'Select one Group',
       }),
@@ -219,24 +272,21 @@ export class PaletteEntryRegistry {
       ...this.connectionArrowheadEntries(selectedConnectionIds),
       ...this.connectionStrokeEntries(selectedConnectionIds),
 
-      this.action('zoom-in', 'Zoom In', 'Viewport', () => this.graphService.zoomBy(0.1, 0, 0), {
-        aliases: ['magnify', 'increase zoom'],
+      this.action('zoom-in', 'Zoom In', 'Viewport', () => this.canvasViewport.zoomByCentered(0.1), {
+        aliases: ['magnify', 'increase zoom'], icon: 'lucideZoomIn',
       }),
-      this.action('zoom-out', 'Zoom Out', 'Viewport', () => this.graphService.zoomBy(-0.1, 0, 0), {
-        aliases: ['shrink', 'decrease zoom'],
-      }),
-      this.action('reset-view', 'Reset View', 'Viewport', () => this.graphService.resetViewport(), {
-        aliases: ['reset zoom', 'home view'],
+      this.action('zoom-out', 'Zoom Out', 'Viewport', () => this.canvasViewport.zoomByCentered(-0.1), {
+        aliases: ['shrink', 'decrease zoom'], icon: 'lucideZoomOut',
       }),
       this.action('zoom-to-fit', 'Zoom to Fit', 'Viewport', () => {
         const size = this.canvasViewport.visibleSize();
         this.graphService.zoomToFit(size.width, size.height);
-      }, { aliases: ['frame canvas', 'fit graph'], shortcut: SHORTCUTS.zoomToFit }),
+      }, { aliases: ['frame canvas', 'fit graph'], shortcut: SHORTCUTS.zoomToFit, icon: 'lucideMaximize' }),
       this.action('zoom-to-selection', 'Zoom to Selection', 'Viewport', () => {
         const size = this.canvasViewport.visibleSize();
         this.graphService.zoomToSelection(size.width, size.height);
       }, {
-        aliases: ['frame selection', 'fit selection'], shortcut: SHORTCUTS.zoomToSelection,
+        aliases: ['frame selection', 'fit selection'], shortcut: SHORTCUTS.zoomToSelection, icon: 'lucideFocus',
         available: selectionSize > 0, unavailableReason: 'Nothing is selected',
       }),
       this.action('tidy-up', 'Tidy up', 'Viewport', () => {
@@ -245,28 +295,28 @@ export class PaletteEntryRegistry {
         this.historyService.execute(command);
         const size = this.canvasViewport.visibleSize();
         this.graphService.zoomToFit(size.width, size.height);
-      }, { aliases: ['auto layout', 'organize graph'] }),
+      }, { aliases: ['auto layout', 'organize graph'], icon: 'lucideNetwork' }),
       this.action('present', 'Present', 'Viewport', () => {
         const size = this.canvasViewport.visibleSize();
         this.presentationService.enter(size.width, size.height);
       }, {
-        aliases: ['presentation mode', 'start tour'],
+        aliases: ['presentation mode', 'start tour'], icon: 'lucidePresentation',
         available: this.presentationService.canPresent(),
         unavailableReason: 'Add a Group before presenting',
       }),
 
       this.action('import-graph', isScratch ? 'Import graph' : 'Import current Project graph', 'Project', () => {
         this.importDialogService.requestOpen();
-      }, { aliases: ['import', 'load graph', 'open json'] }),
+      }, { aliases: ['import', 'load graph', 'open json'], icon: 'lucideUpload' }),
       this.action('export-png', isScratch ? 'Export graph as PNG' : 'Export current Project as PNG', 'Project', () => {
         this.exportDialogService.requestOpen(currentProjectId ?? undefined, undefined, 'png');
-      }, { aliases: ['download png', 'image export'] }),
+      }, { aliases: ['download png', 'image export'], icon: 'lucideImageDown' }),
       this.action('export-json', isScratch ? 'Export graph as JSON' : 'Export current Project as JSON', 'Project', () => {
         this.exportDialogService.requestOpen(currentProjectId ?? undefined, undefined, 'json');
-      }, { aliases: ['download json', 'json export'] }),
+      }, { aliases: ['download json', 'json export'], icon: 'lucideFileJson' }),
       this.action('export-as', isScratch ? 'Export graph as…' : 'Export current Project as…', 'Project', () => {
         this.exportDialogService.requestOpen(currentProjectId ?? undefined);
-      }, { aliases: ['export', 'download'] }),
+      }, { aliases: ['export', 'download'], icon: 'lucideDownload' }),
       this.action('export-selection-png', 'Export Selection as PNG', 'Project', () => {
         const rootIds = [...this.graphService.selectedNodeIds()];
         this.exportDialogService.requestOpen(undefined, {
@@ -274,51 +324,51 @@ export class PaletteEntryRegistry {
           isMultiSelection: rootIds.length > 1,
         }, 'png');
       }, {
-        aliases: ['download selected image', 'selection png'],
+        aliases: ['download selected image', 'selection png'], icon: 'lucideImageDown',
         available: selectedNodeIds.length > 0, unavailableReason: 'Select a Node or Group first',
       }),
       this.action('copy-json', isScratch ? 'Copy graph JSON' : 'Copy current Project JSON', 'Project', () => {
         void this.exportService.copyJson();
-      }, { aliases: ['copy graph', 'copy data'] }),
+      }, { aliases: ['copy graph', 'copy data'], icon: 'lucideBraces' }),
       this.action('copy-link', isScratch ? 'Copy graph link' : 'Copy current Project link', 'Project', () => {
         void this.exportService.copyLink();
-      }, { aliases: ['share link', 'copy url'] }),
+      }, { aliases: ['share link', 'copy url'], icon: 'lucideLink' }),
       this.action('save-as-project', 'Save as Project', 'Project', () => {
         this.paletteService.enterCollectionPicker();
       }, {
-        aliases: ['save graph as project', 'create project from scratch'],
+        aliases: ['save graph as project', 'create project from scratch'], icon: 'lucideSave',
         available: isScratch && this.collectionService.collections().length > 0,
         unavailableReason: isScratch ? 'Create a Collection first' : 'Only available on the Scratch Canvas',
       }),
       this.action('rename-current-project', 'Rename current Project', 'Project', () => {
         if (currentProjectId) this.sidebarService.requestProjectRename(currentProjectId);
       }, {
-        aliases: ['rename project'],
+        aliases: ['rename project'], icon: 'lucidePencil',
         available: !!currentProject,
         unavailableReason: 'Open a Project first',
       }),
       this.action('delete-current-project', 'Delete current Project', 'Project', () => {
         if (currentProjectId) this.sidebarService.requestProjectDelete(currentProjectId);
       }, {
-        aliases: ['remove project', 'delete project'],
+        aliases: ['remove project', 'delete project'], icon: 'lucideTrash2',
         available: !!currentProject,
         unavailableReason: 'Open a Project first',
       }),
 
       this.action('new-collection', 'New Collection', 'Application', () => {
         this.sidebarService.requestNewCollection();
-      }, { aliases: ['create collection'] }),
+      }, { aliases: ['create collection'], icon: 'lucideFolderPlus' }),
       this.action('import-collection', 'Import Collection', 'Application', () => this.openCollectionImport(), {
-        aliases: ['load collection', 'open collection json'],
+        aliases: ['load collection', 'open collection json'], icon: 'lucideUpload',
       }),
       this.action('toggle-sidebar', 'Toggle Sidebar', 'Application', () => this.sidebarService.toggle(), {
-        aliases: ['show sidebar', 'hide sidebar'], shortcut: SHORTCUTS.toggleSidebar,
+        aliases: ['show sidebar', 'hide sidebar'], shortcut: SHORTCUTS.toggleSidebar, icon: 'lucidePanelLeft',
       }),
       this.action('toggle-minimap', 'Toggle Minimap', 'Application', () => this.minimapService.toggle(), {
-        aliases: ['show minimap', 'hide minimap'],
+        aliases: ['show minimap', 'hide minimap'], icon: 'lucideMap',
       }),
       this.action('toggle-pins', 'Toggle Pins', 'Application', () => this.pinVisibilityService.toggle(), {
-        aliases: ['show pins', 'hide pins', 'toggle comments'],
+        aliases: ['show pins', 'hide pins', 'toggle comments'], icon: 'lucideMessageCircle',
       }),
     ];
   }
@@ -359,6 +409,8 @@ export class PaletteEntryRegistry {
       category,
       shortcut: options.shortcut,
       swatch: options.swatch,
+      icon: options.icon,
+      linePreview: options.linePreview,
       sortOrder: options.sortOrder,
       available,
       disabledReason: available ? undefined : options.unavailableReason,
@@ -425,6 +477,7 @@ export class PaletteEntryRegistry {
           aliases: shape === 'rectangle'
             ? ['rectangle nodes', 'default node shape', 'reset node shape']
             : [`${shape} nodes`, `node shape ${shape}`],
+          icon: SHAPE_ICONS[shape],
           sortOrder: 1,
           available,
           unavailableReason,
@@ -447,6 +500,7 @@ export class PaletteEntryRegistry {
       {
         aliases: [`connection ${color.name}`, `color connections ${color.name}`],
         swatch: color.value,
+        sortOrder: 1,
         available,
         unavailableReason,
       },
@@ -459,7 +513,7 @@ export class PaletteEntryRegistry {
         const command = buildSetConnectionsColorCommand(this.graphService, this.graphService.selectedConnectionIds(), null);
         if (command) this.historyService.execute(command);
       },
-      { aliases: ['default connection color', 'remove connection color'], available, unavailableReason },
+      { aliases: ['default connection color', 'remove connection color'], icon: 'lucideEraser', sortOrder: 0, available, unavailableReason },
     ));
     return entries;
   }
@@ -486,6 +540,8 @@ export class PaletteEntryRegistry {
           },
           {
             aliases: [`${end} arrowhead ${type}`, `connection ${end} ${type}`],
+            icon: ARROWHEAD_ICONS[type],
+            sortOrder: (end === 'start' ? 6 : 9) + ARROWHEAD_TYPES.indexOf(type),
             available,
             unavailableReason,
           },
@@ -513,6 +569,8 @@ export class PaletteEntryRegistry {
         },
         {
           aliases: [`${pattern} connections`, `${pattern} stroke`],
+          linePreview: PATTERN_PREVIEWS[pattern],
+          sortOrder: 2,
           available,
           unavailableReason,
         },
@@ -531,6 +589,8 @@ export class PaletteEntryRegistry {
         },
         {
           aliases: [`${weight} connections`, `${weight} stroke weight`],
+          linePreview: WEIGHT_PREVIEWS[weight],
+          sortOrder: CONNECTION_WEIGHT_ORDER[weight],
           available,
           unavailableReason,
         },

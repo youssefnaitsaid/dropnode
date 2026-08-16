@@ -11,13 +11,14 @@ import { ToastService } from '../toast/toast';
   selector: 'app-import-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown.escape)': 'onEscape()' },
   imports: [FormsModule, NgIcon, HlmButton, HlmTextarea],
   providers: [provideIcons({ lucideUpload, lucideX })],
   template: `
     @if (isOpen()) {
       <div class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 p-4" (click)="close()">
           <div
-            class="w-[480px] max-w-[90vw] rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl"
+            class="flex max-h-[85vh] w-[480px] max-w-[90vw] flex-col rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl"
             (click)="$event.stopPropagation()"
             role="dialog"
             aria-modal="true"
@@ -63,7 +64,7 @@ import { ToastService } from '../toast/toast';
           @if (activeTab() === 'text') {
             <textarea
               hlmTextarea
-              class="w-full mb-4 font-mono text-xs"
+              class="mb-4 max-h-[50vh] min-h-40 w-full font-mono text-xs"
               [(ngModel)]="jsonText"
               placeholder="Paste your JSON here..."
               rows="10"
@@ -71,7 +72,7 @@ import { ToastService } from '../toast/toast';
           }
 
           @if (errorMessage()) {
-            <p class="text-destructive text-sm mb-3">{{ errorMessage() }}</p>
+            <p class="mb-3 max-h-24 overflow-y-auto break-words text-sm text-destructive">{{ errorMessage() }}</p>
           }
 
           <div class="flex justify-end gap-2">
@@ -102,6 +103,11 @@ export class ImportDialogComponent {
 
   close(): void {
     this.isOpen.set(false);
+  }
+
+  /** Escape closes the dialog with no side effects, like the backdrop. */
+  onEscape(): void {
+    if (this.isOpen()) this.close();
   }
 
   canImport(): boolean {

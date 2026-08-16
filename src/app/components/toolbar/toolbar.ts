@@ -7,9 +7,7 @@ import {
   lucideCommand,
   lucideZoomIn,
   lucideZoomOut,
-  lucideScan,
   lucideMaximize,
-  lucideGroup,
   lucideUpload,
   lucideDownload,
   lucideFileDown,
@@ -47,8 +45,8 @@ import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CommandPaletteService } from '../../services/command-palette.service';
+import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
-  CreateGroupCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
   buildSetConnectionsColorCommand,
@@ -76,9 +74,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideCommand,
       lucideZoomIn,
       lucideZoomOut,
-      lucideScan,
       lucideMaximize,
-      lucideGroup,
       lucideUpload,
       lucideDownload,
       lucideFileDown,
@@ -296,9 +292,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         <button hlmBtn variant="ghost" size="icon" (click)="zoomOut()" title="Zoom Out" aria-label="Zoom out">
           <ng-icon name="lucideZoomOut" />
         </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="resetView()" title="Reset View" aria-label="Reset view">
-          <ng-icon name="lucideScan" />
-        </button>
         <button hlmBtn variant="ghost" size="icon" (click)="zoomToFit()" title="Zoom to Fit" aria-label="Zoom to fit">
           <ng-icon name="lucideMaximize" />
         </button>
@@ -317,11 +310,8 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
           <ng-icon name="lucidePresentation" />
         </button>
         <span class="min-w-10 text-center text-sm font-medium text-muted-foreground">{{ zoomPercent() }}%</span>
-        <hlm-separator orientation="vertical" class="mx-1" />
-        <button hlmBtn variant="ghost" size="icon" (click)="addGroup()" title="Add Group" aria-label="Add group">
-          <ng-icon name="lucideGroup" />
-        </button>
         @if (scratchMode()) {
+          <hlm-separator orientation="vertical" class="mx-1" />
           <button hlmBtn variant="ghost" size="icon" (click)="openImport()" title="Import" aria-label="Import">
             <ng-icon name="lucideUpload" />
           </button>
@@ -461,6 +451,7 @@ export class ToolbarComponent {
   private exportService = inject(ExportService);
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
+  private canvasViewport = inject(CanvasViewportService);
   private router = inject(Router);
   private commandPaletteService = inject(CommandPaletteService);
 
@@ -613,30 +604,12 @@ export class ToolbarComponent {
     if (cmd) this.historyService.execute(cmd);
   }
 
-  addGroup(): void {
-    // Center the new Group in the Viewport (canvas area, not the window —
-    // the toolbar overlaps the top of the window)
-    const canvasRect = document.querySelector('.canvas-container')?.getBoundingClientRect();
-    const screenCenterX = canvasRect ? canvasRect.width / 2 : window.innerWidth / 2;
-    const screenCenterY = canvasRect ? canvasRect.height / 2 : window.innerHeight / 2;
-    const vp = this.graphService.viewportState();
-    const centerX = (screenCenterX - vp.panX) / vp.zoom;
-    const centerY = (screenCenterY - vp.panY) / vp.zoom;
-    this.historyService.execute(
-      new CreateGroupCommand(this.graphService, 'New Group', centerX - 160, centerY - 100)
-    );
-  }
-
   zoomIn(): void {
-    this.graphService.zoomBy(0.1, 0, 0);
+    this.canvasViewport.zoomByCentered(0.1);
   }
 
   zoomOut(): void {
-    this.graphService.zoomBy(-0.1, 0, 0);
-  }
-
-  resetView(): void {
-    this.graphService.resetViewport();
+    this.canvasViewport.zoomByCentered(-0.1);
   }
 
   // Frame the whole graph. Measures the visible canvas region from the canvas

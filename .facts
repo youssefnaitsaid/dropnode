@@ -32,6 +32,7 @@
 - inside the Text editor Enter inserts a new line (or next bullet in a list); blur or Ctrl+Enter commits, Escape cancels
 - while editing, Ctrl+Z/Ctrl+Y are ProseMirror-internal; a whole edit session commits as one SetNodeTextCommand or SetConnectionTextCommand and unchanged content pushes nothing onto History
 - the Formatting Toolbar shows for the entire edit session, floating above the target (flipping below when clipped at the viewport top); toggle buttons reflect the selection state and clicking them never blurs the edit
+- the S/M/L buttons light a size only when the entire selected text shares it — opening an edit shows a uniformly sized Text at its own size, a mixed-size selection lights no button, and a bare caret reads the size typing would continue at @implemented
 - the Link control opens an inline URL input in the toolbar; entered URLs without a scheme are normalized to https://
 - font sizes render as Node S/M/L = 11/14/18 px and Connection S/M/L = 10/12/15 px; M matches the pre-Text rendering exactly
 - Highlight renders as a yellow marker behind the text; links render underlined and Ctrl+Click opens them in a new tab (noopener) — plain click keeps select/drag
@@ -58,7 +59,7 @@
 
 ## groups
 
-- the toolbar "Add Group" button creates a 320x200 Group labeled "New Group" centered in the Viewport, as a single undo step; Groups use the node_ id pattern
+- a Group is created either from the empty-Canvas Context Menu ("Add group": a 320x200 Group labeled "New Group" centered on the right-click point) or the Command Palette ("Add Group": centered in the visible Canvas, opening the Label editor); each creation is a single undo step, and Groups use the node_ id pattern
 - membership is containment, judged by the node's center point on mouseup: center inside a Group's bounds joins it, center outside releases it — each change is one undo step
 - when overlapping Groups both contain the drop point, the topmost-rendered Group (later in the nodes array) claims the node
 - dropping a node into a Group it is connected to succeeds and severs those Connections: move, membership change, and severed Connections form one compound undo step restoring original ids
@@ -178,14 +179,15 @@
 
 - zoom is clamped to the range 0.1 to 5
 - wheel zoom steps by 0.1 per tick, centered on the cursor so the point under the cursor stays fixed on screen
-- toolbar zoom buttons step by 0.1 centered at origin (0,0), not at the screen center — this differs from wheel zoom
+- toolbar zoom buttons and the Zoom In / Zoom Out Palette Entries step by 0.1 centered on the visible Canvas' center, so the Canvas center point stays fixed on screen — the same centering rule as wheel zoom with a different anchor
 - left-drag on empty Canvas draws a Marquee, not a pan (ADR-0016); panning is hold-Space + left-drag (grab cursor, from anywhere, even over elements) or middle-mouse-drag, and never changes the Selection
-- reset view restores pan (0,0) and zoom 1; importing or clearing a graph does NOT reset the Viewport
+- a Canvas with no stored Viewport to restore (fresh Scratch Canvas, corrupt-Project fallback) initializes at pan (0,0) and zoom 1; importing or clearing a graph does NOT reset the Viewport
+- every page load opens framed: whichever graph activation lands — a stored Project, a ?data share link, or the stashed Scratch snapshot — applies Zoom to Fit instead of restoring its remembered Viewport, and switching Projects on the same route re-frames; the deferred fit waits one frame for the laid-out canvas size, and an empty graph keeps the default Viewport @implemented
 - pan and zoom apply as one shared CSS translate+scale transform covering both the DOM node layer and the SVG connection layer
 - Zoom to fit frames the whole graph — all Nodes (Groups included) unioned with every Connection's curve bounds so a bowing curve is never clipped — into 90% of the visible Canvas, centered on both axes, never magnifying past 1x; an empty graph is a silent no-op @spec
 - Zoom to selection frames the selected element — a Node by its rect, a Group unioned with its children, a Connection by its cubic bezier bounds (the control-point box, which encloses the bow) — into 90% of the Viewport, centered, magnifying no further than 2x; no selection is a silent no-op @spec
-- Zoom to fit and Zoom to selection are bounds-centered — a third zoom-centering behavior alongside cursor-centered wheel zoom and origin-centered toolbar buttons; both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
-- the toolbar zoom cluster carries a Zoom to fit button distinct from Reset View; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
+- Zoom to fit and Zoom to selection are bounds-centered — a zoom-centering behavior distinct from the anchored zooms (cursor-centered wheel zoom, Canvas-center-centered toolbar buttons and Palette Entries); both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
+- the toolbar zoom cluster carries a Zoom to fit button; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
 
 ## minimap
 
@@ -258,7 +260,8 @@
 - label: Export downloads pretty-printed 2-space JSON named dropnode-graph.json with a success toast; Copy JSON copies the same JSON to the clipboard with a success/error toast
   command: sh -c "grep -q \"'dropnode-graph'\" src/app/services/export.service.ts && grep -q \"'.json'\" src/app/services/export.service.ts"
 - a project row's Export actions read the stored graph from localStorage and never navigate; the file is named after the Project (slugged), falling back to project.json — except the open Project's row, whose "Export as…" dialog exports the live on-screen graph (matching its preview) under the same Project filename
-- Copy link copies <origin>/?data=<url-encoded pretty JSON>, dropping any existing path and query parameters — share links always land on the Scratch Canvas; the link is copied whatever its length, with a success/error toast
+- Copy link copies <origin>/?data=gz:<base64url of the gzip-compressed compact Graph State JSON>, dropping any existing path and query parameters — share links always land on the Scratch Canvas; the link is copied whatever its length, with a success/error toast (ADR-0026)
+- share-link payloads are gzip+base64url under a gz: prefix because percent-encoded pretty JSON grew URLs past server request-line limits (browsers report HTTP 431); the payload decompresses via DecompressionStream at startup, so the URL load resolves asynchronously; an unprefixed raw-JSON ?data value from an older link still imports unchanged
 - the Export menu is built on @angular/cdk/menu primitives; export side effects live in ExportService, never in the toolbar component
 - exported Graph State is a copy; mutating it does not affect editor state
 - label: on startup the app imports a Graph State from the URL query parameter named data; ?data is honored only on the Scratch Canvas route (/), never on /p/:projectId; a missing parameter is a silent no-op

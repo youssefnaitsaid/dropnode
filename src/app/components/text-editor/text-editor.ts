@@ -32,6 +32,33 @@ import { textSchema } from './text-schema';
 import { textToDoc, docToText } from './text-doc';
 
 /**
+ * The size the S/M/L row reads for a selection. A caret keeps typing-into
+ * semantics (stored marks, else the marks at the caret). A non-empty range
+ * follows the shared-value rule every other styling control uses (ADR-0015):
+ * active only when every character in the range has one size — a mixed range
+ * lights nothing. Head-position marks can't serve ranges: an AllSelection's
+ * head sits past the last block's closing boundary, where no marks exist.
+ */
+export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined {
+  const { selection } = state;
+  if (selection.empty) {
+    const size = textSchema.marks['size'].isInSet(state.storedMarks ?? selection.$from.marks());
+    return (size?.attrs['level'] as TextSize) ?? 'M';
+  }
+  const sizeType = textSchema.marks['size'];
+  let shared: TextSize | 'M' | undefined;
+  let mixed = false;
+  state.doc.nodesBetween(selection.from, selection.to, node => {
+    if (!node.isText) return;
+    const size = sizeType.isInSet(node.marks);
+    const level = (size?.attrs['level'] as TextSize) ?? 'M';
+    if (shared === undefined) shared = level;
+    else if (shared !== level) mixed = true;
+  });
+  return mixed ? undefined : (shared ?? 'M');
+}
+
+/**
  * The Text editor: a ProseMirror view (ADR-0010) plus the Formatting Toolbar
  * in a CDK overlay floating above the edit target (flipping below when
  * clipped). Mounted only for the single Text being edited.
@@ -229,7 +256,8 @@ export class TextEditorComponent implements AfterViewInit, OnDestroy {
   highlightActive = signal(false);
   linkActive = signal(false);
   bulletsActive = signal(false);
-  sizeActive = signal<'S' | 'M' | 'L'>('M');
+  // undefined = a mixed-size selection — no size button highlights
+  sizeActive = signal<'S' | 'M' | 'L' | undefined>('M');
   linkInputOpen = signal(false);
 
   private pmHost = viewChild.required<ElementRef<HTMLDivElement>>('pmHost');
@@ -444,7 +472,7 @@ export class TextEditorComponent implements AfterViewInit, OnDestroy {
     this.highlightActive.set(this.isMarkActive(state, textSchema.marks['highlight']));
     this.linkActive.set(this.isMarkActive(state, textSchema.marks['link']));
     this.bulletsActive.set(this.isInBulletList(state));
-    this.sizeActive.set(this.currentSize(state));
+    this.sizeActive.set(sizeOfSelection(state));
   }
 
   private isMarkActive(state: EditorState, type: MarkType): boolean {
@@ -461,14 +489,5 @@ export class TextEditorComponent implements AfterViewInit, OnDestroy {
       if ($from.node(depth).type === textSchema.nodes['bullet_list']) return true;
     }
     return false;
-  }
-
-  private currentSize(state: EditorState): TextSize | 'M' {
-    const { empty, $from } = state.selection;
-    const marks = empty
-      ? (state.storedMarks ?? $from.marks())
-      : state.selection.$head.marks();
-    const size = textSchema.marks['size'].isInSet(marks);
-    return (size?.attrs['level'] as TextSize) ?? 'M';
   }
 }

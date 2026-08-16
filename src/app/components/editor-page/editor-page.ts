@@ -20,8 +20,9 @@ import { PresentationService } from '../../services/presentation.service';
 /**
  * The editor page behind both routes: `/` (Scratch Canvas) and
  * `/p/:projectId` (a Project). All decisions live in CollectionService;
- * this component only wires route params, Graph State loading, History
- * clearing, and the auto-save loop together.
+ * this component only wires route params, Graph State loading, the
+ * load-time Zoom to Fit, History clearing, and the auto-save loop
+ * together.
  */
 @Component({
   selector: 'app-editor-page',
@@ -152,24 +153,43 @@ export class EditorPageComponent implements OnDestroy {
         return;
       }
       this.currentProjectId = projectId;
-      this.graphService.setViewport(
-        this.collectionService.getProjectViewport(projectId) ?? { panX: 0, panY: 0, zoom: 1 },
-      );
+      this.frameLoadedGraph();
       this.collectionService.markOpened(projectId);
       return;
     }
 
     this.currentProjectId = null;
-    const loadedFromUrl = this.urlLoader.load();
     const snapshot = this.collectionService.takeScratchSnapshot();
-    if (loadedFromUrl) return;
-    if (snapshot) {
-      this.graphService.importGraph(snapshot.graph);
-      this.graphService.setViewport(snapshot.viewport);
-    } else {
-      this.graphService.clearGraph();
-      this.graphService.resetViewport();
-    }
+    // The compressed ?data payload decompresses asynchronously (ADR-0026),
+    // so the fallbacks wait on the URL load rather than racing it onto the
+    // Canvas.
+    void this.urlLoader.load().then((loadedFromUrl) => {
+      if (loadedFromUrl) {
+        this.frameLoadedGraph();
+        return;
+      }
+      if (snapshot) {
+        this.graphService.importGraph(snapshot.graph);
+        this.frameLoadedGraph();
+      } else {
+        this.graphService.clearGraph();
+        this.graphService.resetViewport();
+      }
+    });
+  }
+
+  /**
+   * A page load always opens framed: whichever graph activation lands — a
+   * Project, a share link, or the stashed Scratch snapshot — gets Zoom to
+   * Fit rather than its remembered Viewport. Deferred one frame so the
+   * canvas container has its laid-out size to frame against; an empty
+   * graph is Zoom to Fit's usual silent no-op.
+   */
+  private frameLoadedGraph(): void {
+    requestAnimationFrame(() => {
+      const rect = document.querySelector('.canvas-container')?.getBoundingClientRect();
+      if (rect) this.graphService.zoomToFit(rect.width, rect.height);
+    });
   }
 
   private scheduleSave(save: () => void): void {

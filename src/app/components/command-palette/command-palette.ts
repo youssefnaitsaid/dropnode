@@ -10,9 +10,55 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  lucideAlignCenterHorizontal,
+  lucideAlignCenterVertical,
+  lucideAlignEndHorizontal,
+  lucideAlignEndVertical,
+  lucideAlignHorizontalSpaceBetween,
+  lucideAlignStartHorizontal,
+  lucideAlignStartVertical,
+  lucideAlignVerticalSpaceBetween,
   lucideArrowLeft,
+  lucideArrowRight,
+  lucideBraces,
+  lucideCircle,
+  lucideClipboardPaste,
   lucideCommand,
+  lucideCopy,
+  lucideCopyPlus,
+  lucideDiamond,
+  lucideDownload,
+  lucideEraser,
+  lucideFileJson,
+  lucideFocus,
+  lucideFolderPlus,
+  lucideGroup,
+  lucideImageDown,
+  lucideLibrary,
+  lucideLink,
+  lucideMap,
+  lucideMaximize,
+  lucideMessageCircle,
+  lucideMinus,
+  lucideNetwork,
+  lucidePanelLeft,
+  lucidePencil,
+  lucidePill,
+  lucidePlay,
+  lucidePresentation,
+  lucideRedo2,
+  lucideSave,
+  lucideScissors,
   lucideSearch,
+  lucideSquare,
+  lucideSquareCheckBig,
+  lucideSquarePlus,
+  lucideSquareX,
+  lucideTrash2,
+  lucideUndo2,
+  lucideUpload,
+  lucideZoomIn,
+  lucideZoomOut,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
@@ -33,7 +79,57 @@ interface PaletteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmButton, HlmInput, HlmCommandImports, HlmDialogImports],
-  providers: [provideIcons({ lucideArrowLeft, lucideCommand, lucideSearch })],
+  providers: [provideIcons({
+    lucideAlignCenterHorizontal,
+    lucideAlignCenterVertical,
+    lucideAlignEndHorizontal,
+    lucideAlignEndVertical,
+    lucideAlignHorizontalSpaceBetween,
+    lucideAlignStartHorizontal,
+    lucideAlignStartVertical,
+    lucideAlignVerticalSpaceBetween,
+    lucideArrowLeft,
+    lucideArrowRight,
+    lucideBraces,
+    lucideCircle,
+    lucideClipboardPaste,
+    lucideCommand,
+    lucideCopy,
+    lucideCopyPlus,
+    lucideDiamond,
+    lucideDownload,
+    lucideEraser,
+    lucideFileJson,
+    lucideFocus,
+    lucideFolderPlus,
+    lucideGroup,
+    lucideImageDown,
+    lucideLibrary,
+    lucideLink,
+    lucideMap,
+    lucideMaximize,
+    lucideMessageCircle,
+    lucideMinus,
+    lucideNetwork,
+    lucidePanelLeft,
+    lucidePencil,
+    lucidePill,
+    lucidePlay,
+    lucidePresentation,
+    lucideRedo2,
+    lucideSave,
+    lucideScissors,
+    lucideSearch,
+    lucideSquare,
+    lucideSquareCheckBig,
+    lucideSquarePlus,
+    lucideSquareX,
+    lucideTrash2,
+    lucideUndo2,
+    lucideUpload,
+    lucideZoomIn,
+    lucideZoomOut,
+  })],
   template: `
     <hlm-dialog
       [state]="palette.isOpen() ? 'open' : 'closed'"
@@ -114,7 +210,7 @@ interface PaletteGroup {
                     [attr.data-selected]="collectionIndex() === index ? '' : null"
                     (click)="selectCollection(collection.id)"
                   >
-                    <span class="palette-item-leading collection-dot" aria-hidden="true"></span>
+                    <ng-icon class="palette-item-icon" name="lucideLibrary" aria-hidden="true" />
                     <span class="palette-item-copy">
                       <span class="palette-item-label">{{ collection.name }}</span>
                       <span class="palette-item-meta">Collection</span>
@@ -170,8 +266,21 @@ interface PaletteGroup {
                       >
                         @if (entry.swatch) {
                           <span class="palette-swatch" [style.background]="entry.swatch" aria-hidden="true"></span>
-                        } @else {
-                          <span class="palette-item-leading" aria-hidden="true"></span>
+                        } @else if (entry.linePreview) {
+                          <span class="palette-line-preview" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" width="16" height="16">
+                              <path
+                                d="M2 10 H18"
+                                fill="none"
+                                stroke="currentColor"
+                                [attr.stroke-width]="entry.linePreview.width ?? 2"
+                                stroke-linecap="round"
+                                [attr.stroke-dasharray]="entry.linePreview.dash ?? null"
+                              />
+                            </svg>
+                          </span>
+                        } @else if (entry.icon) {
+                          <ng-icon class="palette-item-icon" [name]="entry.icon" aria-hidden="true" />
                         }
                         <span class="palette-item-copy">
                           <span class="palette-item-label">{{ entry.label }}</span>
@@ -318,28 +427,28 @@ interface PaletteGroup {
       box-shadow: inset 3px 0 var(--primary);
     }
 
-    .palette-item-leading,
     .palette-swatch {
       width: 18px;
       height: 18px;
       flex: 0 0 18px;
       border-radius: 5px;
-    }
-
-    .palette-item-leading {
-      border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-      background: color-mix(in srgb, var(--muted) 65%, transparent);
-    }
-
-    .palette-swatch {
       border: 2px solid color-mix(in srgb, var(--foreground) 20%, transparent);
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
     }
 
-    .collection-dot {
-      border-radius: 50%;
-      background: var(--primary);
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
+    .palette-item-icon,
+    .palette-line-preview {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted-foreground);
+    }
+
+    .palette-item-icon {
+      font-size: 16px;
     }
 
     .palette-item-copy {

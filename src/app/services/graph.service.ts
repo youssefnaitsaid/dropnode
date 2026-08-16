@@ -8,6 +8,7 @@ import { Bounds, unionBounds, contentBounds, connectionBounds, frameViewport } f
 import { handlePoint } from '../models/curve';
 import { Text, textFromString, isTextEmpty, validateText, canonicalizeText } from '../models/text';
 import { Pin, PinAnchor, pinAnchorPoint } from '../models/pin';
+import { decodeShareParam } from '../models/share-link';
 
 @Injectable({ providedIn: 'root' })
 export class GraphService {
@@ -986,8 +987,9 @@ export class GraphService {
     return { valid: true };
   }
 
-  // URL parameter loading
-  loadFromUrlParam(): { loaded: boolean; error?: string } {
+  // URL parameter loading — async because the gz share-link payload
+  // decompresses through DecompressionStream (ADR-0026).
+  async loadFromUrlParam(): Promise<{ loaded: boolean; error?: string }> {
     if (typeof window === 'undefined') return { loaded: false };
 
     const params = new URLSearchParams(window.location.search);
@@ -996,8 +998,8 @@ export class GraphService {
     if (!dataParam) return { loaded: false };
 
     try {
-      const decoded = decodeURIComponent(dataParam);
-      const parsed = JSON.parse(decoded);
+      const json = await decodeShareParam(dataParam);
+      const parsed = JSON.parse(json);
       const result = this.importGraph(parsed);
       return { loaded: result.success, error: result.error };
     } catch (e) {

@@ -159,10 +159,22 @@ const GROUP_FILL_ALPHA = '4D';
     .node-surface.shape-diamond {
       border-radius: 0;
       clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
     }
     .node-surface.shape-ellipse {
       border-radius: 50%;
+    }
+    /* clip-path clips every shadow the surface itself casts (box-shadow and
+       same-element drop-shadow alike), so the diamond's resting, hover, and
+       selection shadows are cast from the unclipped card instead */
+    .node-card:has(.node-surface.shape-diamond) {
+      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+      transition: filter 0.15s ease;
+    }
+    .node-card:has(.node-surface.shape-diamond):hover {
+      filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.28));
+    }
+    .node-card.presenting:has(.node-surface.shape-diamond):hover {
+      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
     }
     /* Present Mode: the card is a picture, not a control — no drag cursor,
        no hover glow, no Handles. Text links keep their own pointer events
@@ -179,9 +191,13 @@ const GROUP_FILL_ALPHA = '4D';
     .node-card.selected .node-surface {
       box-shadow: 0 0 0px 1px grey, 0 0 6px 2px var(--selection-glow, #f0f0f5);
     }
-    .node-card.selected .node-surface.shape-diamond,
     .node-card.selected .node-surface.shape-ellipse {
       box-shadow: none;
+      filter: drop-shadow(0 0 1px grey) drop-shadow(0 0 6px var(--selection-glow, #f0f0f5));
+    }
+    /* after the diamond hover rule on purpose: a selected diamond keeps its
+       selection glow while hovered, like the rectangle/pill cards */
+    .node-card.selected:has(.node-surface.shape-diamond) {
       filter: drop-shadow(0 0 1px grey) drop-shadow(0 0 6px var(--selection-glow, #f0f0f5));
     }
     /* Lift a selected node (and its glow) above neighbouring cards */

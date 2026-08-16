@@ -25,6 +25,10 @@ export interface PaletteEntry {
   readonly category: PaletteCategory;
   readonly shortcut?: string;
   readonly swatch?: string;
+  /** Lucide icon name for the leading glyph when no swatch or preview applies. */
+  readonly icon?: string;
+  /** Line-style preview (stroke patterns and weights) drawn instead of an icon. */
+  readonly linePreview?: { readonly dash?: string; readonly width?: number };
   /** Optional ordering group within a category; equal groups use the label. */
   readonly sortOrder?: number;
   readonly available: boolean;

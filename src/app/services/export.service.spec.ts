@@ -5,6 +5,7 @@ import { GraphService } from './graph.service';
 import { CollectionService } from './collection.service';
 import { NODE_PALETTE } from '../models/node';
 import { exportBounds, EXPORT_THEMES } from '../models/export-image';
+import { decodeShareParam } from '../models/share-link';
 import { ToastService } from '../components/toast/toast';
 
 describe('ExportService', () => {
@@ -132,7 +133,7 @@ describe('ExportService', () => {
       window.history.pushState({}, '', '/');
     });
 
-    it('copies the app URL with the Graph State in the data query parameter and shows a success toast', async () => {
+    it('copies the app URL with the compressed Graph State in the data query parameter and shows a success toast', async () => {
       graphService.createNode('Link Node', 5, 15);
       const writeText = vi.fn().mockResolvedValue(undefined);
       vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
@@ -140,14 +141,26 @@ describe('ExportService', () => {
       await service.copyLink();
 
       const link = writeText.mock.calls[0][0] as string;
-      expect(link).toBe(
-        window.location.origin +
-          window.location.pathname +
-          '?data=' +
-          encodeURIComponent(JSON.stringify(graphService.exportGraph(), null, 2)),
-      );
+      const param = new URL(link).searchParams.get('data')!;
+      expect(link).toBe(window.location.origin + window.location.pathname + '?data=' + param);
+      // gz: marks the gzip+base64url payload; base64url never needs percent-encoding
+      expect(param).toMatch(/^gz:[A-Za-z0-9_-]+$/);
+      expect(JSON.parse(await decodeShareParam(param))).toEqual(graphService.exportGraph());
       expect(toastService.message()).toBe('Link copied to clipboard');
       expect(toastService.type()).toBe('success');
+    });
+
+    it('compresses the payload far below the legacy percent-encoded pretty JSON length', async () => {
+      for (let i = 0; i < 12; i++) graphService.createNode('Compression fixture node ' + i, i * 120, 0);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+      await service.copyLink();
+
+      const link = writeText.mock.calls[0][0] as string;
+      const param = new URL(link).searchParams.get('data')!;
+      const legacy = encodeURIComponent(JSON.stringify(graphService.exportGraph(), null, 2));
+      expect(param.length).toBeLessThan(legacy.length / 2);
     });
 
     it('round-trips: opening the copied link loads the identical Graph State', async () => {
@@ -164,7 +177,7 @@ describe('ExportService', () => {
       // Simulate opening the link: the ?data param goes through the startup loader
       window.history.pushState({}, '', link);
       graphService.clearGraph();
-      const result = graphService.loadFromUrlParam();
+      const result = await graphService.loadFromUrlParam();
 
       expect(result.loaded).toBe(true);
       expect(graphService.exportGraph()).toEqual(exported);
@@ -187,7 +200,22 @@ describe('ExportService', () => {
       window.history.pushState({}, '', link);
       graphService.clearGraph();
 
-      expect(graphService.loadFromUrlParam().loaded).toBe(true);
+      expect((await graphService.loadFromUrlParam()).loaded).toBe(true);
+      expect(graphService.exportGraph()).toEqual(exported);
+    });
+
+    it('round-trips Text containing a literal percent sign through a shared link', async () => {
+      graphService.createNode('50% off sale', 0, 0);
+      const exported = graphService.exportGraph();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+      await service.copyLink();
+      const link = writeText.mock.calls[0][0] as string;
+      window.history.pushState({}, '', link);
+      graphService.clearGraph();
+
+      expect((await graphService.loadFromUrlParam()).loaded).toBe(true);
       expect(graphService.exportGraph()).toEqual(exported);
     });
 
@@ -290,7 +318,7 @@ describe('ExportService', () => {
       const link = writeText.mock.calls[0][0] as string;
       const url = new URL(link);
       expect(url.pathname).toBe('/');
-      expect(JSON.parse(decodeURIComponent(url.searchParams.get('data')!))).toEqual(storedGraph());
+      expect(JSON.parse(await decodeShareParam(url.searchParams.get('data')!))).toEqual(storedGraph());
     });
 
     it('exportCollectionToFile downloads the envelope named after the collection', async () => {
