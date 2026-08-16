@@ -4,6 +4,7 @@ import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
 import { Connection } from '../models/connection';
 import { GraphState } from '../models/graph-state';
 import { Text, textFromString } from '../models/text';
+import { encodeShareParam } from '../models/share-link';
 
 describe('GraphService', () => {
   let service: GraphService;
@@ -1488,19 +1489,22 @@ describe('GraphService', () => {
   });
 
   describe('loadFromUrlParam', () => {
-    it('loads graph from URL parameter', () => {
+    it('loads graph from a legacy raw-JSON URL parameter', async () => {
       const graphData = {
         nodes: [{ id: 'n1', label: 'Test', x: 0, y: 0, width: 160, height: 48 }],
         connections: [],
       };
-      const encoded = encodeURIComponent(JSON.stringify(graphData));
+      // URLSearchParams.get percent-decodes before the loader sees the
+      // value — the spy hands over the decoded raw JSON, as the real
+      // parser would.
+      const decoded = JSON.stringify(graphData);
 
       const searchSpy = vi.spyOn(URLSearchParams.prototype, 'get').mockImplementation(function(this: URLSearchParams, key: string) {
-        if (key === 'data') return encoded;
+        if (key === 'data') return decoded;
         return null;
       });
 
-      const result = service.loadFromUrlParam();
+      const result = await service.loadFromUrlParam();
 
       expect(result.loaded).toBe(true);
       expect(service.nodes().length).toBe(1);
@@ -1509,19 +1513,50 @@ describe('GraphService', () => {
       searchSpy.mockRestore();
     });
 
-    it('returns loaded: false when no data parameter', () => {
+    it('loads graph from a gz-compressed data parameter', async () => {
+      const graphData = {
+        nodes: [{ id: 'n1', label: 'Test', x: 0, y: 0, width: 160, height: 48 }],
+        connections: [],
+      };
+      const param = await encodeShareParam(JSON.stringify(graphData));
+      expect(param.startsWith('gz:')).toBe(true);
+
+      const searchSpy = vi.spyOn(URLSearchParams.prototype, 'get').mockImplementation(function(this: URLSearchParams, key: string) {
+        if (key === 'data') return param;
+        return null;
+      });
+
+      const result = await service.loadFromUrlParam();
+
+      expect(result.loaded).toBe(true);
+      expect(service.nodes()[0].id).toBe('n1');
+
+      searchSpy.mockRestore();
+    });
+
+    it('returns loaded: false when no data parameter', async () => {
       const searchSpy = vi.spyOn(URLSearchParams.prototype, 'get').mockReturnValue(null);
 
-      const result = service.loadFromUrlParam();
+      const result = await service.loadFromUrlParam();
       expect(result.loaded).toBe(false);
 
       searchSpy.mockRestore();
     });
 
-    it('returns error for invalid JSON', () => {
+    it('returns error for invalid JSON', async () => {
       const searchSpy = vi.spyOn(URLSearchParams.prototype, 'get').mockReturnValue('invalid-json');
 
-      const result = service.loadFromUrlParam();
+      const result = await service.loadFromUrlParam();
+      expect(result.loaded).toBe(false);
+      expect(result.error).toContain('Failed to parse');
+
+      searchSpy.mockRestore();
+    });
+
+    it('returns error for a corrupt gz payload', async () => {
+      const searchSpy = vi.spyOn(URLSearchParams.prototype, 'get').mockReturnValue('gz:not-valid-base64url');
+
+      const result = await service.loadFromUrlParam();
       expect(result.loaded).toBe(false);
       expect(result.error).toContain('Failed to parse');
 

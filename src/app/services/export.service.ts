@@ -8,6 +8,7 @@ import {
   expandExportScope, normalizeExportScopeRequest,
 } from '../models/export-image';
 import { pinPoints } from '../models/pin';
+import { encodeShareParam } from '../models/share-link';
 import { ToastService } from '../components/toast/toast';
 
 @Injectable({ providedIn: 'root' })
@@ -65,7 +66,7 @@ export class ExportService {
   }
 
   copyLink(): Promise<void> {
-    return this.copyGraphLink(this.graphAsJson());
+    return this.copyGraphLink(this.graphService.exportGraph());
   }
 
   // ── PNG export (ADR-0014: snapshots the on-screen graph) ─────────
@@ -162,7 +163,7 @@ export class ExportService {
   copyProjectLink(projectId: string): Promise<void> {
     const graph = this.collectionService.getProjectGraph(projectId);
     if (!graph) return Promise.resolve();
-    return this.copyGraphLink(this.graphAsJson(graph));
+    return this.copyGraphLink(graph);
   }
 
   // ── Collection envelope ──────────────────────────────────────────
@@ -189,10 +190,12 @@ export class ExportService {
 
   /**
    * Share links always target the root path: ?data is only honored on `/`
-   * (the Scratch Canvas), never on a /p/:projectId route (ADR-0007).
+   * (the Scratch Canvas), never on a /p/:projectId route (ADR-0007). The
+   * payload is compact JSON, gzip-compressed and base64url-encoded, so the
+   * URL stays under server request-line limits (ADR-0026).
    */
-  private copyGraphLink(json: string): Promise<void> {
-    const link = window.location.origin + '/?data=' + encodeURIComponent(json);
+  private async copyGraphLink(graph: GraphState): Promise<void> {
+    const link = window.location.origin + '/?data=' + await encodeShareParam(JSON.stringify(graph));
     return this.copyToClipboard(link, 'Link copied to clipboard', 'Failed to copy link to clipboard');
   }
 }

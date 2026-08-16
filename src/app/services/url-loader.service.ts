@@ -7,9 +7,9 @@ export class UrlLoaderService {
   private graphService = inject(GraphService);
   private toastService = inject(ToastService);
 
-  /** Returns true when a graph was loaded from the ?data parameter. */
-  load(): boolean {
-    const result = this.graphService.loadFromUrlParam();
+  /** Resolves true when a graph was loaded from the ?data parameter. */
+  async load(): Promise<boolean> {
+    const result = await this.graphService.loadFromUrlParam();
     if (result.loaded) {
       this.toastService.show('Graph loaded from URL', 'success');
     } else if (result.error) {
