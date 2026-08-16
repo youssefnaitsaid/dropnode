@@ -32,6 +32,7 @@
 - inside the Text editor Enter inserts a new line (or next bullet in a list); blur or Ctrl+Enter commits, Escape cancels
 - while editing, Ctrl+Z/Ctrl+Y are ProseMirror-internal; a whole edit session commits as one SetNodeTextCommand or SetConnectionTextCommand and unchanged content pushes nothing onto History
 - the Formatting Toolbar shows for the entire edit session, floating above the target (flipping below when clipped at the viewport top); toggle buttons reflect the selection state and clicking them never blurs the edit
+- the S/M/L buttons light a size only when the entire selected text shares it — opening an edit shows a uniformly sized Text at its own size, a mixed-size selection lights no button, and a bare caret reads the size typing would continue at @implemented
 - the Link control opens an inline URL input in the toolbar; entered URLs without a scheme are normalized to https://
 - font sizes render as Node S/M/L = 11/14/18 px and Connection S/M/L = 10/12/15 px; M matches the pre-Text rendering exactly
 - Highlight renders as a yellow marker behind the text; links render underlined and Ctrl+Click opens them in a new tab (noopener) — plain click keeps select/drag
