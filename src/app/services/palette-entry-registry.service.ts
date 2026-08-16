@@ -39,6 +39,7 @@ import { ExportDialogService } from './export-dialog.service';
 import { ExportService } from './export.service';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
+import { MinimapService } from './minimap.service';
 import { ImportDialogService } from './import-dialog.service';
 import { PresentationService } from './presentation.service';
 import { SidebarService } from './sidebar.service';
@@ -105,6 +106,7 @@ export class PaletteEntryRegistry {
   private readonly exportService = inject(ExportService);
   private readonly presentationService = inject(PresentationService);
   private readonly sidebarService = inject(SidebarService);
+  private readonly minimapService = inject(MinimapService);
   private readonly paletteService = inject(CommandPaletteService);
   private readonly router = inject(Router);
 
@@ -305,6 +307,9 @@ export class PaletteEntryRegistry {
       }),
       this.action('toggle-sidebar', 'Toggle Sidebar', 'Application', () => this.sidebarService.toggle(), {
         aliases: ['show sidebar', 'hide sidebar'], shortcut: SHORTCUTS.toggleSidebar,
+      }),
+      this.action('toggle-minimap', 'Toggle Minimap', 'Application', () => this.minimapService.toggle(), {
+        aliases: ['show minimap', 'hide minimap'],
       }),
     ];
   }

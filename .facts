@@ -187,6 +187,14 @@
 - Zoom to fit and Zoom to selection are bounds-centered — a third zoom-centering behavior alongside cursor-centered wheel zoom and origin-centered toolbar buttons; both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
 - the toolbar zoom cluster carries a Zoom to fit button distinct from Reset View; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
 
+## minimap
+
+- the Minimap is a small canvas-rendered map of the whole graph overlaid at the editor's bottom-right, diverging from the main Canvas's DOM/SVG rendering so per-frame redraws stay inside the ADR-0003 budget (ADR-0024)
+- the Minimap frames the fit-to-content bounds — the union bounding box of all Nodes and Groups padded by 10% per side, contain-fitted and centered in its 200x150 box
+- the Minimap draws Connections as hairline curves along each route's segments, Groups as lighter rects, regular Nodes as filled rects, the Selection in an accent color, and the current Viewport as an outlined rectangle on top; Reroute Point handles, Connection Text, Shapes, and Palette colors are not drawn
+- pressing or dragging anywhere on the Minimap recenters the Viewport on that world point; recentering is a Viewport operation that keeps the current zoom and adds no History entry
+- the Minimap is hidden while the graph is empty, during Present Mode, and when toggled off; the toggle is the "Toggle Minimap" Palette Entry and persists under the localStorage key dropnode:minimap-hidden (visible by default)
+
 ## present
 
 - Present Mode is entered from a toolbar Present button in the right cluster, disabled with a "Group nodes to present them" hint while the graph has no Groups; it works on the Scratch Canvas and Project routes alike and has no entry shortcut (ADR-0020) @implemented

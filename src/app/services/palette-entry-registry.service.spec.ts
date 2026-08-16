@@ -35,6 +35,7 @@ describe('PaletteEntryRegistry', () => {
     const rose = find('node-color-rose');
     const defaultColor = find('node-color-default');
     const diamond = find('node-shape-diamond');
+    const toggleMinimap = find('toggle-minimap');
 
     expect(fit.label).toBe('Zoom to Fit');
     expect(fit.category).toBe('Viewport');
@@ -46,6 +47,9 @@ describe('PaletteEntryRegistry', () => {
     expect(diamond.label).toBe('Set selected Nodes to Diamond shape');
     expect(diamond.category).toBe('Nodes & Groups');
     expect(diamond.aliases).toContain('node shape diamond');
+    expect(toggleMinimap.label).toBe('Toggle Minimap');
+    expect(toggleMinimap.category).toBe('Application');
+    expect(toggleMinimap.aliases).toContain('hide minimap');
     expect(['rectangle', 'pill', 'diamond', 'ellipse'].map(shape => find(`node-shape-${shape}`).id))
       .toEqual(['node-shape-rectangle', 'node-shape-pill', 'node-shape-diamond', 'node-shape-ellipse']);
 
