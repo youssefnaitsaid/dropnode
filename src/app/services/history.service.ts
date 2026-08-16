@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { Command } from '../models/command';
+import { NodeRect } from '../models/node-shape';
 
 @Injectable({ providedIn: 'root' })
 export class HistoryService {
@@ -36,6 +37,12 @@ export class HistoryService {
     this.undoStack.push(command);
     this.redoStack = [];
     this.updateSignals();
+  }
+
+  /** Let the latest shape Command capture its DOM-measured growth. */
+  recordAutoResize(nodeId: string, rect: NodeRect): void {
+    const command = this.undoStack[this.undoStack.length - 1];
+    command?.recordAutoResize?.(nodeId, rect);
   }
 
   clear(): void {

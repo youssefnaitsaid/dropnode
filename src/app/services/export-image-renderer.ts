@@ -85,7 +85,8 @@ export class ExportImageRenderer {
   /** An artifact, not a screenshot: no Handles, Resize Grips, selection or drag chrome. */
   private stripEditorChrome(clone: HTMLElement): void {
     clone.querySelectorAll('app-handle, .grip, .connection-ghost, .connection-hit, .reroute-point').forEach(el => el.remove());
-    clone.querySelectorAll('.node-card.selected').forEach(el => el.classList.remove('selected'));
+    clone.querySelectorAll('.node-card.selected, .node-surface.selected')
+      .forEach(el => el.classList.remove('selected'));
     clone.querySelectorAll<SVGElement>('.connection-path').forEach(el => {
       el.classList.remove('selected', 'hovered');
       // The selection glow is an inline filter bound in the template
@@ -121,7 +122,8 @@ export class ExportImageRenderer {
       const card = clone.querySelector<HTMLElement>(`.node-card[data-node-id="${node.id}"]`);
       if (!card) continue;
       const base = themedNodeBackground(node.color, colors);
-      card.style.background = node.kind === 'group' ? base + GROUP_FILL_ALPHA : base;
+      const surface = card.querySelector<HTMLElement>('.node-surface') ?? card;
+      surface.style.background = node.kind === 'group' ? base + GROUP_FILL_ALPHA : base;
     }
     clone.querySelectorAll<HTMLElement>('.group-card').forEach(el => {
       el.style.borderColor = colors.groupBorder;

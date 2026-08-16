@@ -40,7 +40,7 @@ import {
   QuickAddNodeCommand,
   NodeRect,
 } from '../../services/commands';
-import { NodeComponent, GripCorner } from '../node/node';
+import { NodeComponent, GripCorner, NodeSizeChangedEvent } from '../node/node';
 import { ConnectionLayerComponent } from '../connection-layer/connection-layer';
 import { HandleSide, GraphNode } from '../../models/node';
 import { MAX_REROUTE_POINTS, ReroutePoint, TEXT_POSITION_DEFAULT } from '../../models/connection';
@@ -1295,8 +1295,11 @@ export class CanvasComponent {
     this.historyService.execute(cmd);
   }
 
-  onNodeSizeChanged(event: { nodeId: string; width: number; height: number }): void {
-    this.graphService.updateNodeSize(event.nodeId, event.width, event.height);
+  onNodeSizeChanged(event: NodeSizeChangedEvent): void {
+    if (event.preserveCenter) {
+      this.historyService.recordAutoResize(event.nodeId, event.rect);
+    }
+    this.graphService.resizeNode(event.nodeId, event.rect);
   }
 }
 

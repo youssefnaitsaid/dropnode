@@ -2,7 +2,7 @@
 
 ## domain
 
-- a Node is a rectangle on the Canvas carrying Text, with a unique id, a position, and dimensions; its Text dictates a minimum size (GraphNode in code)
+- a Node is a rectangular-bounded element on the Canvas carrying Text and an optional visual Shape, with a unique id, a position, and dimensions; its Text dictates a minimum size (GraphNode in code)
 - Text is the formattable content of a Node (required) or Connection (optional): blocks of styled runs supporting bold, italic, highlight, link, font size S/M/L, and bulleted lists (ADR-0009)
 - Formatting is applied via the Formatting Toolbar shown while editing Text; Groups carry a plain single-line Label instead of Text
 - a Group is a distinct kind of node (kind 'group') that visually and logically contains child nodes via their parentId; nesting is one level deep — a Group never contains another Group
@@ -44,6 +44,10 @@
 - double-clicking empty Canvas creates a Node with Text "New Node" centered on the cursor, as a single undo step
 - new Nodes default to 160x48; Text wraps at the Node's width, and after render the measured content raises the width floor (widest unbreakable line, 120px minimum) and height (48px minimum) but never shrinks — manual sizes are grow-only protected
 - Node auto-sizing updates go directly to GraphService and never create a History entry
+- a regular Node carries an optional Shape — rectangle by default, with pill, diamond, and ellipse as the only non-default values; Groups never carry Shape @implemented
+- Shape is visual-only: the Node's rectangular bounding box remains authoritative for Handles, hit testing, Marquee, alignment, containment, bounds, and Export, while Text stays centered in the shape's safe area @implemented
+- choosing a Shape from the toolbar or Command Palette applies it only to regular Nodes in the Selection as one undoable bulk Command; selected Groups are ignored, mixed Shapes show no active button, and an all-no-op choice creates no History entry @implemented
+- a Shape change grows an undersized regular Node around its existing center using a shape-specific Text-safe minimum and never shrinks an existing rect; Resize Grips remain free width/height resizing subject to that minimum @implemented
 - four Resize Grips show at the corners of a node only while it is the entire Selection (exactly one Node, nothing else); dragging one resizes with the opposite corner anchored
 - a grip drag clamps width and height to the Text-derived minimums (floors 120 and 48)
 - an entire grip drag is one undo step: per-mousemove size updates bypass History, and a single ResizeNodeCommand is pushed on mouseup only if the rect changed more than 2px
@@ -222,6 +226,7 @@
 - Import is validate-then-replace: an invalid payload is rejected wholesale with a specific error message and existing state stays untouched
 - Import validation rejects duplicate Node ids, Connections referencing Nodes absent from the same payload, and handle values outside top/right/bottom/left; an empty graph is valid
 - Import validation also rejects kind values other than 'group', off-palette colors, parentId values that reference a missing node or a non-Group, Groups carrying a parentId, and Connections linking a Group to its own child
+- Import accepts only rectangle, pill, diamond, or ellipse Shape values on regular Nodes, rejects Shape on Groups, and canonicalizes explicit rectangle to an absent field @implemented
 - payloads without kind, parentId, or color import unchanged as plain nodes — pre-Group exports and links stay valid
 - Import validation does NOT reject duplicate Connection ids or self-connections — only createConnection guards those
 - Import whitelists Text wholesale: unknown block kinds or run keys, non-true format flags, sizes outside S/L, and non-http(s) links are rejected with "Invalid node {id}: {reason}" or "Invalid connection {id}: {reason}"; a Group carrying text is rejected, and a Group without a string label is rejected
@@ -288,6 +293,7 @@
 - the Clipboard is in-memory, single-entry, and session-scoped (ADR-0011): it holds the most recently Cut or Copied Selection and is lost on reload; the OS clipboard is never used for graph elements
 - Cut, Copy, and Duplicate apply to Nodes and Groups only — a Selection with no Node offers them as silent no-ops
 - copying a Selection captures its Nodes, each selected Group's children, and only Connections with BOTH endpoints inside the captured set — a selected Connection with an endpoint outside is silently dropped from the copy; the snapshot is a deep clone isolated from later edits
+- Copy, Paste, Duplicate, project persistence, Graph State Export, and PNG rendering preserve a regular Node's Shape @implemented
 - Copy keeps the original selected and never touches History
 - Cut removes the captured set plus every touching Connection — and any explicitly selected dangling Connection, though it is never copied — as one compound undo step; unlike Delete, cutting a Group removes its children instead of releasing them; undo restores original ids while the Clipboard keeps the copy
 - Paste regenerates all ids in the node_/conn_ patterns and remaps parentId and Connection endpoints; pasting the same entry twice yields two independent copies; a multi-element paste recenters the set's bounding box on the paste point

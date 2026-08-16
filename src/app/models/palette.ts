@@ -25,6 +25,8 @@ export interface PaletteEntry {
   readonly category: PaletteCategory;
   readonly shortcut?: string;
   readonly swatch?: string;
+  /** Optional ordering group within a category; equal groups use the label. */
+  readonly sortOrder?: number;
   readonly available: boolean;
   readonly disabledReason?: string;
   readonly execute: () => void;
@@ -86,11 +88,18 @@ function categoryIndex(category: PaletteCategory): number {
   return PALETTE_CATEGORY_ORDER.indexOf(category);
 }
 
+function sortOrderDifference(a: PaletteEntry, b: PaletteEntry): number {
+  if (a.sortOrder === undefined || b.sortOrder === undefined) return 0;
+  return a.sortOrder - b.sortOrder;
+}
+
 function compareEntries(a: RankedEntry, b: RankedEntry): number {
   if (a.entry.available !== b.entry.available) return a.entry.available ? -1 : 1;
   if (a.score !== b.score) return a.score - b.score;
   const categoryDifference = categoryIndex(a.entry.category) - categoryIndex(b.entry.category);
   if (categoryDifference !== 0) return categoryDifference;
+  const sortOrderDifferenceValue = sortOrderDifference(a.entry, b.entry);
+  if (sortOrderDifferenceValue !== 0) return sortOrderDifferenceValue;
   const labelDifference = a.entry.label.localeCompare(b.entry.label);
   return labelDifference !== 0 ? labelDifference : a.entry.id.localeCompare(b.entry.id);
 }
@@ -110,6 +119,8 @@ export function searchPaletteEntries(
       if (a.available !== b.available) return a.available ? -1 : 1;
       const categoryDifference = categoryIndex(a.category) - categoryIndex(b.category);
       if (categoryDifference !== 0) return categoryDifference;
+      const sortOrderDifferenceValue = sortOrderDifference(a, b);
+      if (sortOrderDifferenceValue !== 0) return sortOrderDifferenceValue;
       const labelDifference = a.label.localeCompare(b.label);
       return labelDifference !== 0 ? labelDifference : a.id.localeCompare(b.id);
     });

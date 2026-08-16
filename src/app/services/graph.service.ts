@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
+import { NodeShape, isNodeShape, storedNodeShape } from '../models/node-shape';
 import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
 import { GraphState } from '../models/graph-state';
 import { ViewportState, ZOOM_MIN, ZOOM_MAX } from '../models/viewport-state';
@@ -213,6 +214,22 @@ export class GraphService {
           return rest;
         }
         return { ...n, color };
+      })
+    );
+  }
+
+  // Shape is a visual property of regular Nodes only. The rectangle is the
+  // default and is represented by an absent field, like other optional styles.
+  setNodeShape(id: string, shape: NodeShape | null): void {
+    const stored = shape === null ? undefined : storedNodeShape(shape);
+    this.nodes.update(nodes =>
+      nodes.map(n => {
+        if (n.id !== id || n.kind === 'group') return n;
+        if (stored === undefined) {
+          const { shape: _removed, ...rest } = n;
+          return rest;
+        }
+        return { ...n, shape: stored };
       })
     );
   }
@@ -589,10 +606,32 @@ export class GraphService {
       return { success: false, error: validation.error };
     }
 
-    this.nodes.set(state.nodes.map(n => this.migrateNode(n)));
-    this.connections.set(state.connections.map(c => this.migrateConnection(c)));
+    const canonical = this.canonicalizeGraphState(state);
+    this.nodes.set(canonical.nodes);
+    this.connections.set(canonical.connections);
     this.clearSelection();
     return { success: true };
+  }
+
+  /** Apply the same legacy migration and default canonicalization as Import. */
+  canonicalizeGraphState(state: GraphState): GraphState {
+    return structuredClone({
+      nodes: state.nodes.map(node => this.migrateNode(node)),
+      connections: state.connections.map(connection => this.migrateConnection(connection)),
+    });
+  }
+
+  /** Canonicalize only Shape defaults for collection envelopes. */
+  canonicalizeNodeShapes(state: GraphState): GraphState {
+    return structuredClone({
+      nodes: state.nodes.map(node => {
+        const raw = node as Omit<GraphNode, 'shape'> & { shape?: NodeShape };
+        if (raw.shape !== 'rectangle' && raw.shape !== undefined) return raw;
+        const { shape: _removed, ...rest } = raw;
+        return rest;
+      }),
+      connections: state.connections,
+    });
   }
 
   // Legacy payloads carry plain-string labels on regular nodes/connections;
@@ -600,8 +639,14 @@ export class GraphService {
   // Text is canonicalized so imported key order can't spoof a later change.
   private migrateNode(node: GraphNode): GraphNode {
     if (node.kind === 'group') return { ...node };
-    const { label, ...rest } = node as GraphNode & { label?: string };
-    return { ...rest, text: node.text ? canonicalizeText(node.text) : textFromString(label ?? '') };
+    const { label, shape, ...rest } = node as Omit<GraphNode, 'shape'> & { label?: string; shape?: NodeShape };
+    const migrated = {
+      ...rest,
+      text: node.text ? canonicalizeText(node.text) : textFromString(label ?? ''),
+    } as GraphNode;
+    return shape === 'rectangle' || shape === undefined
+      ? migrated
+      : { ...migrated, shape };
   }
 
   private migrateConnection(conn: Connection): Connection {
@@ -701,6 +746,14 @@ export class GraphService {
       }
       if (node['kind'] !== undefined && node['kind'] !== 'group') {
         return { valid: false, error: `Invalid node ${nodeId}: kind must be 'group'` };
+      }
+      if (node['shape'] !== undefined) {
+        if (node['kind'] === 'group') {
+          return { valid: false, error: `Invalid node ${nodeId}: a Group cannot carry shape` };
+        }
+        if (!isNodeShape(node['shape'])) {
+          return { valid: false, error: `Invalid node ${nodeId}: shape must be rectangle, pill, diamond, or ellipse` };
+        }
       }
       if (node['color'] !== undefined && !NODE_PALETTE.includes(node['color'] as string)) {
         return { valid: false, error: `Invalid node ${nodeId}: color must be a palette color` };

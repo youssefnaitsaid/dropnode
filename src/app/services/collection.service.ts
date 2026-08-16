@@ -257,7 +257,10 @@ export class CollectionService {
       if (!validation.valid) {
         return { success: false, error: `Invalid project "${entry['name']}": ${validation.error}` };
       }
-      entries.push({ name: entry['name'], graph: entry['graph'] as GraphState });
+      entries.push({
+        name: entry['name'],
+        graph: this.graphService.canonicalizeNodeShapes(entry['graph'] as GraphState),
+      });
     }
 
     const collection = this.createCollection(file['name']);
