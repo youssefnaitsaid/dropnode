@@ -1,17 +1,19 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { GraphNode } from '../models/node';
 import { Connection } from '../models/connection';
+import { Pin } from '../models/pin';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { CompoundCommand, DeleteNodeCommand, DeleteConnectionCommand, InsertElementsCommand } from './commands';
 import { Command } from '../models/command';
 
 // A captured Selection: the top-level roots (Nodes and Groups) whose copies
-// re-form the Selection after a paste, plus every rider (Group children and
-// internal Connections).
+// re-form the Selection after a paste, plus every rider (Group children,
+// internal Connections, and Pins anchored to captured Nodes).
 interface ClipboardEntry {
   nodes: GraphNode[];
   connections: Connection[];
+  pins: Pin[];
   rootIds: string[];
 }
 
@@ -46,7 +48,7 @@ export class ClipboardService {
 
   // A pending Alt+drag duplicate, created transiently and committed on drop
   private spawned: {
-    nodes: GraphNode[]; connections: Connection[]; rootIds: string[]; sourceIds: string[];
+    nodes: GraphNode[]; connections: Connection[]; pins: Pin[]; rootIds: string[]; sourceIds: string[];
     baseConnections: Connection[];
   } | null = null;
 
@@ -114,7 +116,7 @@ export class ClipboardService {
     translateConnections(materialized.connections, dx, dy);
 
     this.historyService.execute(new InsertElementsCommand(
-      this.graphService, 'Paste', materialized.nodes, materialized.connections,
+      this.graphService, 'Paste', materialized.nodes, materialized.connections, materialized.pins,
     ));
   }
 
@@ -167,7 +169,7 @@ export class ClipboardService {
     const materialized = this.materializeLiveCopy(toArray(nodeIds), DUPLICATE_OFFSET, DUPLICATE_OFFSET);
     if (!materialized) return;
     this.historyService.execute(new InsertElementsCommand(
-      this.graphService, 'Duplicate', materialized.nodes, materialized.connections,
+      this.graphService, 'Duplicate', materialized.nodes, materialized.connections, materialized.pins,
     ));
   }
 
@@ -187,6 +189,7 @@ export class ClipboardService {
     this.spawned = {
       nodes: materialized.nodes,
       connections: materialized.connections,
+      pins: materialized.pins,
       rootIds: materialized.rootIds,
       sourceIds,
       baseConnections: structuredClone(materialized.connections),
@@ -194,6 +197,9 @@ export class ClipboardService {
     this.graphService.nodes.update(nodes => [...nodes, ...materialized.nodes]);
     if (materialized.connections.length > 0) {
       this.graphService.connections.update(conns => [...conns, ...materialized.connections]);
+    }
+    if (materialized.pins.length > 0) {
+      this.graphService.pins.update(pins => [...pins, ...materialized.pins]);
     }
     this.graphService.setSelection(materialized.rootIds, []);
 
@@ -237,10 +243,12 @@ export class ClipboardService {
 
     const nodeIds = new Set(spawned.nodes.map(n => n.id));
     const connIds = new Set(spawned.connections.map(c => c.id));
+    const pinIds = new Set(spawned.pins.map(p => p.id));
     const nodes = this.graphService.nodes().filter(n => nodeIds.has(n.id));
     const connections = this.graphService.connections().filter(c => connIds.has(c.id));
+    const pins = this.graphService.pins().filter(p => pinIds.has(p.id));
     this.historyService.pushWithoutExecute(new InsertElementsCommand(
-      this.graphService, 'Duplicate', nodes, connections,
+      this.graphService, 'Duplicate', nodes, connections, pins,
     ));
   }
 
@@ -256,8 +264,10 @@ export class ClipboardService {
 
     const nodeIds = new Set(spawned.nodes.map(n => n.id));
     const connIds = new Set(spawned.connections.map(c => c.id));
+    const pinIds = new Set(spawned.pins.map(p => p.id));
     this.graphService.nodes.update(nodes => nodes.filter(n => !nodeIds.has(n.id)));
     this.graphService.connections.update(conns => conns.filter(c => !connIds.has(c.id)));
+    this.graphService.pins.update(pins => pins.filter(p => !pinIds.has(p.id)));
     if (spawned.rootIds.some(id => this.graphService.isNodeSelected(id))) {
       this.graphService.setSelection(spawned.sourceIds, []);
     }
@@ -269,7 +279,7 @@ export class ClipboardService {
     nodeIds: readonly string[],
     dx: number,
     dy: number,
-  ): { nodes: GraphNode[]; connections: Connection[]; rootIds: string[]; idMap: Map<string, string> } | null {
+  ): { nodes: GraphNode[]; connections: Connection[]; pins: Pin[]; rootIds: string[]; idMap: Map<string, string> } | null {
     const captured = this.capture(nodeIds);
     if (!captured) return null;
 
@@ -283,9 +293,10 @@ export class ClipboardService {
   }
 
   // Deep-cloned capture of the Selection roots: each Group brings its
-  // children, and only Connections with BOTH endpoints inside the captured
-  // set travel (danglers are dropped). A root whose own Group is also a root
-  // is folded into that Group (group-as-unit).
+  // children, only Connections with BOTH endpoints inside the captured set
+  // travel (danglers are dropped), and Pins anchored to captured Nodes ride
+  // along (Canvas-anchored Pins never do). A root whose own Group is also a
+  // root is folded into that Group (group-as-unit).
   private capture(nodeIds: readonly string[]): ClipboardEntry | null {
     const byId = new Map(this.graphService.nodes().map(n => [n.id, n]));
     const rootSet = new Set(nodeIds.filter(id => byId.has(id)));
@@ -307,18 +318,21 @@ export class ClipboardService {
     const connections = this.graphService.connections().filter(
       c => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId),
     );
+    const pins = this.graphService.pins().filter(
+      p => p.anchor.kind === 'node' && ids.has(p.anchor.nodeId),
+    );
 
-    return structuredClone({ nodes, connections, rootIds: roots.map(r => r.id) });
+    return structuredClone({ nodes, connections, pins, rootIds: roots.map(r => r.id) });
   }
 
   // Fresh ids for every element, internal references remapped; parentId is
   // remapped when its Group is in the set, else kept (Duplicate's sibling
   // semantics), replaced by parentGroupId (Group paste-target), or stripped
-  // (Canvas paste).
+  // (Canvas paste). A riding Pin's anchor nodeId is always in the set.
   private materialize(
     entry: ClipboardEntry,
     opts: { parentGroupId?: string; preserveOutsideParents?: boolean } = {},
-  ): { nodes: GraphNode[]; connections: Connection[]; rootIds: string[]; idMap: Map<string, string> } {
+  ): { nodes: GraphNode[]; connections: Connection[]; pins: Pin[]; rootIds: string[]; idMap: Map<string, string> } {
     const cloned: ClipboardEntry = structuredClone(entry);
     const idMap = new Map<string, string>();
     for (const node of cloned.nodes) {
@@ -345,9 +359,18 @@ export class ClipboardService {
       targetNodeId: idMap.get(conn.targetNodeId)!,
     }));
 
+    const pins = cloned.pins.map(pin => ({
+      ...pin,
+      id: this.graphService.generatePinId(),
+      anchor: pin.anchor.kind === 'node'
+        ? { ...pin.anchor, nodeId: idMap.get(pin.anchor.nodeId)! }
+        : { ...pin.anchor },
+    }));
+
     return {
       nodes,
       connections,
+      pins,
       rootIds: entry.rootIds.map(id => idMap.get(id)!),
       idMap,
     };

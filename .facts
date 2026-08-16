@@ -12,7 +12,7 @@
 - a Resize Grip is a draggable control at one of the four corners of the selected node, used to change the node's size; distinct from a Handle
 - the Canvas is the unbounded workspace containing all Nodes and Connections
 - the Viewport is the visible region of the Canvas, defined by a pan offset and a zoom scale
-- the Graph State is the complete serializable model: the arrays of all Nodes and all Connections, and nothing else
+- the Graph State is the complete serializable model: the arrays of all Nodes, all Connections, and all Pins, and nothing else (ADR-0025)
 - a Command is an undoable user action exposing execute(), undo(), and a description
 - the History is the ordered record of executed Commands, split into an undo stack and a redo stack
 - the Snap Zone is a 30-canvas-unit radius around a Handle; a dragged connection endpoint inside it attaches to that Handle
@@ -276,7 +276,7 @@
 - / redirects to the most recently opened Project; a ?data share link or an empty store stays on the Scratch Canvas
 - an unknown or deleted /p/:projectId redirects to / with a "Project not found" error toast
 - editing auto-saves: Graph State and Viewport changes persist to the current Project debounced at 300ms; there is no save button and no dirty state
-- the per-Project Viewport is stored outside Graph State — exported JSON and ?data links carry nodes and connections only
+- the per-Project Viewport is stored outside Graph State — exported JSON and ?data links carry the graph's nodes, connections, and Pins, never the Viewport
 - deleting a Collection cascade-deletes all its Projects; Collection and Project deletion are permanent (not undoable) and both guarded by a confirmation modal, the Collection modal stating its project count
 - deleting the Project being viewed navigates to the most recently opened surviving Project, or to / when none remain
 - Sidebar inline rename follows the node-label contract: Enter or blur commits, Escape cancels, empty or unchanged names are never committed; newly created Collections and Projects drop straight into rename
@@ -323,6 +323,25 @@
 - menu Edit text opens the target Node's or Connection's Text editor; menu Rename opens a Group's inline Label editor — all reuse the double-click editors and their commit rules
 - menu Delete runs the same Commands as the Delete/Backspace shortcut, with identical cascade and undo behavior; opening or dismissing a menu never touches History
 - the native browser context menu is suppressed on the Canvas, Nodes, Groups, and Connections, but preserved inside the Text editor and Group Label input (both stop propagation of the contextmenu event)
+
+## pins
+
+- label: a Pin is a single-user marker anchored to a Canvas point (absolute {x,y}) or a Node (nodeId plus an offset from the node's top-left), holding one non-empty plain-string message — never Text, never a Label; Pins are a third Graph State collection and serialize everywhere the document travels (ADR-0025)
+  command: grep -q "kind: 'canvas'" src/app/models/pin.ts
+- Pin ids follow the pin_{timestamp}_{counter} pattern @implemented
+- a Node-anchored Pin moves with its Node (drags, Group moves, Tidy up); a Canvas-anchored Pin moves with nothing @implemented
+- deleting a Node cascade-deletes its anchored Pins in the same compound undo step, and undo restores original ids; Groups are anchorable, and deleting a Group kills the Group's own Pins while its released children and their Pins survive @implemented
+- Pin operations are full Commands: create-with-message, edit, move, and delete are all undoable @implemented
+- creation is ghost-pin: "Add pin" (empty-Canvas, Node, and Group Context Menus, or a Palette Entry that anchors to the single selected Node at its top-right corner when exactly one is selected, else drops canvas-anchored at the Viewport center) opens the popover; nothing enters Graph State until a non-empty commit creates the Pin with its message as one Command; Escape or an empty commit leaves no trace and no History entry @implemented
+- editing mirrors the Text editor contract on a plain textarea: click opens the popover focused and selected, Enter inserts a newline, blur or Ctrl+Enter commits, Escape cancels; an unchanged commit pushes nothing; committing empty removes the Pin; the Formatting Toolbar never appears @implemented
+- dragging a Pin moves its anchor within its own kind — no node-to-canvas re-anchoring — with transient updates and one Command on mouseup past the 2px threshold @implemented
+- Cut, Copy, Duplicate, and Alt+drag carry Pins anchored to captured Nodes; Paste regenerates Pin ids and remaps anchors; Canvas-anchored Pins never ride @implemented
+- Import validates pins wholesale: rejects unknown anchor kinds, anchors referencing nodes absent from the same payload, non-finite coordinates or offsets, non-string or empty/whitespace messages, and duplicate Pin ids; a payload without a pins key imports pin-less and an empty array canonicalizes to absent; Groups are valid anchors; there are no count or message-length caps @implemented
+- label: Pin visibility is a global toggle — the "Toggle Pins" Palette Entry, persisted under dropnode:pins-hidden, visible by default; hidden Pins still exist, still serialize, still ride the Clipboard, and still render in a PNG whose "Include Pins" checkbox is checked
+  command: grep -q 'dropnode:pins-hidden' src/app/services/pin-visibility.service.ts
+- PNG Export omits Pins unless the "Export as…" dialog's "Include Pins" checkbox is checked — default off, reset on every open, PNG-only; when included, capture bounds union the rendered Pin positions, and a scoped export renders only Pins anchored to in-scope Nodes (Canvas Pins never render scoped) @implemented
+- Pins never join the Selection, are ignored by Marquee and Ctrl+A, never extend Zoom-to-fit bounds, are not drawn on the Minimap, and are hidden in Present Mode @implemented
+- right-clicking a Pin offers "Edit pin" and "Delete pin"; Delete pin runs the same removal Command as an empty commit, and the pin Context Menu never touches the Selection @implemented
 
 ## ui
 

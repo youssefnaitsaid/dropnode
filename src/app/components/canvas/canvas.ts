@@ -7,7 +7,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
   lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
-  lucideImageDown,
+  lucideImageDown, lucideMessageCircle,
   lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
   lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
   lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
@@ -42,6 +42,7 @@ import {
 } from '../../services/commands';
 import { NodeComponent, GripCorner, NodeSizeChangedEvent } from '../node/node';
 import { ConnectionLayerComponent } from '../connection-layer/connection-layer';
+import { PinLayerComponent } from '../pin-layer/pin-layer';
 import { HandleSide, GraphNode } from '../../models/node';
 import { MAX_REROUTE_POINTS, ReroutePoint, TEXT_POSITION_DEFAULT } from '../../models/connection';
 import { Rect, normalizedRect, marqueeSelection, rectsOverlap } from '../../models/marquee';
@@ -53,7 +54,7 @@ import { Text } from '../../models/text';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NodeComponent, ConnectionLayerComponent, NgIcon,
+    NodeComponent, ConnectionLayerComponent, PinLayerComponent, NgIcon,
     CdkContextMenuTrigger, HlmDropdownMenu, HlmDropdownMenuItem,
     HlmDropdownMenuSub, HlmDropdownMenuSubTrigger, HlmDropdownMenuItemSubIndicator,
   ],
@@ -61,7 +62,7 @@ import { Text } from '../../models/text';
     provideIcons({
       lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
       lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
-      lucideImageDown,
+      lucideImageDown, lucideMessageCircle,
       lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
       lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
       lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
@@ -130,6 +131,11 @@ import { Text } from '../../models/text';
             }
           </div>
 
+          <!-- The Pin layer rides above the nodes (ADR-0025): Pins are
+               never Selection members, hidden by the global toggle and in
+               Present Mode -->
+          <app-pin-layer />
+
           <!-- The Marquee rectangle (ADR-0016), in canvas coordinates inside
                the shared transform so it scales with the graph -->
           @if (marqueeRect(); as rect) {
@@ -169,6 +175,10 @@ import { Text } from '../../models/text';
               <ng-icon name="lucideGroup" />
               <span>Add group</span>
             </button>
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.addPin()">
+              <ng-icon name="lucideMessageCircle" />
+              <span>Add pin</span>
+            </button>
             <button hlmDropdownMenuItem [disabled]="!contextMenuService.canPaste()" (triggered)="contextMenuService.pasteHere()">
               <ng-icon name="lucideClipboardPaste" />
               <span>Paste</span>
@@ -190,6 +200,10 @@ import { Text } from '../../models/text';
                 <span>Edit text</span>
               </button>
             }
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.addPin()">
+              <ng-icon name="lucideMessageCircle" />
+              <span>Add pin</span>
+            </button>
             <button hlmDropdownMenuItem (triggered)="contextMenuService.cutTarget()">
               <ng-icon name="lucideScissors" />
               <span>Cut</span>
@@ -225,6 +239,16 @@ import { Text } from '../../models/text';
             <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteTarget()">
               <ng-icon name="lucideTrash2" />
               <span>Delete</span>
+            </button>
+          }
+          @case ('pin') {
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.editPin()">
+              <ng-icon name="lucideMessageCircle" />
+              <span>Edit pin</span>
+            </button>
+            <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deletePin()">
+              <ng-icon name="lucideTrash2" />
+              <span>Delete pin</span>
             </button>
           }
           @case ('multi') {
@@ -537,7 +561,7 @@ export class CanvasComponent {
 
   onCanvasDoubleClick(event: MouseEvent): void {
     if (this.presentationService.active()) return;
-    if ((event.target as HTMLElement).closest('app-node')) return;
+    if ((event.target as HTMLElement).closest('app-node, [data-pin-id]')) return;
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const screenX = event.clientX - rect.left;
@@ -556,7 +580,7 @@ export class CanvasComponent {
       this.startPan(event);
       return;
     }
-    if ((event.target as HTMLElement).closest('app-node')) return;
+    if ((event.target as HTMLElement).closest('app-node, [data-pin-id], .pin-popover')) return;
     // Left button only — right-click is reserved for the context menu and
     // must never start a Marquee or clear selection (the menu handles that)
     if (event.button !== 0) return;
@@ -635,6 +659,15 @@ export class CanvasComponent {
     if (connEl) {
       this.contextMenuService.openFor(
         { kind: 'connection', connectionId: connEl.getAttribute('data-connection-id')! },
+        canvasPos.x, canvasPos.y,
+      );
+      return;
+    }
+
+    const pinEl = el.closest('[data-pin-id]');
+    if (pinEl) {
+      this.contextMenuService.openFor(
+        { kind: 'pin', pinId: pinEl.getAttribute('data-pin-id')! },
         canvasPos.x, canvasPos.y,
       );
       return;

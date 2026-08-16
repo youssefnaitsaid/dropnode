@@ -489,4 +489,84 @@ describe('ContextMenuService', () => {
       expect(historyService.canUndo()).toBe(false);
     });
   });
+
+  describe('pins', () => {
+    it('right-clicking a Pin keeps the Selection and shows the pin menu', () => {
+      const node = graphService.createNode('A', 0, 0);
+      const pin = graphService.createPin({ kind: 'canvas', x: 5, y: 5 }, 'Note')!;
+      graphService.selectNode(node.id);
+
+      service.openFor({ kind: 'pin', pinId: pin.id }, 5, 5);
+
+      expect(service.menuKind()).toBe('pin');
+      expect(graphService.selectedNodeId()).toBe(node.id);
+    });
+
+    it('addPin from the empty Canvas requests a ghost canvas anchor at the right-click point', () => {
+      service.openFor({ kind: 'canvas' }, 120, 80);
+
+      service.addPin();
+
+      expect(service.pinCreateRequest()).toEqual({ kind: 'canvas', x: 120, y: 80 });
+      expect(graphService.pins().length).toBe(0);
+      expect(historyService.canUndo()).toBe(false);
+    });
+
+    it('addPin from a Node target requests a node anchor offset from the Node top-left', () => {
+      const node = graphService.createNode('A', 100, 200);
+
+      service.openFor({ kind: 'node', nodeId: node.id }, 150, 230);
+      service.addPin();
+
+      expect(service.pinCreateRequest()).toEqual({
+        kind: 'node', nodeId: node.id, offsetX: 50, offsetY: 30,
+      });
+    });
+
+    it('addPin from a Group target anchors to the Group', () => {
+      const group = graphService.createGroup('G', 0, 0);
+
+      service.openFor({ kind: 'node', nodeId: group.id }, 10, 10);
+      service.addPin();
+
+      expect(service.pinCreateRequest()).toEqual({
+        kind: 'node', nodeId: group.id, offsetX: 10, offsetY: 10,
+      });
+    });
+
+    it('editPin requests the pin editor for the target Pin', () => {
+      const pin = graphService.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Note')!;
+      service.openFor({ kind: 'pin', pinId: pin.id }, 0, 0);
+
+      service.editPin();
+
+      expect(service.pinEditRequest()).toBe(pin.id);
+    });
+
+    it('deletePin removes the Pin as one undoable Command', () => {
+      const pin = graphService.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Note')!;
+      service.openFor({ kind: 'pin', pinId: pin.id }, 0, 0);
+
+      service.deletePin();
+
+      expect(graphService.pins().length).toBe(0);
+      expect(historyService.canUndo()).toBe(true);
+      historyService.undo();
+      expect(graphService.pins().length).toBe(1);
+    });
+
+    it('clearPinCreateRequest and clearPinEditRequest reset the signals', () => {
+      const pin = graphService.createPin({ kind: 'canvas', x: 0, y: 0 }, 'Note')!;
+
+      service.requestCreatePin({ kind: 'canvas', x: 1, y: 2 });
+      service.openFor({ kind: 'pin', pinId: pin.id }, 0, 0);
+      service.editPin();
+
+      service.clearPinCreateRequest();
+      service.clearPinEditRequest();
+
+      expect(service.pinCreateRequest()).toBeNull();
+      expect(service.pinEditRequest()).toBeNull();
+    });
+  });
 });

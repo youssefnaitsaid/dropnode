@@ -4,6 +4,7 @@ import { NodeRect, NodeShape, effectiveNodeShape } from '../models/node-shape';
 export type { NodeRect } from '../models/node-shape';
 import { Connection, ReroutePoint, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT } from '../models/connection';
 import { Text } from '../models/text';
+import { Pin, PinAnchor } from '../models/pin';
 import { AlignKind, DistributeAxis, RootRect, TargetPosition, alignRects, distributeRects } from '../models/align-distribute';
 import { TidyResult, applyTidyToState, isTidyEmpty, tidyLayout } from '../models/tidy-layout';
 import { GraphService } from './graph.service';
@@ -126,6 +127,7 @@ export class DeleteNodeCommand implements Command {
   private deletedNode: GraphNode | null = null;
   private removedConnections: Connection[] = [];
   private releasedChildIds: string[] = [];
+  private removedPins: Pin[] = [];
 
   constructor(
     private graphService: GraphService,
@@ -137,6 +139,7 @@ export class DeleteNodeCommand implements Command {
     this.deletedNode = result.node;
     this.removedConnections = result.removedConnections;
     this.releasedChildIds = result.releasedChildIds;
+    this.removedPins = result.removedPins;
   }
 
   undo(): void {
@@ -155,6 +158,110 @@ export class DeleteNodeCommand implements Command {
         ...structuredClone(this.removedConnections),
       ]);
     }
+    // Re-create the Pins that cascaded away with the node
+    if (this.removedPins.length > 0) {
+      this.graphService.pins.update(pins => [...pins, ...structuredClone(this.removedPins)]);
+    }
+  }
+}
+
+// Pin commands (ADR-0025): full History citizens, one undo step each.
+
+/** Ghost-pin commit: the Pin materializes only here, already carrying its message. */
+export class CreatePinCommand implements Command {
+  description = 'Create Pin';
+  private pin: Pin | null = null;
+
+  constructor(
+    private graphService: GraphService,
+    private anchor: PinAnchor,
+    private message: string,
+  ) {}
+
+  execute(): void {
+    this.pin = this.graphService.createPin(this.anchor, this.message);
+  }
+
+  undo(): void {
+    if (this.pin) {
+      this.graphService.deletePin(this.pin.id);
+    }
+  }
+
+  getPin(): Pin | null {
+    return this.pin;
+  }
+}
+
+export class EditPinCommand implements Command {
+  description = 'Edit Pin';
+  private originalMessage = '';
+
+  constructor(
+    private graphService: GraphService,
+    private pinId: string,
+    private newMessage: string,
+  ) {
+    const pin = this.graphService.pins().find(p => p.id === pinId);
+    this.originalMessage = pin?.message ?? '';
+  }
+
+  execute(): void {
+    this.graphService.setPinMessage(this.pinId, this.newMessage);
+  }
+
+  undo(): void {
+    this.graphService.setPinMessage(this.pinId, this.originalMessage);
+  }
+}
+
+/** One Pin drag commits as exactly one of these (anchor snapshots in the ctor). */
+export class MovePinCommand implements Command {
+  description = 'Move Pin';
+  private originalAnchor: PinAnchor | null;
+
+  constructor(
+    private graphService: GraphService,
+    private pinId: string,
+    private newAnchor: PinAnchor,
+    explicitOriginalAnchor?: PinAnchor,
+  ) {
+    if (explicitOriginalAnchor !== undefined) {
+      this.originalAnchor = explicitOriginalAnchor;
+    } else {
+      const pin = this.graphService.pins().find(p => p.id === pinId);
+      this.originalAnchor = pin ? structuredClone(pin.anchor) : null;
+    }
+  }
+
+  execute(): void {
+    this.graphService.setPinAnchor(this.pinId, this.newAnchor);
+  }
+
+  undo(): void {
+    if (this.originalAnchor !== null) {
+      this.graphService.setPinAnchor(this.pinId, this.originalAnchor);
+    }
+  }
+}
+
+export class DeletePinCommand implements Command {
+  description = 'Delete Pin';
+  private deletedPin: Pin | null = null;
+
+  constructor(
+    private graphService: GraphService,
+    private pinId: string,
+  ) {}
+
+  execute(): void {
+    const deleted = this.graphService.deletePin(this.pinId);
+    this.deletedPin = deleted ? structuredClone(deleted) : null;
+  }
+
+  undo(): void {
+    if (!this.deletedPin) return;
+    this.graphService.pins.update(pins => [...pins, structuredClone(this.deletedPin!)]);
   }
 }
 
@@ -723,16 +830,19 @@ export class QuickAddNodeCommand implements Command {
 export class InsertElementsCommand implements Command {
   private nodes: GraphNode[];
   private connections: Connection[];
+  private pins: Pin[];
 
   constructor(
     private graphService: GraphService,
     public description: string,
     nodes: GraphNode[],
     connections: Connection[],
+    pins: Pin[] = [],
   ) {
     // Deep copy so later graph mutations can't alias into the redo snapshot
     this.nodes = structuredClone(nodes);
     this.connections = structuredClone(connections);
+    this.pins = structuredClone(pins);
   }
 
   execute(): void {
@@ -740,8 +850,11 @@ export class InsertElementsCommand implements Command {
     if (this.connections.length > 0) {
       this.graphService.connections.update(conns => [...conns, ...structuredClone(this.connections)]);
     }
+    if (this.pins.length > 0) {
+      this.graphService.pins.update(current => [...current, ...structuredClone(this.pins)]);
+    }
     // The new copies become the Selection (ADR-0015); normalization keeps
-    // inserted Group children implicit
+    // inserted Group children implicit. Pins never join the Selection.
     this.graphService.setSelection(
       this.nodes.map(n => n.id),
       this.connections.map(c => c.id),
@@ -751,8 +864,10 @@ export class InsertElementsCommand implements Command {
   undo(): void {
     const nodeIds = new Set(this.nodes.map(n => n.id));
     const connIds = new Set(this.connections.map(c => c.id));
+    const pinIds = new Set(this.pins.map(p => p.id));
     this.graphService.nodes.update(nodes => nodes.filter(n => !nodeIds.has(n.id)));
     this.graphService.connections.update(conns => conns.filter(c => !connIds.has(c.id)));
+    this.graphService.pins.update(current => current.filter(p => !pinIds.has(p.id)));
     // Removed elements leave the Selection; anything else selected stays
     this.graphService.setSelection(
       this.graphService.selectedNodeIds().filter(id => !nodeIds.has(id)),

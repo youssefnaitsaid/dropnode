@@ -550,4 +550,96 @@ describe('ClipboardService', () => {
       expect(graphService.selectedNodeIds().sort()).toEqual([a.id, b.id].sort());
     });
   });
+
+  describe('Pins ride the Clipboard with their anchored Nodes', () => {
+    it('copy captures Pins anchored to captured Nodes and never Canvas-anchored Pins', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const group = graphService.createGroup('G', 300, 0);
+      const child = graphService.createNode('Child', 320, 20);
+      graphService.setNodeParent(child.id, group.id);
+      graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 1, offsetY: 2 }, 'On A');
+      graphService.createPin({ kind: 'node', nodeId: child.id, offsetX: 0, offsetY: 0 }, 'On child');
+      graphService.createPin({ kind: 'canvas', x: 9, y: 9 }, 'Loose');
+
+      service.copy(group.id);
+
+      service.pasteAt(1000, 1000);
+
+      // The pasted Group's child kept its Pin; A's and the loose one did not ride
+      const pastedChild = graphService.nodes().find(n => n.parentId !== undefined && n.id !== child.id)!;
+      const pastedPins = graphService.pins().filter(p => p.message === 'On child');
+      expect(pastedPins.length).toBe(2);
+      expect(graphService.pins().filter(p => p.message === 'On A').length).toBe(1);
+      expect(graphService.pins().filter(p => p.message === 'Loose').length).toBe(1);
+      expect(graphService.pins().find(p => p.id === pastedPins[1].id)!.anchor)
+        .toEqual({ kind: 'node', nodeId: pastedChild.id, offsetX: 0, offsetY: 0 });
+    });
+
+    it('paste regenerates Pin ids and remaps the anchor nodeId', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const pin = graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 4, offsetY: 5 }, 'Rider')!;
+
+      service.copy(a.id);
+      service.pasteAt(500, 500);
+
+      const pastedPin = graphService.pins().find(p => p.id !== pin.id)!;
+      expect(pastedPin.id).toMatch(/^pin_\d+_\d+$/);
+      expect(pastedPin.anchor.kind).toBe('node');
+      if (pastedPin.anchor.kind === 'node') {
+        const pastedNode = graphService.nodes().find(n => n.id === pastedPin.anchor.nodeId)!;
+        expect(pastedNode.id).not.toBe(a.id);
+        expect(graphService.pinPoint(pastedPin.id)).toEqual({ x: pastedNode.x + 4, y: pastedNode.y + 5 });
+      }
+    });
+
+    it('cut and paste moves the anchored Pins with their Nodes', () => {
+      const a = graphService.createNode('A', 0, 0);
+      graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 0, offsetY: 0 }, 'Moves along');
+      graphService.createPin({ kind: 'canvas', x: 50, y: 50 }, 'Stays behind');
+
+      service.cut(a.id);
+      expect(graphService.pins().map(p => p.message)).toEqual(['Stays behind']);
+
+      service.pasteAt(800, 800);
+      const messages = graphService.pins().map(p => p.message).sort();
+      expect(messages).toEqual(['Moves along', 'Stays behind']);
+    });
+
+    it('duplicate carries anchored Pins as independent copies', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const pin = graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 0, offsetY: 0 }, 'Rider')!;
+
+      service.duplicate(a.id);
+
+      const pins = graphService.pins();
+      expect(pins.length).toBe(2);
+      expect(pins.every(p => p.message === 'Rider')).toBe(true);
+      expect(new Set(pins.map(p => p.id)).size).toBe(2);
+      const copy = pins.find(p => p.id !== pin.id)!;
+      expect((copy.anchor as { nodeId: string }).nodeId).not.toBe(a.id);
+    });
+
+    it('undoing a paste removes the pasted Pins', () => {
+      const a = graphService.createNode('A', 0, 0);
+      graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 0, offsetY: 0 }, 'Rider')!;
+
+      service.copy(a.id);
+      service.pasteAt(500, 500);
+      expect(graphService.pins().length).toBe(2);
+
+      historyService.undo();
+      expect(graphService.pins().length).toBe(1);
+    });
+
+    it('a Node anchored outside the captured set never rides', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const outside = graphService.createNode('B', 500, 0);
+      graphService.createPin({ kind: 'node', nodeId: outside.id, offsetX: 0, offsetY: 0 }, 'Stranger');
+
+      service.copy(a.id);
+      service.pasteAt(100, 100);
+
+      expect(graphService.pins().filter(p => p.message === 'Stranger').length).toBe(1);
+    });
+  });
 });

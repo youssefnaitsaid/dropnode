@@ -401,6 +401,8 @@ describe('ExportService', () => {
         exportBounds(graphService.nodes()),
         EXPORT_THEMES.dark,
         graphService.nodes(),
+        undefined,
+        {},
       );
       // Preview rendering neither downloads nor toasts
       expect(clickedAnchor).toBeNull();
@@ -410,7 +412,7 @@ describe('ExportService', () => {
     it('renderPng maps the light theme to the light colors', async () => {
       await service.renderPng('light');
 
-      expect(render).toHaveBeenCalledWith(exportBounds([]), EXPORT_THEMES.light, []);
+      expect(render).toHaveBeenCalledWith(exportBounds([]), EXPORT_THEMES.light, [], undefined, {});
     });
 
     it('renderPng hands the renderer only the live Export Scope and its bounds', async () => {

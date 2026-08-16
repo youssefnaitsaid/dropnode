@@ -1,6 +1,7 @@
 import { GraphNode } from './node';
 import { Connection } from './connection';
 import { contentBounds } from './bounds';
+import { Pin } from './pin';
 
 // PNG Export capture rules (ADR-0014): full graph bounds plus fixed padding,
 // rasterized at 2x so Text stays crisp when enlarged. Independent of the
@@ -29,6 +30,8 @@ export interface ExportScope {
   roots: GraphNode[];
   nodes: GraphNode[];
   connections: Connection[];
+  /** Node-anchored Pins whose anchor Node is in scope (Canvas Pins never ride a Scope). */
+  pins: Pin[];
 }
 
 /** Frozen scope metadata carried from a Context Menu into the Export dialog. */
@@ -56,6 +59,7 @@ export function expandExportScope(
   rootIds: readonly string[],
   nodes: readonly GraphNode[],
   connections: readonly Connection[] = [],
+  pins: readonly Pin[] = [],
 ): ExportScope {
   const nodesById = new Map(nodes.map(node => [node.id, node]));
   const candidates = [...new Set(rootIds)]
@@ -79,16 +83,34 @@ export function expandExportScope(
     connections: connections.filter(
       connection => includedIds.has(connection.sourceNodeId) && includedIds.has(connection.targetNodeId),
     ),
+    pins: pins.filter(
+      pin => pin.anchor.kind === 'node' && includedIds.has(pin.anchor.nodeId),
+    ),
   };
 }
 
 /** Capture box: all Nodes and every Connection's curve plus padding; an empty
- *  graph yields just the padded origin. */
+ *  graph yields just the padded origin. Pin points, when given, join the box —
+ *  bounds follow what renders (ADR-0020). */
 export function exportBounds(
   nodes: readonly GraphNode[],
   connections: readonly Connection[] = [],
+  pinPointList: readonly { x: number; y: number }[] = [],
 ): ExportBounds {
-  const raw = contentBounds(nodes, connections);
+  let raw = contentBounds(nodes, connections);
+  if (pinPointList.length > 0) {
+    let minX = raw?.x ?? Infinity;
+    let minY = raw?.y ?? Infinity;
+    let maxX = raw ? raw.x + raw.width : -Infinity;
+    let maxY = raw ? raw.y + raw.height : -Infinity;
+    for (const point of pinPointList) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+    raw = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
   if (!raw) {
     const side = EXPORT_PADDING * 2;
     return {

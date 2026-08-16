@@ -1,12 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { GraphService } from './graph.service';
 import { CollectionService } from './collection.service';
-import { ExportImageRenderer } from './export-image-renderer';
+import { ExportImageRenderer, RenderOptions } from './export-image-renderer';
 import { GraphState } from '../models/graph-state';
 import {
   exportBounds, EXPORT_THEMES, ExportScope, ExportScopeInput, ExportScopeRequest, ExportTheme,
   expandExportScope, normalizeExportScopeRequest,
 } from '../models/export-image';
+import { pinPoints } from '../models/pin';
 import { ToastService } from '../components/toast/toast';
 
 @Injectable({ providedIn: 'root' })
@@ -70,27 +71,35 @@ export class ExportService {
   // ── PNG export (ADR-0014: snapshots the on-screen graph) ─────────
 
   /** Real snapshot of the rendered graph — the preview and the download share this. */
-  renderPng(theme: ExportTheme, scopeInput?: ExportScopeInput): Promise<Blob> {
-    return this.renderPngWithScope(theme, scopeInput).blob;
+  renderPng(theme: ExportTheme, scopeInput?: ExportScopeInput, options: RenderOptions = {}): Promise<Blob> {
+    return this.renderPngWithScope(theme, scopeInput, options).blob;
   }
 
   private renderPngWithScope(
     theme: ExportTheme,
     scopeInput?: ExportScopeInput,
+    options: RenderOptions = {},
   ): { blob: Promise<Blob>; scope?: ExportScope; request?: Required<ExportScopeRequest> } {
     const nodes = this.graphService.nodes();
     const connections = this.graphService.connections();
+    const pins = this.graphService.pins();
     if (scopeInput === undefined) {
+      const includePinPoints = options.includePins ? pinPoints(pins, nodes) : [];
       return {
-        blob: this.imageRenderer.render(exportBounds(nodes, connections), EXPORT_THEMES[theme], nodes),
+        blob: this.imageRenderer.render(
+          exportBounds(nodes, connections, includePinPoints),
+          EXPORT_THEMES[theme], nodes, undefined, options,
+        ),
       };
     }
 
     const request = normalizeExportScopeRequest(scopeInput);
-    const scope = expandExportScope(request.rootIds, nodes, connections);
+    const scope = expandExportScope(request.rootIds, nodes, connections, pins);
+    const includePinPoints = options.includePins ? pinPoints(scope.pins, scope.nodes) : [];
     return {
       blob: this.imageRenderer.render(
-        exportBounds(scope.nodes, scope.connections), EXPORT_THEMES[theme], scope.nodes, scope,
+        exportBounds(scope.nodes, scope.connections, includePinPoints),
+        EXPORT_THEMES[theme], scope.nodes, scope, options,
       ),
       scope,
       request,
@@ -102,9 +111,10 @@ export class ExportService {
     theme: ExportTheme,
     projectId?: string,
     scopeInput?: ExportScopeInput,
+    options: RenderOptions = {},
   ): Promise<void> {
     try {
-      const rendered = this.renderPngWithScope(theme, scopeInput);
+      const rendered = this.renderPngWithScope(theme, scopeInput, options);
       const blob = await rendered.blob;
       const filename = scopeInput === undefined
         ? this.filenameBase(projectId) + '.png'

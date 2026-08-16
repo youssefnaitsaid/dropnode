@@ -28,6 +28,10 @@ import {
   SetConnectionStrokeWeightCommand,
   InsertElementsCommand,
   QuickAddNodeCommand,
+  CreatePinCommand,
+  EditPinCommand,
+  MovePinCommand,
+  DeletePinCommand,
   buildDeleteSelectionCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
@@ -1578,6 +1582,105 @@ describe('Commands', () => {
       cmd.undo();
       expect(graphService.selectedNodeIds()).toEqual([a.id]);
       expect(graphService.selectedConnectionIds()).toEqual([conn.id]);
+    });
+  });
+
+  describe('Pin commands', () => {
+    it('CreatePinCommand creates the Pin with its message as one step; undo removes it', () => {
+      const cmd = new CreatePinCommand(graphService, { kind: 'canvas', x: 10, y: 20 }, 'Note');
+      cmd.execute();
+
+      const pin = cmd.getPin()!;
+      expect(graphService.pins().map(p => p.id)).toEqual([pin.id]);
+      expect(pin.message).toBe('Note');
+
+      cmd.undo();
+      expect(graphService.pins().length).toBe(0);
+    });
+
+    it('CreatePinCommand with an empty message creates nothing', () => {
+      const cmd = new CreatePinCommand(graphService, { kind: 'canvas', x: 0, y: 0 }, '  ');
+      cmd.execute();
+
+      expect(cmd.getPin()).toBeNull();
+      expect(graphService.pins().length).toBe(0);
+
+      cmd.undo();
+      expect(graphService.pins().length).toBe(0);
+    });
+
+    it('EditPinCommand sets the message; undo restores the original', () => {
+      const pin = graphService.createPin({ kind: 'canvas', x: 0, y: 0 }, 'First')!;
+
+      const cmd = new EditPinCommand(graphService, pin.id, 'Second');
+      cmd.execute();
+      expect(graphService.pins()[0].message).toBe('Second');
+
+      cmd.undo();
+      expect(graphService.pins()[0].message).toBe('First');
+    });
+
+    it('MovePinCommand sets the anchor; undo restores the original anchor', () => {
+      const pin = graphService.createPin({ kind: 'canvas', x: 1, y: 2 }, 'Note')!;
+
+      const cmd = new MovePinCommand(graphService, pin.id, { kind: 'canvas', x: 30, y: 40 });
+      cmd.execute();
+      expect(graphService.pins()[0].anchor).toEqual({ kind: 'canvas', x: 30, y: 40 });
+
+      cmd.undo();
+      expect(graphService.pins()[0].anchor).toEqual({ kind: 'canvas', x: 1, y: 2 });
+    });
+
+    it('DeletePinCommand removes the Pin; undo restores it with the same id', () => {
+      const pin = graphService.createPin(
+        { kind: 'node', nodeId: graphService.createNode('A', 0, 0).id, offsetX: 3, offsetY: 4 },
+        'Note',
+      )!;
+
+      const cmd = new DeletePinCommand(graphService, pin.id);
+      cmd.execute();
+      expect(graphService.pins().length).toBe(0);
+
+      cmd.undo();
+      expect(graphService.pins().length).toBe(1);
+      expect(graphService.pins()[0]).toEqual(pin);
+    });
+
+    it('DeleteNodeCommand undo restores the Node, its Connections, and its anchored Pins with original ids', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      const pin = graphService.createPin({ kind: 'node', nodeId: a.id, offsetX: 5, offsetY: 6 }, 'On A')!;
+
+      const cmd = new DeleteNodeCommand(graphService, a.id);
+      cmd.execute();
+      expect(graphService.pins().length).toBe(0);
+
+      cmd.undo();
+      expect(graphService.nodes().map(n => n.id)).toContain(a.id);
+      expect(graphService.connections().map(c => c.id)).toContain(conn.id);
+      expect(graphService.pins().map(p => p.id)).toEqual([pin.id]);
+    });
+
+    it('InsertElementsCommand inserts and removes Pins alongside Nodes', () => {
+      const node = graphService.createNode('A', 0, 0);
+      const pin = graphService.createPin({ kind: 'node', nodeId: node.id, offsetX: 0, offsetY: 0 }, 'Rider')!;
+      // Callers regenerate ids before inserting (Paste/Duplicate materialize)
+      const insertedNode = { ...structuredClone(node), id: graphService.generateNodeId() };
+      const insertedPin = { ...structuredClone(pin), id: graphService.generatePinId(), anchor: { ...pin.anchor, nodeId: insertedNode.id } };
+
+      const cmd = new InsertElementsCommand(
+        graphService,
+        'Paste',
+        [insertedNode],
+        [],
+        [insertedPin],
+      );
+      cmd.execute();
+      expect(graphService.pins().length).toBe(2);
+
+      cmd.undo();
+      expect(graphService.pins().map(p => p.id)).toEqual([pin.id]);
     });
   });
 });
