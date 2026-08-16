@@ -8,6 +8,8 @@ import {
   untracked,
 } from '@angular/core';
 import { CanvasComponent } from '../canvas/canvas';
+import { MinimapComponent } from '../minimap/minimap';
+import { MinimapService } from '../../services/minimap.service';
 import { ToolbarComponent } from '../toolbar/toolbar';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -25,12 +27,17 @@ import { PresentationService } from '../../services/presentation.service';
   selector: 'app-editor-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CanvasComponent, ToolbarComponent],
+  imports: [CanvasComponent, ToolbarComponent, MinimapComponent],
   template: `
     @if (!presentationService.active()) {
       <app-toolbar [scratchMode]="!projectId()" />
     }
     <app-canvas />
+    <!-- Hidden when empty (nothing to map), when the user toggled it off,
+         and in Present Mode (it's chrome). -->
+    @if (!presentationService.active() && !minimapService.hidden() && graphService.nodes().length > 0) {
+      <app-minimap />
+    }
     <!-- Present Mode's only overlay: a non-interactive Step counter -->
     @if (presentationService.active()) {
       <div class="step-counter">
@@ -69,11 +76,12 @@ import { PresentationService } from '../../services/presentation.service';
   `],
 })
 export class EditorPageComponent implements OnDestroy {
-  private graphService = inject(GraphService);
+  graphService = inject(GraphService);
   private historyService = inject(HistoryService);
   private collectionService = inject(CollectionService);
   private urlLoader = inject(UrlLoaderService);
   protected presentationService = inject(PresentationService);
+  protected minimapService = inject(MinimapService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
