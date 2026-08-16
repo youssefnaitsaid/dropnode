@@ -45,6 +45,7 @@ import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CommandPaletteService } from '../../services/command-palette.service';
+import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
@@ -450,6 +451,7 @@ export class ToolbarComponent {
   private exportService = inject(ExportService);
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
+  private canvasViewport = inject(CanvasViewportService);
   private router = inject(Router);
   private commandPaletteService = inject(CommandPaletteService);
 
@@ -603,11 +605,11 @@ export class ToolbarComponent {
   }
 
   zoomIn(): void {
-    this.graphService.zoomBy(0.1, 0, 0);
+    this.canvasViewport.zoomByCentered(0.1);
   }
 
   zoomOut(): void {
-    this.graphService.zoomBy(-0.1, 0, 0);
+    this.canvasViewport.zoomByCentered(-0.1);
   }
 
   // Frame the whole graph. Measures the visible canvas region from the canvas

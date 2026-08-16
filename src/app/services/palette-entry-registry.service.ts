@@ -219,10 +219,10 @@ export class PaletteEntryRegistry {
       ...this.connectionArrowheadEntries(selectedConnectionIds),
       ...this.connectionStrokeEntries(selectedConnectionIds),
 
-      this.action('zoom-in', 'Zoom In', 'Viewport', () => this.graphService.zoomBy(0.1, 0, 0), {
+      this.action('zoom-in', 'Zoom In', 'Viewport', () => this.canvasViewport.zoomByCentered(0.1), {
         aliases: ['magnify', 'increase zoom'],
       }),
-      this.action('zoom-out', 'Zoom Out', 'Viewport', () => this.graphService.zoomBy(-0.1, 0, 0), {
+      this.action('zoom-out', 'Zoom Out', 'Viewport', () => this.canvasViewport.zoomByCentered(-0.1), {
         aliases: ['shrink', 'decrease zoom'],
       }),
       this.action('zoom-to-fit', 'Zoom to Fit', 'Viewport', () => {

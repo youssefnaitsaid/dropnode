@@ -25,4 +25,10 @@ export class CanvasViewportService {
       y: (height / 2 - viewport.panY) / viewport.zoom,
     };
   }
+
+  /** Button/palette zoom: step the zoom while keeping the visible Canvas' center fixed. */
+  zoomByCentered(delta: number): void {
+    const { width, height } = this.visibleSize();
+    this.graphService.zoomBy(delta, width / 2, height / 2);
+  }
 }

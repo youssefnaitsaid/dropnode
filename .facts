@@ -179,13 +179,13 @@
 
 - zoom is clamped to the range 0.1 to 5
 - wheel zoom steps by 0.1 per tick, centered on the cursor so the point under the cursor stays fixed on screen
-- toolbar zoom buttons step by 0.1 centered at origin (0,0), not at the screen center — this differs from wheel zoom
+- toolbar zoom buttons and the Zoom In / Zoom Out Palette Entries step by 0.1 centered on the visible Canvas' center, so the Canvas center point stays fixed on screen — the same centering rule as wheel zoom with a different anchor
 - left-drag on empty Canvas draws a Marquee, not a pan (ADR-0016); panning is hold-Space + left-drag (grab cursor, from anywhere, even over elements) or middle-mouse-drag, and never changes the Selection
 - a Canvas with no stored Viewport to restore (fresh Scratch Canvas, corrupt-Project fallback) initializes at pan (0,0) and zoom 1; importing or clearing a graph does NOT reset the Viewport
 - pan and zoom apply as one shared CSS translate+scale transform covering both the DOM node layer and the SVG connection layer
 - Zoom to fit frames the whole graph — all Nodes (Groups included) unioned with every Connection's curve bounds so a bowing curve is never clipped — into 90% of the visible Canvas, centered on both axes, never magnifying past 1x; an empty graph is a silent no-op @spec
 - Zoom to selection frames the selected element — a Node by its rect, a Group unioned with its children, a Connection by its cubic bezier bounds (the control-point box, which encloses the bow) — into 90% of the Viewport, centered, magnifying no further than 2x; no selection is a silent no-op @spec
-- Zoom to fit and Zoom to selection are bounds-centered — a third zoom-centering behavior alongside cursor-centered wheel zoom and origin-centered toolbar buttons; both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
+- Zoom to fit and Zoom to selection are bounds-centered — a zoom-centering behavior distinct from the anchored zooms (cursor-centered wheel zoom, Canvas-center-centered toolbar buttons and Palette Entries); both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
 - the toolbar zoom cluster carries a Zoom to fit button; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
 
 ## minimap
