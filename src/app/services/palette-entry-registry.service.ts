@@ -225,9 +225,6 @@ export class PaletteEntryRegistry {
       this.action('zoom-out', 'Zoom Out', 'Viewport', () => this.graphService.zoomBy(-0.1, 0, 0), {
         aliases: ['shrink', 'decrease zoom'],
       }),
-      this.action('reset-view', 'Reset View', 'Viewport', () => this.graphService.resetViewport(), {
-        aliases: ['reset zoom', 'home view'],
-      }),
       this.action('zoom-to-fit', 'Zoom to Fit', 'Viewport', () => {
         const size = this.canvasViewport.visibleSize();
         this.graphService.zoomToFit(size.width, size.height);

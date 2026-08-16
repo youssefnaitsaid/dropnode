@@ -51,7 +51,6 @@ Build artifacts are emitted to `dist/`.
 | Delete connection | Click the connection curve |
 | Pan | Drag empty canvas |
 | Zoom | Mouse wheel (cursor-centered) or toolbar `+` / `−` |
-| Reset view | Toolbar reset button |
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Deselect | `Esc` |
 

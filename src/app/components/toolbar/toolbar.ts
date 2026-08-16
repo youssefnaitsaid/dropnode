@@ -7,7 +7,6 @@ import {
   lucideCommand,
   lucideZoomIn,
   lucideZoomOut,
-  lucideScan,
   lucideMaximize,
   lucideGroup,
   lucideUpload,
@@ -76,7 +75,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideCommand,
       lucideZoomIn,
       lucideZoomOut,
-      lucideScan,
       lucideMaximize,
       lucideGroup,
       lucideUpload,
@@ -295,9 +293,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         </button>
         <button hlmBtn variant="ghost" size="icon" (click)="zoomOut()" title="Zoom Out" aria-label="Zoom out">
           <ng-icon name="lucideZoomOut" />
-        </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="resetView()" title="Reset View" aria-label="Reset view">
-          <ng-icon name="lucideScan" />
         </button>
         <button hlmBtn variant="ghost" size="icon" (click)="zoomToFit()" title="Zoom to Fit" aria-label="Zoom to fit">
           <ng-icon name="lucideMaximize" />
@@ -633,10 +628,6 @@ export class ToolbarComponent {
 
   zoomOut(): void {
     this.graphService.zoomBy(-0.1, 0, 0);
-  }
-
-  resetView(): void {
-    this.graphService.resetViewport();
   }
 
   // Frame the whole graph. Measures the visible canvas region from the canvas
