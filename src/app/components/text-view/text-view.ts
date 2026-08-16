@@ -77,7 +77,7 @@ import { Text } from '../../models/text';
     .tv-bold { font-weight: 700; }
     .tv-italic { font-style: italic; }
     .tv-highlight {
-      background: #ffe066;
+      background: var(--dn-highlight);
       border-radius: 2px;
       padding: 0 1px;
     }

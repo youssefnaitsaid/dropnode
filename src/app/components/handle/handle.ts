@@ -19,19 +19,19 @@ import { HandleSide } from '../../models/node';
   styles: [`
     :host {
       position: absolute;
-      z-index: 10;
+      z-index: var(--dn-z-handle);
     }
     .handle {
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background: #7c5cff;
-      border: 2px solid #0e0e11;
+      background: var(--dn-accent);
+      border: 2px solid var(--dn-canvas);
       cursor: crosshair;
       transition: transform 0.15s ease, background 0.15s ease;
     }
     .handle:hover, .handle.snap-highlight {
-      background: #ff6b6b;
+      background: var(--dn-danger);
       transform: scale(1.4);
     }
     .side-top { }

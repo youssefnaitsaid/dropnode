@@ -162,7 +162,7 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
       overflow-wrap: normal;
       line-height: 1.4;
       cursor: text;
-      caret-color: #7c5cff;
+      caret-color: var(--dn-accent);
     }
     app-text-editor .pm-host .ProseMirror p {
       margin: 0;
@@ -176,7 +176,7 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
     }
     app-text-editor .pm-host .ProseMirror strong { font-weight: 700; }
     app-text-editor .pm-host .ProseMirror mark {
-      background: #ffe066;
+      background: var(--dn-highlight);
       border-radius: 2px;
       padding: 0 1px;
       color: inherit;
@@ -194,10 +194,10 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
       align-items: center;
       gap: 2px;
       padding: 4px;
-      background: #1c1c22;
-      border: 1px solid rgba(124, 92, 255, 0.45);
+      background: var(--dn-chip);
+      border: 1px solid color-mix(in srgb, var(--dn-accent) 45%, transparent);
       border-radius: 8px;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--dn-shadow-chip);
     }
     .formatting-toolbar .ft-btn {
       display: inline-flex;
@@ -208,31 +208,31 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
       border: none;
       border-radius: 6px;
       background: transparent;
-      color: #e8e8ee;
+      color: var(--dn-chip-ink);
       font-size: 13px;
       cursor: pointer;
     }
-    .formatting-toolbar .ft-btn:hover { background: rgba(124, 92, 255, 0.2); }
+    .formatting-toolbar .ft-btn:hover { background: color-mix(in srgb, var(--dn-accent) 20%, transparent); }
     .formatting-toolbar .ft-btn.active {
-      background: #7c5cff;
-      color: #ffffff;
+      background: var(--dn-accent);
+      color: var(--dn-accent-ink);
     }
     .formatting-toolbar .ft-size { font-weight: 600; }
     .formatting-toolbar .ft-separator {
       width: 1px;
       height: 16px;
       margin: 0 3px;
-      background: rgba(232, 232, 238, 0.25);
+      background: color-mix(in srgb, var(--dn-chip-ink) 25%, transparent);
     }
     .formatting-toolbar .ft-link-input {
       margin-left: 4px;
       width: 170px;
       height: 26px;
       padding: 0 8px;
-      border: 1px solid #7c5cff;
+      border: 1px solid var(--dn-accent);
       border-radius: 6px;
-      background: #121216;
-      color: #e8e8ee;
+      background: var(--dn-chip-input);
+      color: var(--dn-chip-ink);
       font-size: 12px;
       outline: none;
     }

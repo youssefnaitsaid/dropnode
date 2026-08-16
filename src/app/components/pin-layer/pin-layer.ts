@@ -81,7 +81,7 @@ type PopoverState =
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 30;
+      z-index: var(--dn-z-pin);
     }
     /* Hidden via a class, not by removing elements, so a PNG Export that
        includes Pins can reveal them in its snapshot regardless of the
@@ -98,10 +98,10 @@ type PopoverState =
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #7c5cff;
-      color: #ffffff;
+      background: var(--dn-accent);
+      color: var(--dn-accent-ink);
       border: 2px solid rgba(255, 255, 255, 0.85);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--dn-shadow-pin);
       cursor: grab;
       user-select: none;
     }
@@ -116,9 +116,9 @@ type PopoverState =
       width: 300px;
       margin: 10px 0 0 -14px;
       border-radius: 0.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: #1c1c22;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 1px solid color-mix(in srgb, var(--dn-chip-ink) 16%, transparent);
+      background: var(--dn-chip);
+      box-shadow: var(--dn-shadow-pop);
       padding: 0.625rem;
     }
     .pin-popover textarea {
@@ -127,21 +127,21 @@ type PopoverState =
       resize: vertical;
       min-height: 88px;
       border-radius: 0.375rem;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.04);
-      color: #e8e8ee;
+      border: 1px solid color-mix(in srgb, var(--dn-chip-ink) 14%, transparent);
+      background: color-mix(in srgb, var(--dn-chip-ink) 4%, transparent);
+      color: var(--dn-chip-ink);
       padding: 0.5rem 0.625rem;
       font-size: 13px;
       line-height: 1.45;
       outline: none;
     }
     .pin-popover textarea:focus {
-      border-color: #7c5cff;
+      border-color: var(--dn-accent);
     }
     .pin-popover-hint {
       margin: 0.5rem 0.125rem 0.125rem;
       font-size: 11px;
-      color: rgba(232, 232, 238, 0.5);
+      color: color-mix(in srgb, var(--dn-chip-ink) 50%, transparent);
     }
   `],
 })

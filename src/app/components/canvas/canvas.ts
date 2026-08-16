@@ -337,9 +337,9 @@ import { Text } from '../../models/text';
     .canvas-container {
       width: 100%;
       height: 100%;
-      background-color: #0e0e11;
+      background-color: var(--dn-canvas);
       background-image:
-        radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+        radial-gradient(circle at 1px 1px, var(--dn-canvas-dot) 1px, transparent 0);
       background-size: 26px 26px;
       position: relative;
       overflow: hidden;
@@ -353,16 +353,16 @@ import { Text } from '../../models/text';
     }
     .marquee-rect {
       position: absolute;
-      border: 1px solid #7c5cff;
-      background: rgba(124, 92, 255, 0.12);
+      border: 1px solid var(--dn-accent);
+      background: color-mix(in srgb, var(--dn-accent) 12%, transparent);
       pointer-events: none;
-      z-index: 10;
+      z-index: var(--dn-z-handle);
     }
     .alignment-guide {
       position: absolute;
-      background: #ff6b6b;
+      background: var(--dn-danger);
       pointer-events: none;
-      z-index: 20;
+      z-index: var(--dn-z-overlay);
     }
     .canvas-transform {
       position: absolute;

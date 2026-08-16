@@ -59,7 +59,7 @@ export class ToastService {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      z-index: 1000;
+      z-index: var(--dn-z-toast);
     }
     .toast {
       animation: slideIn 0.3s ease;

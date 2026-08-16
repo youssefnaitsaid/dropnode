@@ -142,16 +142,16 @@ const GROUP_FILL_ALPHA = '4D';
       justify-content: center;
       min-width: 0;
       min-height: 0;
-      border: 1px solid rgba(15, 15, 18, 0.15);
+      border: 1px solid var(--dn-node-edge);
       border-radius: 10px;
       padding: 8px 16px;
       box-sizing: border-box;
       overflow: visible;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--dn-shadow-node);
       transition: border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
     }
     .node-card:hover .node-surface {
-      box-shadow: 0 6px 20px rgba(124, 92, 255, 0.28);
+      box-shadow: var(--dn-shadow-node-hover);
     }
     .node-surface.shape-pill {
       border-radius: 9999px;
@@ -171,7 +171,7 @@ const GROUP_FILL_ALPHA = '4D';
       transition: filter 0.15s ease;
     }
     .node-card:has(.node-surface.shape-diamond):hover {
-      filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.28));
+      filter: drop-shadow(0 6px 13px color-mix(in srgb, var(--dn-accent) 28%, transparent));
     }
     .node-card.presenting:has(.node-surface.shape-diamond):hover {
       filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
@@ -183,26 +183,26 @@ const GROUP_FILL_ALPHA = '4D';
       cursor: default;
     }
     .node-card.presenting:hover .node-surface {
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--dn-shadow-node);
     }
     .node-card.presenting app-handle {
       display: none;
     }
     .node-card.selected .node-surface {
-      box-shadow: 0 0 0px 1px grey, 0 0 6px 2px var(--selection-glow, #f0f0f5);
+      box-shadow: 0 0 0px 1px var(--dn-sel-edge), 0 0 6px 2px var(--selection-glow, var(--dn-paper));
     }
     .node-card.selected .node-surface.shape-ellipse {
       box-shadow: none;
-      filter: drop-shadow(0 0 1px grey) drop-shadow(0 0 6px var(--selection-glow, #f0f0f5));
+      filter: drop-shadow(0 0 1px var(--dn-sel-edge)) drop-shadow(0 0 6px var(--selection-glow, var(--dn-paper)));
     }
     /* after the diamond hover rule on purpose: a selected diamond keeps its
        selection glow while hovered, like the rectangle/pill cards */
     .node-card.selected:has(.node-surface.shape-diamond) {
-      filter: drop-shadow(0 0 1px grey) drop-shadow(0 0 6px var(--selection-glow, #f0f0f5));
+      filter: drop-shadow(0 0 1px var(--dn-sel-edge)) drop-shadow(0 0 6px var(--selection-glow, var(--dn-paper)));
     }
     /* Lift a selected node (and its glow) above neighbouring cards */
     :host:has(.node-card.selected) {
-      z-index: 5;
+      z-index: var(--dn-z-selected);
     }
     /* While editing, the card hosts a text editor — not a drag target */
     .node-card.editing {
@@ -215,7 +215,7 @@ const GROUP_FILL_ALPHA = '4D';
       justify-content: flex-start;
       border-style: dashed;
       border-width: 2px;
-      border-color: rgba(255, 255, 255, 0.22);
+      border-color: var(--dn-group-edge);
       box-shadow: none;
     }
     .group-label-strip {
@@ -226,10 +226,10 @@ const GROUP_FILL_ALPHA = '4D';
       padding: 0 12px;
       box-sizing: border-box;
       border-radius: 6px 6px 0 0;
-      background: rgba(58, 58, 92, 0.35);
+      background: var(--dn-group-strip);
     }
     .group-label {
-      color: #f0f0f5;
+      color: var(--dn-paper);
       font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
@@ -238,7 +238,7 @@ const GROUP_FILL_ALPHA = '4D';
     }
     .node-text {
       width: 100%;
-      color: #1a1a2e;
+      color: var(--dn-ink);
       font-size: 14px;
       font-weight: 500;
       text-align: center;
@@ -248,8 +248,8 @@ const GROUP_FILL_ALPHA = '4D';
     .node-label-input {
       background: transparent;
       border: none;
-      border-bottom: 2px solid #7c5cff;
-      color: #1a1a2e;
+      border-bottom: 2px solid var(--dn-accent);
+      color: var(--dn-ink);
       font-size: 14px;
       font-weight: 500;
       outline: none;
@@ -258,7 +258,7 @@ const GROUP_FILL_ALPHA = '4D';
       text-align: center;
     }
     .group-label-input {
-      color: #f0f0f5;
+      color: var(--dn-paper);
       font-size: 12px;
       font-weight: 600;
       text-align: left;
@@ -292,9 +292,9 @@ const GROUP_FILL_ALPHA = '4D';
       width: 10px;
       height: 10px;
       border-radius: 2px;
-      background: #7c5cff;
-      border: 2px solid #0e0e11;
-      z-index: 11;
+      background: var(--dn-accent);
+      border: 2px solid var(--dn-canvas);
+      z-index: var(--dn-z-grip);
     }
     .grip-nw { top: -5px; left: -5px; cursor: nwse-resize; }
     .grip-ne { top: -5px; right: -5px; cursor: nesw-resize; }

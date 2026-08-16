@@ -2,6 +2,7 @@ import { GraphNode } from './node';
 import { Connection } from './connection';
 import { contentBounds } from './bounds';
 import { Pin } from './pin';
+import { DN_TOKENS } from '../design-tokens';
 
 // PNG Export capture rules (ADR-0014): full graph bounds plus fixed padding,
 // rasterized at 2x so Text stays crisp when enlarged. Independent of the
@@ -149,28 +150,30 @@ export interface ExportThemeColors {
 }
 
 export const EXPORT_THEMES: Record<ExportTheme, ExportThemeColors> = {
-  // Mirrors the on-screen editor: near-black Canvas, light Nodes,
+  // Mirrors the on-screen editor (values composed from the design tokens,
+  // DESIGN.md "Export themes"): near-black Canvas, light Nodes,
   // translucent-white Group chrome, dark Connection Text chips.
   dark: {
-    background: '#0e0e11',
-    nodeBackground: '#f0f0f5',
-    nodeText: '#1a1a2e',
-    groupBorder: 'rgba(255, 255, 255, 0.22)',
-    groupLabel: '#f0f0f5',
-    connectionTextBackground: '#1c1c22',
-    connectionTextColor: '#e8e8ee',
+    background: DN_TOKENS.canvas,
+    nodeBackground: DN_TOKENS.paper,
+    nodeText: DN_TOKENS.ink,
+    groupBorder: DN_TOKENS.groupEdge,
+    groupLabel: DN_TOKENS.paper,
+    connectionTextBackground: DN_TOKENS.chip,
+    connectionTextColor: DN_TOKENS.chipInk,
   },
   // White background; the dark-only defaults flip (Group chrome, Connection
   // Text chips) — default Node fills, Node Text, and the purple Connection
-  // stroke stay legible on white as-is.
+  // stroke stay legible on white as-is. White and the dark Group border are
+  // light-only values with no on-screen token counterpart.
   light: {
     background: '#ffffff',
-    nodeBackground: '#f0f0f5',
-    nodeText: '#1a1a2e',
+    nodeBackground: DN_TOKENS.paper,
+    nodeText: DN_TOKENS.ink,
     groupBorder: 'rgba(15, 15, 18, 0.3)',
-    groupLabel: '#1a1a2e',
+    groupLabel: DN_TOKENS.ink,
     connectionTextBackground: '#ffffff',
-    connectionTextColor: '#1a1a2e',
+    connectionTextColor: DN_TOKENS.ink,
   },
 };
 

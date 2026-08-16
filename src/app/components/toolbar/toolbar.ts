@@ -399,7 +399,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
     }
     .swatch-default {
-      background: #f0f0f5;
+      background: var(--dn-paper);
       position: relative;
     }
     .swatch-default::after {

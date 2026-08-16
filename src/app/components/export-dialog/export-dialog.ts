@@ -90,7 +90,7 @@ const PREVIEW_DEBOUNCE_MS = 150;
             <label class="mb-4 flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
-                class="size-4 accent-[#7c5cff]"
+                class="size-4 accent-(--dn-accent)"
                 [checked]="includePins()"
                 (change)="setIncludePins($any($event.target).checked)"
               />

@@ -21,17 +21,18 @@ import {
   viewportRect,
   worldToMinimap,
 } from '../../models/minimap';
+import { DN_TOKENS } from '../../design-tokens';
 
 // The Minimap's fixed on-screen footprint, per the spec (~200x150).
 const MINIMAP_WIDTH = 200;
 const MINIMAP_HEIGHT = 150;
 
-// Refined-dark canvas tones (ADR-0001's palette, flattened for map scale).
-const GROUP_FILL = 'rgba(240, 240, 245, 0.25)';
-const NODE_FILL = 'rgba(240, 240, 245, 0.8)';
-const CONNECTION_STROKE = 'rgba(232, 232, 238, 0.35)';
-const ACCENT = '#86dced';
-const VIEWPORT_STROKE = 'rgba(232, 232, 238, 0.9)';
+// Canvas design tokens, flattened for map scale (ADR-0001's palette).
+const GROUP_FILL = DN_TOKENS.minimapGroup;
+const NODE_FILL = DN_TOKENS.minimapNode;
+const CONNECTION_STROKE = DN_TOKENS.minimapConnection;
+const ACCENT = DN_TOKENS.minimapAccent;
+const VIEWPORT_STROKE = DN_TOKENS.minimapViewport;
 
 /**
  * The Minimap: a canvas-rendered corner map of the whole graph (ADR-0024).
@@ -57,12 +58,12 @@ const VIEWPORT_STROKE = 'rgba(232, 232, 238, 0.9)';
       bottom: 16px;
       border-radius: 8px;
       overflow: hidden;
-      border: 1px solid rgba(232, 232, 238, 0.15);
-      background: rgba(14, 14, 17, 0.75);
+      border: 1px solid color-mix(in srgb, var(--dn-chip-ink) 15%, transparent);
+      background: color-mix(in srgb, var(--dn-canvas) 75%, transparent);
       cursor: pointer;
       touch-action: none;
       user-select: none;
-      z-index: 20;
+      z-index: var(--dn-z-overlay);
     }
     canvas {
       display: block;

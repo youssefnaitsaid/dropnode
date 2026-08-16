@@ -1,5 +1,6 @@
 import { Text } from './text';
 import { StoredNodeShape } from './node-shape';
+import { DN_TOKENS } from '../design-tokens';
 
 export type HandleSide = 'top' | 'right' | 'bottom' | 'left';
 
@@ -17,8 +18,9 @@ export function oppositeHandle(handle: HandleSide): HandleSide {
 
 // Curated background palette, retuned for the refined-dark canvas: light,
 // vivid pastels that stay legible with dark node text and pop on near-black.
-// An absent color means the default node background.
-export const DEFAULT_NODE_BACKGROUND = '#f0f0f5';
+// An absent color means the default node background. The Palette is domain
+// data — its hexes are stored in Graph State and documented in DESIGN.md.
+export const DEFAULT_NODE_BACKGROUND = DN_TOKENS.paper;
 export const NODE_PALETTE: readonly string[] = [
   '#ff8fa3', '#ffb37a', '#ffe08a', '#9fe0a3',
   '#86dced', '#9fb4ff', '#c3a3ff', '#f2a3e8',

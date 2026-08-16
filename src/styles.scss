@@ -60,13 +60,16 @@ body {
 :root.dark {
   color-scheme: dark;
 
+  /* Chrome accent unified with the canvas accent (DESIGN.md): one purple,
+     #7c5cff, everywhere — previously chrome drifted at oklch(0.62 0.233 293.5)
+     ≈ #925cff while the canvas used #7c5cff. */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.233 293.5);
+  --primary: #7c5cff;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -77,15 +80,59 @@ body {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.233 293.5);
+  --ring: #7c5cff;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.62 0.233 293.5);
+  --sidebar-primary: #7c5cff;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.62 0.233 293.5);
+  --sidebar-ring: #7c5cff;
+}
+
+/* ── Dropnode design tokens ──────────────────────────────────────────
+   Single source of truth for on-screen canvas and accent values
+   (DESIGN.md documents each token's role). The TS mirror for consumers
+   that need resolved strings — SVG marker defs, the Minimap's 2D
+   context, PNG Export themes — lives in src/app/design-tokens.ts;
+   design-tokens.spec.ts asserts the two files stay in sync. The PNG
+   export pipeline inlines these rules into its snapshot, so var()
+   references are export-safe. */
+:root {
+  /* Surfaces & ink */
+  --dn-canvas: #0e0e11;                            /* Canvas backdrop */
+  --dn-canvas-dot: rgba(255, 255, 255, 0.05);      /* Canvas grid dots */
+  --dn-paper: #f0f0f5;                             /* default Node surface; Group Label ink */
+  --dn-ink: #1a1a2e;                               /* Node Text on light surfaces */
+  --dn-node-edge: rgba(15, 15, 18, 0.15);          /* Node surface border */
+  --dn-group-edge: rgba(255, 255, 255, 0.22);      /* dashed Group border */
+  --dn-group-strip: rgba(58, 58, 92, 0.35);        /* Group Label strip fill */
+  --dn-chip: #1c1c22;                              /* floating chips: Connection Text, Pin popover, Formatting Toolbar */
+  --dn-chip-ink: #e8e8ee;                          /* ink on chips and overlays */
+  --dn-chip-input: #121216;                        /* input field inside a chip */
+
+  /* Accent & semantic */
+  --dn-accent: #7c5cff;                            /* the Dropnode purple: default Connection stroke, Handles, Grips, caret */
+  --dn-accent-ink: #ffffff;                        /* ink on accent fills */
+  --dn-danger: #ff6b6b;                            /* Handle snap highlight, Alignment Guide */
+  --dn-highlight: #ffe066;                         /* Text highlight mark */
+  --dn-sel-edge: #808080;                          /* 1px edge ring under the selection glow */
+
+  /* Elevation (canvas elements) */
+  --dn-shadow-node: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --dn-shadow-node-hover: 0 6px 20px rgba(124, 92, 255, 0.28);
+  --dn-shadow-chip: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --dn-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --dn-shadow-pin: 0 2px 8px rgba(0, 0, 0, 0.45);
+
+  /* Z-index ladder (DESIGN.md "Layering") */
+  --dn-z-selected: 5;      /* selected Node card */
+  --dn-z-handle: 10;       /* Handles, Marquee */
+  --dn-z-grip: 11;         /* Resize Grips, above Handles */
+  --dn-z-overlay: 20;      /* Alignment Guides, Minimap, Step counter */
+  --dn-z-pin: 30;          /* Pin layer */
+  --dn-z-toast: 1000;      /* Toasts above everything */
 }
 
 @layer base {

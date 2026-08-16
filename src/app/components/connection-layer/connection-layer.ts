@@ -1,5 +1,6 @@
 import { Component, computed, effect, input, output, signal, ChangeDetectionStrategy, inject } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE, oppositeHandle } from '../../models/node';
+import { DN_TOKENS } from '../../design-tokens';
 import { Connection, ArrowheadType, effectiveArrowhead, effectiveTextPosition, effectiveStrokePattern, effectiveStrokeWeight, strokeWidthPx, strokeDasharray } from '../../models/connection';
 import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, textPositionFromRoute } from '../../models/curve';
 import { Text, isTextEmpty } from '../../models/text';
@@ -149,7 +150,7 @@ interface DragState {
     }
     .connection-path {
       fill: none;
-      stroke: #7c5cff;
+      stroke: var(--dn-accent);
       /* Width comes from the Stroke Weight preset (--sw, set inline); the
          hover/selected increments are relative (ADR-0020). Rounded linecaps
          (which draw dotted's dots) bind per path — only for dashed/dotted,
@@ -167,15 +168,15 @@ interface DragState {
     }
     .connection-ghost {
       fill: none;
-      stroke: #7c5cff;
+      stroke: var(--dn-accent);
       stroke-width: 2;
       stroke-dasharray: 8 4;
       opacity: 0.7;
       pointer-events: none;
     }
     .reroute-point {
-      fill: #1c1c22;
-      stroke: #7c5cff;
+      fill: var(--dn-chip);
+      stroke: var(--dn-accent);
       stroke-width: 2px;
       pointer-events: all;
       cursor: grab;
@@ -191,11 +192,11 @@ interface DragState {
     .connection-text-card {
       position: absolute;
       transform: translate(-50%, -50%);
-      background: #1c1c22;
-      border: 1px solid rgba(124, 92, 255, 0.45);
+      background: var(--dn-chip);
+      border: 1px solid color-mix(in srgb, var(--dn-accent) 45%, transparent);
       border-radius: 10px;
       padding: 3px 10px;
-      color: #e8e8ee;
+      color: var(--dn-chip-ink);
       font-size: 12px;
       font-weight: 500;
       max-width: 240px;
@@ -207,11 +208,11 @@ interface DragState {
       --tv-size-l: 15px;
     }
     .connection-text-card.selected {
-      border-color: #7c5cff;
-      box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.4);
+      border-color: var(--dn-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--dn-accent) 40%, transparent);
     }
     .connection-text-card.editing {
-      border-color: #7c5cff;
+      border-color: var(--dn-accent);
       width: 240px;
       cursor: text;
       user-select: text;
@@ -226,7 +227,7 @@ export class ConnectionLayerComponent {
   connections = this.graphService.connections;
 
   // Default stroke when a Connection carries no color (matches the CSS fallback)
-  private static readonly DEFAULT_STROKE = '#7c5cff';
+  private static readonly DEFAULT_STROKE = DN_TOKENS.accent;
 
   // SVG markers don't inherit stroke color, so one marker is emitted per
   // possible stroke color: the default plus every palette color.
