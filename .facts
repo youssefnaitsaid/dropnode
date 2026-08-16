@@ -59,7 +59,7 @@
 
 ## groups
 
-- the toolbar "Add Group" button creates a 320x200 Group labeled "New Group" centered in the Viewport, as a single undo step; Groups use the node_ id pattern
+- a Group is created either from the empty-Canvas Context Menu ("Add group": a 320x200 Group labeled "New Group" centered on the right-click point) or the Command Palette ("Add Group": centered in the visible Canvas, opening the Label editor); each creation is a single undo step, and Groups use the node_ id pattern
 - membership is containment, judged by the node's center point on mouseup: center inside a Group's bounds joins it, center outside releases it — each change is one undo step
 - when overlapping Groups both contain the drop point, the topmost-rendered Group (later in the nodes array) claims the node
 - dropping a node into a Group it is connected to succeeds and severs those Connections: move, membership change, and severed Connections form one compound undo step restoring original ids

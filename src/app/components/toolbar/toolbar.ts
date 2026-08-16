@@ -8,7 +8,6 @@ import {
   lucideZoomIn,
   lucideZoomOut,
   lucideMaximize,
-  lucideGroup,
   lucideUpload,
   lucideDownload,
   lucideFileDown,
@@ -47,7 +46,6 @@ import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CommandPaletteService } from '../../services/command-palette.service';
 import {
-  CreateGroupCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
   buildSetConnectionsColorCommand,
@@ -76,7 +74,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideZoomIn,
       lucideZoomOut,
       lucideMaximize,
-      lucideGroup,
       lucideUpload,
       lucideDownload,
       lucideFileDown,
@@ -312,11 +309,8 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
           <ng-icon name="lucidePresentation" />
         </button>
         <span class="min-w-10 text-center text-sm font-medium text-muted-foreground">{{ zoomPercent() }}%</span>
-        <hlm-separator orientation="vertical" class="mx-1" />
-        <button hlmBtn variant="ghost" size="icon" (click)="addGroup()" title="Add Group" aria-label="Add group">
-          <ng-icon name="lucideGroup" />
-        </button>
         @if (scratchMode()) {
+          <hlm-separator orientation="vertical" class="mx-1" />
           <button hlmBtn variant="ghost" size="icon" (click)="openImport()" title="Import" aria-label="Import">
             <ng-icon name="lucideUpload" />
           </button>
@@ -606,20 +600,6 @@ export class ToolbarComponent {
       this.graphService, this.graphService.selectedNodeIds(), axis,
     );
     if (cmd) this.historyService.execute(cmd);
-  }
-
-  addGroup(): void {
-    // Center the new Group in the Viewport (canvas area, not the window —
-    // the toolbar overlaps the top of the window)
-    const canvasRect = document.querySelector('.canvas-container')?.getBoundingClientRect();
-    const screenCenterX = canvasRect ? canvasRect.width / 2 : window.innerWidth / 2;
-    const screenCenterY = canvasRect ? canvasRect.height / 2 : window.innerHeight / 2;
-    const vp = this.graphService.viewportState();
-    const centerX = (screenCenterX - vp.panX) / vp.zoom;
-    const centerY = (screenCenterY - vp.panY) / vp.zoom;
-    this.historyService.execute(
-      new CreateGroupCommand(this.graphService, 'New Group', centerX - 160, centerY - 100)
-    );
   }
 
   zoomIn(): void {
