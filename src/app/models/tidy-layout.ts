@@ -1,6 +1,7 @@
 import { GraphNode, HandleSide } from './node';
 import { Connection } from './connection';
 import { Bounds, graphBounds } from './bounds';
+import { handlePoint } from './curve';
 
 // Pure Tidy up layout (spec #26, ADR-0019). One hand-rolled Sugiyama-lite
 // pass: cycle-breaking → longest-path layering → ordering → coordinates from
@@ -27,6 +28,10 @@ export const TIDY_GROUP_PADDING = 16;
 // the Group's Label.
 export const TIDY_GROUP_LABEL_STRIP = 28;
 
+// Re-anchor knobs — visual tuning, not behavioral contracts (ADR-0021).
+export const TIDY_REROUTE_OFFSET_CAP_FRACTION = 0.25; // max kept offset as a fraction of the new span
+export const TIDY_REROUTE_COLLINEAR_EPSILON = 6; // canvas units; closer points add only kinks and drop
+
 export interface TidyNodePosition {
   id: string;
   x: number;
@@ -49,10 +54,18 @@ export interface TidyHandleAssignment {
 
 // The complete Tidy up mutation as data: only actual changes are listed, so
 // an all-empty result means the graph is already tidy (nothing to do).
+export interface TidyRerouteAdjustment {
+  id: string;
+  // Re-anchored Reroute Points, or null to remove the route entirely (it
+  // collapsed onto the flow and renders as the plain curve).
+  reroutePoints: Point[] | null;
+}
+
 export interface TidyResult {
   nodePositions: TidyNodePosition[]; // regular Nodes (loose and children)
   groupRects: TidyGroupRect[]; // Groups: position and exact-fit size
   handleAssignments: TidyHandleAssignment[]; // re-picked Connection endpoints
+  rerouteAdjustments: TidyRerouteAdjustment[]; // re-anchored Reroute Points
 }
 
 /** True when the result changes nothing — the no-op guard for the Command layer. */
@@ -60,7 +73,8 @@ export function isTidyEmpty(result: TidyResult): boolean {
   return (
     result.nodePositions.length === 0 &&
     result.groupRects.length === 0 &&
-    result.handleAssignments.length === 0
+    result.handleAssignments.length === 0 &&
+    result.rerouteAdjustments.length === 0
   );
 }
 
@@ -77,6 +91,7 @@ export function applyTidyToState(
   const positions = new Map(result.nodePositions.map(p => [p.id, p]));
   const rects = new Map(result.groupRects.map(r => [r.id, r]));
   const handles = new Map(result.handleAssignments.map(h => [h.id, h]));
+  const reroutes = new Map(result.rerouteAdjustments.map(r => [r.id, r]));
   return {
     nodes: nodes.map(n => {
       const rect = rects.get(n.id);
@@ -86,7 +101,18 @@ export function applyTidyToState(
     }),
     connections: connections.map(c => {
       const h = handles.get(c.id);
-      return h ? { ...c, sourceHandle: h.sourceHandle, targetHandle: h.targetHandle } : c;
+      const r = reroutes.get(c.id);
+      if (!h && r === undefined) return c;
+      let next = h ? { ...c, sourceHandle: h.sourceHandle, targetHandle: h.targetHandle } : c;
+      if (r !== undefined) {
+        if (r.reroutePoints === null) {
+          const { reroutePoints: _removed, ...rest } = next;
+          next = rest;
+        } else {
+          next = { ...next, reroutePoints: r.reroutePoints };
+        }
+      }
+      return next;
     }),
   };
 }
@@ -370,6 +396,173 @@ function segmentIntersectsRect(a: Point, b: Point, r: Bounds): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Reroute Point re-anchoring (ADR-0021): Tidy up rebuilds the layout, so a
+// Connection's absolute Reroute Points are re-interpreted against the new
+// flow instead of being left to detour through dead space.
+// ---------------------------------------------------------------------------
+
+function handleDir(side: HandleSide): Point {
+  switch (side) {
+    case 'top': return { x: 0, y: -1 };
+    case 'right': return { x: 1, y: 0 };
+    case 'bottom': return { x: 0, y: 1 };
+    case 'left': return { x: -1, y: 0 };
+  }
+}
+
+/** Fraction along the corridor a→b, clamped to [0, 1]. */
+function corridorFraction(a: Point, b: Point, p: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const spanSq = dx * dx + dy * dy;
+  if (spanSq === 0) return 0;
+  return Math.min(Math.max(((p.x - a.x) * dx + (p.y - a.y) * dy) / spanSq, 0), 1);
+}
+
+/** Signed distance of a point from the corridor a→b, positive on its left. */
+function signedOffset(a: Point, b: Point, p: Point): number {
+  const span = Math.hypot(b.x - a.x, b.y - a.y);
+  if (span === 0) return 0;
+  return ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / span;
+}
+
+/** How far a point lies ahead of a Handle along its Handle direction; a point
+ *  behind the Handle returns zero — mirrors curve.ts's forwardProjection, the
+ *  cap the routed renderer applies to the endpoint sweeps. */
+function forwardProjection(point: Point, handle: Point, side: HandleSide): number {
+  const dir = handleDir(side);
+  return Math.max((point.x - handle.x) * dir.x + (point.y - handle.y) * dir.y, 0);
+}
+
+/** Push a point along a Handle direction, capped so it keeps a 1-unit
+ *  along-corridor margin from its route neighbor (route order must survive). */
+function pushAlongCorridor(
+  point: Point,
+  dir: Point,
+  push: number,
+  neighbor: Point | undefined,
+  unitX: number,
+  unitY: number,
+): Point {
+  const target = { x: point.x + dir.x * push, y: point.y + dir.y * push };
+  if (!neighbor) return target;
+  const advance = (dir.x * unitX + dir.y * unitY) * push; // along-corridor progress of the push
+  const gap = (neighbor.x - point.x) * unitX + (neighbor.y - point.y) * unitY; // neighbor's corridor position relative to the point
+  // For the first point the neighbor lies ahead (gap > 0) and for the last
+  // behind (gap < 0); the push is capped only when it moves toward the
+  // neighbor and would close the gap below one unit.
+  if (advance * gap > 0 && Math.abs(gap) < Math.abs(advance) + 1) {
+    const allowed = Math.max(Math.abs(gap) - 1, 0);
+    const factor = allowed / Math.abs(advance);
+    return { x: point.x + dir.x * push * factor, y: point.y + dir.y * push * factor };
+  }
+  return target;
+}
+
+/**
+ * Re-anchor a Connection's Reroute Points onto the tidy corridor — the
+ * straight segment between the newly re-picked Handle midpoints. Each point
+ * keeps its signed perpendicular offset from the corridor, scaled by the
+ * span ratio (new ÷ old) and capped at TIDY_REROUTE_OFFSET_CAP_FRACTION of
+ * the new span, so the curve keeps its personality but follows the new flow
+ * and never doubles back. Points that end up within
+ * TIDY_REROUTE_COLLINEAR_EPSILON of the corridor add only kinks and drop; an
+ * empty result means the route collapsed and renders as the plain curve.
+ *
+ * The first and last survivors are then pushed along their Handle directions
+ * until their forward projection reaches the plain curve's span-based offset
+ * (clamp(0.4 × span, 40, 150)): the routed renderer caps the departure and
+ * arrival sweeps at the first/last point's forward projection, so a point
+ * sitting perpendicular to the Handle direction — exactly what re-anchoring
+ * onto a horizontal corridor does to a top/top Connection — would flatten
+ * the sweep to zero. The guard restores the plain curve's sweep.
+ *
+ * Results round to whole canvas units, which makes the mapping a fixed point:
+ * re-anchoring an already re-anchored route is a no-op, keeping
+ * tidy(tidy(g)) === tidy(g).
+ */
+function reanchorReroutePoints(
+  points: readonly Point[],
+  oldStart: Point,
+  oldEnd: Point,
+  newStart: Point,
+  newEnd: Point,
+  sourceHandle: HandleSide,
+  targetHandle: HandleSide,
+): Point[] {
+  const vx = newEnd.x - newStart.x;
+  const vy = newEnd.y - newStart.y;
+  const span = Math.hypot(vx, vy);
+  if (span === 0) return points.slice(); // degenerate corridor — leave the route alone
+
+  const oldSpan = Math.hypot(oldEnd.x - oldStart.x, oldEnd.y - oldStart.y);
+  const scale = oldSpan > 0 ? span / oldSpan : 1;
+  const cap = TIDY_REROUTE_OFFSET_CAP_FRACTION * span;
+  const unitX = vx / span;
+  const unitY = vy / span;
+  const normalX = -vy / span; // left normal of the corridor
+  const normalY = vx / span;
+
+  // 1. Project each point onto the corridor, keeping the signed offset
+  //    scaled by the span ratio and capped.
+  const reanchored = points.map(p => {
+    const fraction = corridorFraction(newStart, newEnd, p);
+    const footX = newStart.x + fraction * vx;
+    const footY = newStart.y + fraction * vy;
+    const kept = Math.min(Math.max(signedOffset(newStart, newEnd, p) * scale, -cap), cap);
+    return {
+      x: footX + normalX * kept,
+      y: footY + normalY * kept,
+      d: Math.abs(kept),
+    };
+  });
+
+  // 2. Drop near-collinear points — they only add kinks
+  const shaped: Point[] = reanchored
+    .filter(p => p.d >= TIDY_REROUTE_COLLINEAR_EPSILON)
+    .map(p => ({ x: p.x, y: p.y }));
+  if (shaped.length === 0) return [];
+
+  // 3. Endpoint sweep guard on the first and last survivors
+  const sweepTarget = Math.min(Math.max(span * 0.4, 40), 150);
+  const first = shaped[0];
+  const firstProjection = forwardProjection(first, newStart, sourceHandle);
+  if (firstProjection < sweepTarget) {
+    shaped[0] = pushAlongCorridor(
+      first,
+      handleDir(sourceHandle),
+      sweepTarget - firstProjection,
+      shaped[1],
+      unitX,
+      unitY,
+    );
+  }
+  const last = shaped[shaped.length - 1];
+  const lastProjection = forwardProjection(last, newEnd, targetHandle);
+  if (lastProjection < sweepTarget) {
+    shaped[shaped.length - 1] = pushAlongCorridor(
+      last,
+      handleDir(targetHandle),
+      sweepTarget - lastProjection,
+      shaped[shaped.length - 2],
+      unitX,
+      unitY,
+    );
+  }
+
+  // 4. Round to whole canvas units, dropping consecutive duplicates
+  const rounded: Point[] = [];
+  for (const p of shaped) {
+    const candidate = { x: Math.round(p.x), y: Math.round(p.y) };
+    const previous = rounded[rounded.length - 1];
+    if (!previous || previous.x !== candidate.x || previous.y !== candidate.y) {
+      rounded.push(candidate);
+    }
+  }
+  return rounded;
+}
+
+// ---------------------------------------------------------------------------
 // The seam: the complete Tidy up mutation as data.
 // ---------------------------------------------------------------------------
 
@@ -383,7 +576,7 @@ export function tidyLayout(
   nodes: readonly GraphNode[],
   connections: readonly Connection[],
 ): TidyResult {
-  const result: TidyResult = { nodePositions: [], groupRects: [], handleAssignments: [] };
+  const result: TidyResult = { nodePositions: [], groupRects: [], handleAssignments: [], rerouteAdjustments: [] };
   const oldBounds = graphBounds(nodes);
   if (!oldBounds) return result;
 
@@ -490,41 +683,75 @@ export function tidyLayout(
   const occluders = nodes
     .filter(n => n.kind !== 'group')
     .map(n => ({ id: n.id, rect: newRect(n) }));
-  for (const c of connections) {
-    const source = nodeById.get(c.sourceNodeId);
-    const target = nodeById.get(c.targetNodeId);
-    if (!source || !target) continue;
-    const sRect = newRect(source);
-    const tRect = newRect(target);
+  // Every Connection's re-picked Handle pair — needed both for the diff below
+  // and as the corridor anchors for Reroute Point re-anchoring.
+  const pickHandles = (c: Connection, sRect: Bounds, tRect: Bounds): { sourceHandle: HandleSide; targetHandle: HandleSide } => {
     const dx = tRect.x + tRect.width / 2 - (sRect.x + sRect.width / 2);
     const dy = tRect.y + tRect.height / 2 - (sRect.y + sRect.height / 2);
-    let sourceHandle: HandleSide;
-    let targetHandle: HandleSide;
-    if (dx < 0) {
-      sourceHandle = 'top';
-      targetHandle = 'top';
-    } else if (Math.abs(dx) >= Math.abs(dy)) {
-      sourceHandle = 'right';
-      targetHandle = 'left';
+    if (dx < 0) return { sourceHandle: 'top', targetHandle: 'top' };
+    if (Math.abs(dx) >= Math.abs(dy)) {
       // The chord between the two facing Handle midpoints
       const from = { x: sRect.x + sRect.width, y: sRect.y + sRect.height / 2 };
       const to = { x: tRect.x, y: tRect.y + tRect.height / 2 };
       const occluded = occluders.some(
-        o =>
-          o.id !== source.id &&
-          o.id !== target.id &&
-          segmentIntersectsRect(from, to, o.rect),
+        o => o.id !== c.sourceNodeId && o.id !== c.targetNodeId && segmentIntersectsRect(from, to, o.rect),
       );
-      if (occluded) {
-        sourceHandle = 'bottom';
-        targetHandle = 'bottom';
-      }
-    } else {
-      sourceHandle = dy > 0 ? 'bottom' : 'top';
-      targetHandle = dy > 0 ? 'top' : 'bottom';
+      return occluded
+        ? { sourceHandle: 'bottom', targetHandle: 'bottom' }
+        : { sourceHandle: 'right', targetHandle: 'left' };
     }
+    return dy > 0
+      ? { sourceHandle: 'bottom', targetHandle: 'top' }
+      : { sourceHandle: 'top', targetHandle: 'bottom' };
+  };
+  const newHandles = new Map<string, { sourceHandle: HandleSide; targetHandle: HandleSide }>();
+  for (const c of connections) {
+    const source = nodeById.get(c.sourceNodeId);
+    const target = nodeById.get(c.targetNodeId);
+    if (!source || !target) continue;
+    newHandles.set(c.id, pickHandles(c, newRect(source), newRect(target)));
+  }
+  for (const c of connections) {
+    const source = nodeById.get(c.sourceNodeId);
+    const target = nodeById.get(c.targetNodeId);
+    if (!source || !target) continue;
+    const { sourceHandle, targetHandle } = newHandles.get(c.id)!;
     if (c.sourceHandle !== sourceHandle || c.targetHandle !== targetHandle) {
       result.handleAssignments.push({ id: c.id, sourceHandle, targetHandle });
+    }
+  }
+
+  // Reroute Points re-anchored onto the new flow: each routed Connection's
+  // points are projected onto the corridor between its newly re-picked
+  // Handle midpoints, swept, and simplified (see reanchorReroutePoints).
+  // Emitted only when the stored points actually change, so tidying a
+  // tidied graph stays a no-op.
+  for (const c of connections) {
+    if (!c.reroutePoints || c.reroutePoints.length === 0) continue;
+    const source = nodeById.get(c.sourceNodeId);
+    const target = nodeById.get(c.targetNodeId);
+    if (!source || !target) continue;
+    const { sourceHandle, targetHandle } = newHandles.get(c.id)!;
+    const sRect = newRect(source);
+    const tRect = newRect(target);
+    const reanchored = reanchorReroutePoints(
+      c.reroutePoints,
+      handlePoint(source, c.sourceHandle),
+      handlePoint(target, c.targetHandle),
+      handlePoint({ ...source, ...sRect }, sourceHandle),
+      handlePoint({ ...target, ...tRect }, targetHandle),
+      sourceHandle,
+      targetHandle,
+    );
+    const current = c.reroutePoints;
+    const changed =
+      reanchored.length !== current.length ||
+      reanchored.some((p, i) => p.x !== current[i].x || p.y !== current[i].y);
+    if (changed) {
+      result.rerouteAdjustments.push({
+        id: c.id,
+        reroutePoints: reanchored.length > 0 ? reanchored : null,
+      });
     }
   }
 

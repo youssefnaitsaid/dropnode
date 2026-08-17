@@ -1081,8 +1081,8 @@ export function buildDistributeSelectionCommand(
 // Tidy up (spec #26, ADR-0019): the whole-graph layered layout as ONE undo
 // step. The pure module computes the complete mutation; this Command applies
 // it via applyTidyToState and undoes it from a before-snapshot of exactly the
-// touched fields — positions, Group rects, and Connection Handles. The
-// Selection is never read or written.
+// touched fields — positions, Group rects, Connection Handles, and Reroute
+// Points. The Selection is never read or written.
 export class TidyUpCommand implements Command {
   description = 'Tidy up';
   private inverse: TidyResult;
@@ -1105,6 +1105,15 @@ export class TidyUpCommand implements Command {
       handleAssignments: result.handleAssignments.map(h => {
         const c = connById.get(h.id)!;
         return { id: h.id, sourceHandle: c.sourceHandle, targetHandle: c.targetHandle };
+      }),
+      rerouteAdjustments: result.rerouteAdjustments.map(r => {
+        const c = connById.get(r.id)!;
+        return {
+          id: r.id,
+          reroutePoints: c.reroutePoints
+            ? c.reroutePoints.map(p => ({ x: p.x, y: p.y }))
+            : null,
+        };
       }),
     };
   }

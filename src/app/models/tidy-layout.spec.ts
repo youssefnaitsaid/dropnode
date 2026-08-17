@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GraphNode } from './node';
 import { Connection } from './connection';
+import { handlePoint, connectionRoute, connectionCurve } from './curve';
 import {
   tidyLayout,
   isTidyEmpty,
@@ -294,12 +295,21 @@ describe('tidyLayout', () => {
     const applied = applyTidyToState(nodes, connections, first);
     const second = tidyLayout(applied.nodes, applied.connections);
 
-    expect(second).toEqual({ nodePositions: [], groupRects: [], handleAssignments: [] });
+    expect(second).toEqual({
+      nodePositions: [],
+      groupRects: [],
+      handleAssignments: [],
+      rerouteAdjustments: [],
+    });
   });
 
-  it('preserves absolute Reroute Points while applying Node and Handle changes', () => {
-    const nodes = [node('a', 200, 0), node('b', -100, 200)];
-    const points = [{ x: 40, y: 80 }, { x: 180, y: 260 }];
+  it('re-anchors Reroute Points onto the new flow, keeping a gentle scaled offset', () => {
+    // a→b laid out left-to-right: b moves from x=500 to x=280, so the arc
+    // above the old corridor shrinks with it (offset scaled by the span
+    // ratio), and the endpoint guard pushes the first/last points ahead of
+    // their Handles so the routed sweeps keep the plain curve's magnitude
+    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+    const points = [{ x: 200, y: 60 }, { x: 350, y: 60 }];
     const connections: Connection[] = [{
       ...conn('c1', 'a', 'right', 'b', 'left'),
       reroutePoints: points,
@@ -308,6 +318,86 @@ describe('tidyLayout', () => {
     const result = tidyLayout(nodes, connections);
     const applied = applyTidyToState(nodes, connections, result);
 
-    expect(applied.connections[0].reroutePoints).toEqual(points);
+    // New corridor: a right (160,124) → b left (280,124); old offset 64
+    // above it scales by 120/340 ≈ 22.6 → y 101, first point pushed to 48
+    // ahead of the source Handle, last pushed 48 left of the target Handle
+    expect(result.rerouteAdjustments).toEqual([{
+      id: 'c1',
+      reroutePoints: [{ x: 208, y: 101 }, { x: 232, y: 101 }],
+    }]);
+    expect(applied.connections[0].reroutePoints).toEqual([{ x: 208, y: 101 }, { x: 232, y: 101 }]);
+  });
+
+  it('re-anchored Reroute Points render with the plain curve endpoint sweeps', () => {
+    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+    const connections: Connection[] = [{
+      ...conn('c1', 'a', 'right', 'b', 'left'),
+      reroutePoints: [{ x: 200, y: 60 }, { x: 350, y: 60 }],
+    }];
+
+    const result = tidyLayout(nodes, connections);
+    const applied = applyTidyToState(nodes, connections, result);
+    const a2 = applied.nodes.find(n => n.id === 'a')!;
+    const b2 = applied.nodes.find(n => n.id === 'b')!;
+    const c2 = applied.connections[0];
+    const start = handlePoint(a2, c2.sourceHandle);
+    const end = handlePoint(b2, c2.targetHandle);
+    const routed = connectionRoute(start, end, c2.sourceHandle, c2.targetHandle, c2.reroutePoints);
+    const plain = connectionCurve(start, end, c2.sourceHandle, c2.targetHandle);
+
+    // Departure and arrival control points are identical to the plain
+    // curve's — the re-anchored Connection reads as the standard curve,
+    // just diverted mid-route (ADR-0021)
+    expect(routed.segments[0].cp1).toEqual(plain.cp1);
+    expect(routed.segments[routed.segments.length - 1].cp2).toEqual(plain.cp2);
+  });
+
+  it('caps a re-anchored offset so an old arc never sweeps over the new layout', () => {
+    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+    const connections: Connection[] = [{
+      ...conn('c1', 'a', 'right', 'b', 'left'),
+      reroutePoints: [{ x: 300, y: -300 }], // 424 units above the old corridor
+    }];
+
+    const result = tidyLayout(nodes, connections);
+
+    // New span is 120 → offset capped at 25% = 30 above the corridor, and
+    // the arrival guard pushes the lone point 48 left of the target Handle
+    const adjusted = result.rerouteAdjustments[0].reroutePoints!;
+    expect(adjusted).toEqual([{ x: 232, y: 94 }]);
+  });
+
+  it('drops near-collinear Reroute Points and removes the route entirely when nothing keeps shape', () => {
+    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+    const connections: Connection[] = [{
+      ...conn('c1', 'a', 'right', 'b', 'left'),
+      reroutePoints: [{ x: 200, y: 124 }, { x: 350, y: 124 }], // exactly on the old corridor
+    }];
+
+    const result = tidyLayout(nodes, connections);
+    const applied = applyTidyToState(nodes, connections, result);
+
+    expect(result.rerouteAdjustments).toEqual([{ id: 'c1', reroutePoints: null }]);
+    expect('reroutePoints' in applied.connections[0]).toBe(false);
+  });
+
+  it('is idempotent with re-anchored Reroute Points: tidying a tidied routed graph changes nothing', () => {
+    const nodes = [node('a', 13, 7), node('b', 500, 300), node('c', -100, 900)];
+    const connections: Connection[] = [
+      conn('c1', 'a', 'top', 'b', 'top'),
+      { ...conn('c2', 'b', 'bottom', 'c', 'top'), reroutePoints: [{ x: 260, y: 500 }, { x: 40, y: 640 }] },
+    ];
+
+    const first = tidyLayout(nodes, connections);
+    expect(isTidyEmpty(first)).toBe(false);
+    const applied = applyTidyToState(nodes, connections, first);
+    const second = tidyLayout(applied.nodes, applied.connections);
+
+    expect(second).toEqual({
+      nodePositions: [],
+      groupRects: [],
+      handleAssignments: [],
+      rerouteAdjustments: [],
+    });
   });
 });

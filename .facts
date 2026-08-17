@@ -143,7 +143,7 @@
 - Reroute Point markers are stripped from PNG Export @implemented
 - Reroute Point dragging has no Alignment Snap or Handle Snap Zone @implemented
 - Reroute Point dragging has no obstacle collision or automatic rerouting @implemented
-- Tidy up preserves Reroute Points exactly @implemented
+- Tidy up re-anchors Reroute Points onto the new flow: each point is projected onto the straight corridor between the newly re-picked Handle midpoints keeping its signed perpendicular offset scaled by the span ratio and capped at 25% of the new span, first/last points are pushed along their Handle directions so the routed endpoint sweeps match the plain curve, points within 6 canvas units of the corridor drop, and a route with no shape left is removed (rendering the plain curve); re-anchored points round to whole canvas units, keeping tidy of a tidied graph a no-op @implemented
 - Copy, Paste, Duplicate, and Alt+drag translate copied Reroute Points by the graph fragment's Canvas delta @implemented
 - rendering, hit-testing, and Marquee selection use the complete routed curve @implemented
 - Zoom to Fit, Zoom to Selection, Connection Text projection, and PNG bounds use the complete routed curve @implemented
@@ -174,7 +174,7 @@
 - Tidy up re-picks every Connection's sourceHandle and targetHandle to follow the flow: forward Connections face the counterpart along the dominant axis between the new rects (ties fall horizontal), a Connection pointing against the flow (a cycle's back edge) arcs over the row via top/top Handles, and a forward corridor that would hide behind another Node's card detours under via bottom/bottom — exact duplicates may still collapse onto identical endpoints, accepted as cosmetic @implemented
 - disconnected components stack vertically largest-area-first; Connection-less regular Nodes gather into a grid after the last component; a Connection-less Group still stacks as a one-unit component, never in the grid @implemented
 - the tidied arrangement anchors its bounding-box top-left at the old graph bounds' top-left; results are deterministic (every tie breaks on nodes array order) and idempotent — an empty or already-tidy graph builds no Command and pushes nothing onto History @implemented
-- after a tidy executes, the toolbar runs the standard Zoom to fit (viewport-only, no History entry); the Selection is neither read nor cleared, and undo restores positions, Group rects, and Handles exactly with ids untouched @implemented
+- after a tidy executes, the toolbar runs the standard Zoom to fit (viewport-only, no History entry); the Selection is neither read nor cleared, and undo restores positions, Group rects, Handles, and Reroute Points exactly with ids untouched @implemented
 
 ## viewport
 

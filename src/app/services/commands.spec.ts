@@ -1519,6 +1519,26 @@ describe('Commands', () => {
       expect(graphService.connections()).toEqual(connsBefore);
     });
 
+    it('execute re-anchors Reroute Points and undo restores them exactly', () => {
+      const a = graphService.createNode('A', 0, 100);
+      const b = graphService.createNode('B', 500, 100);
+      const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      graphService.setConnectionReroutePoints(conn.id, [{ x: 200, y: 60 }, { x: 350, y: 60 }]);
+      const pointsBefore = structuredClone(graphService.connections().find(c => c.id === conn.id)!.reroutePoints);
+
+      const cmd = buildTidyUpCommand(graphService)!;
+      cmd.execute();
+
+      // Re-anchored onto the shrunken corridor, swept and simplified
+      expect(graphService.connections().find(c => c.id === conn.id)!.reroutePoints).toEqual([
+        { x: 208, y: 101 },
+        { x: 232, y: 101 },
+      ]);
+      cmd.undo();
+
+      expect(graphService.connections().find(c => c.id === conn.id)!.reroutePoints).toEqual(pointsBefore);
+    });
+
     it('redo reapplies the identical tidy', () => {
       const a = graphService.createNode('A', 0, 0);
       const b = graphService.createNode('B', 10, 300);
