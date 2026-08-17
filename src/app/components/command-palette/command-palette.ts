@@ -38,6 +38,7 @@ import {
   lucideLibrary,
   lucideLink,
   lucideMap,
+  lucideMapPin,
   lucideMaximize,
   lucideMessageCircle,
   lucideMinus,
@@ -108,6 +109,7 @@ interface PaletteGroup {
     lucideLibrary,
     lucideLink,
     lucideMap,
+    lucideMapPin,
     lucideMaximize,
     lucideMessageCircle,
     lucideMinus,
@@ -140,7 +142,7 @@ interface PaletteGroup {
     >
       <hlm-dialog-content
         *hlmDialogPortal
-        class="palette-content w-[min(720px,calc(100vw-2rem))] max-w-none overflow-hidden border-primary/35 bg-card p-0 shadow-2xl"
+        class="palette-content w-[min(720px,calc(100vw-2rem))] max-w-none sm:max-w-none overflow-hidden border-primary/35 bg-card p-0 shadow-2xl"
         [showCloseButton]="false"
       >
         <hlm-dialog-header class="sr-only">
@@ -205,7 +207,7 @@ interface PaletteGroup {
                     type="button"
                     class="palette-item"
                     [class.palette-active]="collectionIndex() === index"
-                    [attr.id]="collectionOptionId(collection.id)"
+                    [id]="collectionOptionId(collection.id)"
                     [attr.aria-selected]="collectionIndex() === index"
                     [value]="collection.id"
                     (mouseenter)="collectionIndex.set(index)"
@@ -258,7 +260,7 @@ interface PaletteGroup {
                         [class.palette-unavailable]="!entry.available"
                         [disabled]="!entry.available"
                         [value]="entry.id"
-                        [attr.id]="optionId(entry.id)"
+                        [id]="optionId(entry.id)"
                         [attr.aria-disabled]="!entry.available"
                         [attr.aria-selected]="isActive(entry) ? 'true' : 'false'"
                         [attr.data-selected]="isActive(entry) ? '' : null"
@@ -608,6 +610,22 @@ export class CommandPaletteComponent {
       this.collectionIndex.set(0);
       queueMicrotask(() => this.searchInput()?.nativeElement.focus());
       void step;
+    });
+
+    // Keep the active option in view as the index moves — arrows, Home/End,
+    // hover, and query resets. The brain command only scrolls items it
+    // activates itself (clicks, mouseenter), never our keyboard navigation,
+    // so the scrollable list would otherwise hide the active item. block
+    // 'nearest' scrolls the minimum needed; jsdom lacks scrollIntoView,
+    // hence the optional call (tests).
+    effect(() => {
+      if (!this.palette.isOpen()) return;
+      const optionId = this.palette.step() === 'collections'
+        ? this.activeCollection() ? this.collectionOptionId(this.activeCollection()!.id) : null
+        : this.activeEntry() ? this.optionId(this.activeEntry()!.id) : null;
+      if (!optionId) return;
+      const el = typeof document !== 'undefined' ? document.getElementById(optionId) : null;
+      el?.scrollIntoView?.({ block: 'nearest' });
     });
   }
 

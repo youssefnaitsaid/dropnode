@@ -73,12 +73,13 @@ describe('PaletteEntryRegistry', () => {
     expect(find('connection-weight-thick').linePreview).toEqual({ width: 3.5 });
   });
 
-  it('orders Connection entries Reset → colors → patterns → weights → arrowheads', () => {
+  it('orders Connection entries Add Reroute Point first, then Reset → colors → patterns → weights → arrowheads', () => {
     const ids = registry.search('')
       .filter(entry => entry.category === 'Connections')
       .map(entry => entry.id);
 
     expect(ids).toEqual([
+      'add-reroute-point',
       'connection-color-default',
       'connection-color-cyan',
       'connection-color-green',
@@ -187,6 +188,44 @@ describe('PaletteEntryRegistry', () => {
     await router.navigateByUrl('/p/project-1');
     expect(find('export-json').label).toBe('Export current Project as JSON');
     expect(find('save-as-project').available).toBe(false);
+  });
+
+  it('Add Reroute Point is a Connections entry enabled on a single selected Connection', () => {
+    const entry = find('add-reroute-point');
+    expect(entry.label).toBe('Add Reroute Point');
+    expect(entry.category).toBe('Connections');
+    expect(entry.icon).toBe('lucideMapPin');
+    expect(entry.available).toBe(false);
+    expect(entry.disabledReason).toBe('Select a Connection first');
+
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 320, 0);
+    const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    graphService.selectConnection(conn.id);
+
+    expect(find('add-reroute-point').available).toBe(true);
+    expect(registry.execute('add-reroute-point')).toBe(true);
+    expect(graphService.connections()[0].reroutePoints).toHaveLength(1);
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect(graphService.connections()[0].reroutePoints).toBeUndefined();
+  });
+
+  it('Add Reroute Point is unavailable once the Connection holds 32 Reroute Points', () => {
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 320, 0);
+    const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    graphService.setConnectionReroutePoints(
+      conn.id,
+      Array.from({ length: 32 }, (_, i) => ({ x: 10 + i, y: 20 })),
+    );
+    graphService.selectConnection(conn.id);
+
+    const entry = find('add-reroute-point');
+    expect(entry.available).toBe(false);
+    expect(entry.disabledReason).toBe('Reroute Point limit reached');
+    expect(registry.execute('add-reroute-point')).toBe(false);
   });
 
   it('exposes Add pin with comment as a hidden search alias', () => {

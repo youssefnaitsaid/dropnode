@@ -4,6 +4,7 @@ import {
   ARROWHEAD_TYPES,
   ArrowheadEnd,
   ArrowheadType,
+  MAX_REROUTE_POINTS,
   STROKE_PATTERNS,
   STROKE_WEIGHTS,
   StrokePattern,
@@ -178,6 +179,13 @@ export class PaletteEntryRegistry {
     const oneSelectedNode = selectedNodeIds.length === 1
       ? nodes.find(node => node.id === selectedNodeIds[0])
       : undefined;
+    const selectedConnection = selectedConnectionIds.length === 1
+      ? this.graphService.connections().find(conn => conn.id === selectedConnectionIds[0])
+      : undefined;
+    // A single selected Connection can take a new Reroute Point unless it is
+    // already at the 32-point ceiling (the mouse add's silent guard)
+    const canAddReroutePoint = !!selectedConnection &&
+      (selectedConnection.reroutePoints?.length ?? 0) < MAX_REROUTE_POINTS;
 
     return [
       this.action('undo', 'Undo', 'History', () => this.historyService.undo(), {
@@ -282,6 +290,19 @@ export class PaletteEntryRegistry {
       }),
       ...this.nodeColorEntries(selectedNodeIds),
       ...this.nodeShapeEntries(selectedRegularNodeIds),
+
+      this.action('add-reroute-point', 'Add Reroute Point', 'Connections', () => {
+        const connectionId = this.graphService.selectedConnectionId();
+        if (connectionId) this.contextMenuService.addReroutePointToConnection(connectionId);
+      }, {
+        aliases: ['reroute', 'add bend point', 'add route point'],
+        icon: 'lucideMapPin',
+        sortOrder: -1,
+        available: canAddReroutePoint,
+        unavailableReason: canAddReroutePoint
+          ? undefined
+          : selectedConnection ? 'Reroute Point limit reached' : 'Select a Connection first',
+      }),
 
       ...this.connectionColorEntries(selectedConnectionIds),
       ...this.connectionArrowheadEntries(selectedConnectionIds),

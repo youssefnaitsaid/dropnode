@@ -418,7 +418,7 @@ type PendingDelete =
       @if (!sidebar.collapsed()) {
         <footer class="shrink-0 border-t border-sidebar-border px-4 py-3">
           <p class="text-[11px] leading-relaxed text-muted-foreground">
-            Your work stays in this browser — nothing is uploaded.
+            Your work stays in this browser, nothing is uploaded.
           </p>
         </footer>
       }

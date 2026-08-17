@@ -18,10 +18,14 @@ function entry(
 }
 
 describe('palette search', () => {
-  it('orders an empty query by availability, category, then label', () => {
+  it('orders an empty query by section (History first), then availability, then label', () => {
     const entries = [
       entry('viewport-zoom', 'Zoom In', 'Viewport'),
-      entry('history-redo', 'Redo', 'History'),
+      // A disabled History entry stays in the History section, which still leads
+      entry('history-redo', 'Redo', 'History', {
+        available: false,
+        disabledReason: 'Nothing to redo',
+      }),
       entry('selection-clear', 'Clear Selection', 'Selection', {
         available: false,
         disabledReason: 'Nothing is selected',
@@ -30,10 +34,10 @@ describe('palette search', () => {
     ];
 
     expect(searchPaletteEntries(entries, '').map(item => item.id)).toEqual([
-      'history-redo',
       'history-undo',
-      'viewport-zoom',
+      'history-redo',
       'selection-clear',
+      'viewport-zoom',
     ]);
   });
 
@@ -63,7 +67,7 @@ describe('palette search', () => {
     expect(entries[0].label).toBe('Zoom to Fit');
   });
 
-  it('keeps an unavailable matching entry visible after available matches', () => {
+  it('ranks search matches by relevance, keeping unavailable entries visible', () => {
     const entries = [
       entry('undo', 'Undo', 'History'),
       entry('delete', 'Delete', 'Selection', {
@@ -73,6 +77,20 @@ describe('palette search', () => {
     ];
 
     expect(searchPaletteEntries(entries, 'delete').map(item => item.id)).toEqual(['delete']);
-    expect(searchPaletteEntries(entries, 'd').map(item => item.id)).toEqual(['undo', 'delete']);
+    // 'delete' is a prefix match, 'undo' only a fuzzy subsequence — relevance
+    // ranks first; the unavailable entry stays discoverable, not hidden
+    expect(searchPaletteEntries(entries, 'd').map(item => item.id)).toEqual(['delete', 'undo']);
+  });
+
+  it('keeps an unavailable entry after an available one at the same ranking level', () => {
+    const entries = [
+      entry('delete-a', 'Delete', 'Selection'),
+      entry('delete-b', 'Delete', 'Selection', {
+        available: false,
+        disabledReason: 'Nothing is selected',
+      }),
+    ];
+
+    expect(searchPaletteEntries(entries, 'delete').map(item => item.id)).toEqual(['delete-a', 'delete-b']);
   });
 });

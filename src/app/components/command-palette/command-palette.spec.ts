@@ -53,6 +53,33 @@ describe('CommandPaletteComponent', () => {
     expect(component.activeIndex()).toBe(count - 1);
   });
 
+  it('scrolls the active option into view when navigating with arrows', () => {
+    // jsdom has no scrollIntoView; install a spy that records the target so
+    // the effect's scroll call is observable
+    const scrolled: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (
+      this: HTMLElement,
+      options?: ScrollIntoViewOptions,
+    ) {
+      scrolled.push(this.id);
+      void options;
+    };
+    try {
+      palette.open(null);
+      fixture.detectChanges();
+      component.onQueryChange({ target: { value: 'zoom' } } as unknown as Event);
+      fixture.detectChanges();
+      component.onKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+      fixture.detectChanges();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+
+    expect(scrolled.length).toBeGreaterThan(0);
+    expect(scrolled.at(-1)).toBe(component.optionId(component.activeEntry()!.id));
+  });
+
   it('keeps the palette open for no results and closes on Escape', () => {
     palette.open(null);
     fixture.detectChanges();

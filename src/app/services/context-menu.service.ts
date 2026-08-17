@@ -262,16 +262,22 @@ export class ContextMenuService {
     this.pinEditRequest.set(pinId);
   }
 
-  /**
-   * Context Menu "Add Reroute Point": append a point at the route's
-   * midpoint (the route's default text position) and focus it, so arrows
-   * move it immediately (shape brief). Silent past the drag path's 32-point
-   * ceiling, matching the mouse add's guard.
-   */
+  /** Context Menu "Add Reroute Point": same action on the right-clicked Connection. */
   addReroutePoint(): void {
     const target = this.target();
     if (target?.kind !== 'connection') return;
-    const conn = this.graphService.connections().find(c => c.id === target.connectionId);
+    this.addReroutePointToConnection(target.connectionId);
+  }
+
+  /**
+   * "Add Reroute Point": append a point at the route's midpoint (the route's
+   * default text position) and focus it, so arrows move it immediately (shape
+   * brief). Silent past the drag path's 32-point ceiling, matching the mouse
+   * add's guard. Shared by the Connection Context Menu and the Command
+   * Palette (which acts on the selected Connection).
+   */
+  addReroutePointToConnection(connectionId: string): void {
+    const conn = this.graphService.connections().find(c => c.id === connectionId);
     if (!conn) return;
     const points = conn.reroutePoints ?? [];
     if (points.length >= MAX_REROUTE_POINTS) return;

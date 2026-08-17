@@ -599,5 +599,28 @@ describe('ContextMenuService', () => {
 
       expect(graphService.connections()).toHaveLength(0);
     });
+
+    it('addReroutePointToConnection appends a midpoint point to the given Connection without a menu target', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 320, 0);
+      const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+
+      service.addReroutePointToConnection(conn.id);
+
+      const points = graphService.connections()[0].reroutePoints!;
+      expect(points).toHaveLength(1);
+      expect(points[0].x).toBeGreaterThan(160);
+      expect(points[0].x).toBeLessThan(320);
+      expect(points[0].y).toBe(24);
+
+      historyService.undo();
+      expect(graphService.connections()[0].reroutePoints).toBeUndefined();
+    });
+
+    it('addReroutePointToConnection is a silent no-op for an unknown id', () => {
+      service.addReroutePointToConnection('missing');
+
+      expect(historyService.canUndo()).toBe(false);
+    });
   });
 });

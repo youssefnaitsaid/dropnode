@@ -98,10 +98,10 @@ function sortOrderDifference(a: PaletteEntry, b: PaletteEntry): number {
 }
 
 function compareEntries(a: RankedEntry, b: RankedEntry): number {
-  if (a.entry.available !== b.entry.available) return a.entry.available ? -1 : 1;
   if (a.score !== b.score) return a.score - b.score;
   const categoryDifference = categoryIndex(a.entry.category) - categoryIndex(b.entry.category);
   if (categoryDifference !== 0) return categoryDifference;
+  if (a.entry.available !== b.entry.available) return a.entry.available ? -1 : 1;
   const sortOrderDifferenceValue = sortOrderDifference(a.entry, b.entry);
   if (sortOrderDifferenceValue !== 0) return sortOrderDifferenceValue;
   const labelDifference = a.entry.label.localeCompare(b.entry.label);
@@ -110,8 +110,9 @@ function compareEntries(a: RankedEntry, b: RankedEntry): number {
 
 /**
  * Search and order Palette Entries without knowing anything about Angular or
- * the editor. Unavailable entries stay discoverable, but always follow the
- * available entries at the same ranking level.
+ * the editor. Sections always follow PALETTE_CATEGORY_ORDER — History first —
+ * and unavailable entries stay discoverable, following the available entries
+ * within their section at the same ranking level.
  */
 export function searchPaletteEntries(
   entries: readonly PaletteEntry[],
@@ -120,9 +121,9 @@ export function searchPaletteEntries(
   const query = normalize(rawQuery);
   if (!query) {
     return [...entries].sort((a, b) => {
-      if (a.available !== b.available) return a.available ? -1 : 1;
       const categoryDifference = categoryIndex(a.category) - categoryIndex(b.category);
       if (categoryDifference !== 0) return categoryDifference;
+      if (a.available !== b.available) return a.available ? -1 : 1;
       const sortOrderDifferenceValue = sortOrderDifference(a, b);
       if (sortOrderDifferenceValue !== 0) return sortOrderDifferenceValue;
       const labelDifference = a.label.localeCompare(b.label);
