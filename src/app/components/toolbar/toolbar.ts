@@ -129,123 +129,72 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
           <kbd>Ctrl K</kbd>
         </button>
         @if (graphService.selectedNodes().length > 0) {
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-1.5" title="Background color">
-            <button
-              class="swatch swatch-default"
-              [class.active]="sharedNodeColor() === null"
-              title="Default"
-              aria-label="Default color"
-              (click)="setColor(null)"
-            ></button>
-            @for (entry of paletteEntries; track entry.value) {
-              <button
-                class="swatch"
-                [class.active]="sharedNodeColor() === entry.value"
-                [style.background]="entry.value"
-                [title]="entry.name"
-                [attr.aria-label]="entry.name"
-                (click)="setColor(entry.value)"
-              ></button>
-            }
-          </div>
-        }
-        @if (selectedRegularNodes().length > 0) {
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-0.5" title="Node shape" aria-label="Node shape">
-            @for (option of shapeOptions; track option.shape) {
-              <button
-                type="button"
-                class="ah-btn shape-btn"
-                [class.active]="sharedNodeShape() === option.shape"
-                [title]="option.label"
-                [attr.aria-label]="option.label"
-                (click)="setShape(option.shape)"
-              >
-                <svg viewBox="0 0 20 20" aria-hidden="true">
-                  @if (option.shape === 'rectangle') {
-                    <rect x="3" y="5" width="14" height="10" rx="2" />
-                  } @else if (option.shape === 'pill') {
-                    <rect x="2" y="6" width="16" height="8" rx="4" />
-                  } @else if (option.shape === 'diamond') {
-                    <polygon points="10,2 18,10 10,18 2,10" />
-                  } @else {
-                    <ellipse cx="10" cy="10" rx="7" ry="5" />
-                  }
-                </svg>
-              </button>
-            }
-          </div>
-        }
-        @if (graphService.selectedNodes().length >= 2) {
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-0.5">
-            <button hlmBtn variant="ghost" size="icon" (click)="align('left')" title="Align left" aria-label="Align left">
-              <ng-icon name="lucideAlignStartVertical" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('center')" title="Align horizontal center" aria-label="Align horizontal center">
-              <ng-icon name="lucideAlignCenterVertical" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('right')" title="Align right" aria-label="Align right">
-              <ng-icon name="lucideAlignEndVertical" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('top')" title="Align top" aria-label="Align top">
-              <ng-icon name="lucideAlignStartHorizontal" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('middle')" title="Align vertical middle" aria-label="Align vertical middle">
-              <ng-icon name="lucideAlignCenterHorizontal" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('bottom')" title="Align bottom" aria-label="Align bottom">
-              <ng-icon name="lucideAlignEndHorizontal" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="distribute('horizontal')" [disabled]="graphService.selectedNodes().length < 3" title="Distribute horizontally" aria-label="Distribute horizontally">
-              <ng-icon name="lucideAlignHorizontalSpaceBetween" />
-            </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="distribute('vertical')" [disabled]="graphService.selectedNodes().length < 3" title="Distribute vertically" aria-label="Distribute vertically">
-              <ng-icon name="lucideAlignVerticalSpaceBetween" />
-            </button>
-          </div>
-        }
-        @if (graphService.selectedConnections().length > 0) {
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-1.5" title="Connection color">
-            <button
-              class="swatch swatch-default"
-              [class.active]="sharedConnectionColor() === null"
-              title="Default"
-              aria-label="Default color"
-              (click)="setConnectionColor(null)"
-            ></button>
-            @for (entry of paletteEntries; track entry.value) {
-              <button
-                class="swatch"
-                [class.active]="sharedConnectionColor() === entry.value"
-                [style.background]="entry.value"
-                [title]="entry.name"
-                [attr.aria-label]="entry.name"
-                (click)="setConnectionColor(entry.value)"
-              ></button>
-            }
-          </div>
-          <!-- Stroke: one trigger with a live preview of the current
-               arrowheads/pattern/weight; the details live in the dropdown so a
-               Connection selection reads as two decisions (color, stroke)
-               instead of twenty-two buttons (critique: selection-toolbar
-               overload). -->
+          <!-- Node styling: one trigger previewing the shared color and Shape
+               (ADR-0028); the details live in the dropdown so a Node selection
+               reads as one decision instead of thirteen buttons. -->
           <hlm-separator orientation="vertical" class="mx-1" />
           <button
             hlmBtn
             variant="ghost"
             size="icon"
-            [hlmDropdownMenuTrigger]="strokeMenu"
-            title="Stroke — arrowheads, pattern, weight"
-            aria-label="Stroke settings"
+            [hlmDropdownMenuTrigger]="nodeMenu"
+            title="Node — color and shape"
+            aria-label="Node styling"
+          >
+            <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+              <g [attr.fill]="nodePreviewFill()" stroke="currentColor" stroke-width="1.5">
+                @switch (nodePreviewShape()) {
+                  @case ('rectangle') {
+                    <rect x="3" y="5" width="14" height="10" rx="2" />
+                  }
+                  @case ('pill') {
+                    <rect x="2" y="6" width="16" height="8" rx="4" />
+                  }
+                  @case ('diamond') {
+                    <polygon points="10,2 18,10 10,18 2,10" />
+                  }
+                  @default {
+                    <ellipse cx="10" cy="10" rx="7" ry="5" />
+                  }
+                }
+              </g>
+            </svg>
+          </button>
+        }
+        @if (graphService.selectedNodes().length >= 2) {
+          <!-- Arrange: Align and Distribute are actions, not a value, so the
+               trigger is a fixed glyph with no preview (ADR-0028). -->
+          <hlm-separator orientation="vertical" class="mx-1" />
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon"
+            [hlmDropdownMenuTrigger]="alignMenu"
+            title="Align and distribute"
+            aria-label="Align and distribute"
+          >
+            <ng-icon name="lucideAlignStartVertical" />
+          </button>
+        }
+        @if (graphService.selectedConnections().length > 0) {
+          <!-- Connection styling: one trigger previewing the shared color,
+               pattern, and weight; the details live in the dropdown so a
+               Connection selection reads as one decision instead of twenty-two
+               buttons (ADR-0028). -->
+          <hlm-separator orientation="vertical" class="mx-1" />
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon"
+            [hlmDropdownMenuTrigger]="connectionMenu"
+            title="Connection — color, arrowheads, pattern, weight"
+            aria-label="Connection styling"
           >
             <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
               <path
                 d="M2 10 H18"
                 fill="none"
-                stroke="currentColor"
+                [attr.stroke]="connectionPreviewColor()"
                 [attr.stroke-width]="sharedStrokePreviewWeight()"
                 stroke-linecap="round"
                 [attr.stroke-dasharray]="sharedStrokePreviewDash()"
@@ -255,8 +204,106 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         }
       </div>
 
-      <ng-template #strokeMenu>
+      <ng-template #nodeMenu>
+        <div hlmDropdownMenu class="w-56">
+          <div hlmDropdownMenuLabel>Color</div>
+          <button hlmDropdownMenuItem (triggered)="setColor(null)">
+            <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+            <span>Default</span>
+            @if (sharedNodeColor() === null) {
+              <ng-icon name="lucideCheck" class="ml-auto" />
+            }
+          </button>
+          @for (entry of paletteEntries; track entry.value) {
+            <button hlmDropdownMenuItem (triggered)="setColor(entry.value)">
+              <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+              <span>{{ entry.name }}</span>
+              @if (sharedNodeColor() === entry.value) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
+          <!-- Groups carry no Shape (ADR-0023); the section stays visible but
+               disabled so the state is explained (ADR-0028) -->
+          <div hlmDropdownMenuLabel>
+            {{ selectedRegularNodes().length === 0 ? 'Shape — select a regular Node first' : 'Shape' }}
+          </div>
+          @for (option of shapeOptions; track option.shape) {
+            <button
+              hlmDropdownMenuItem
+              [disabled]="selectedRegularNodes().length === 0"
+              (triggered)="setShape(option.shape)"
+            >
+              <svg viewBox="0 0 20 20" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                @switch (option.shape) {
+                  @case ('rectangle') {
+                    <rect x="3" y="5" width="14" height="10" rx="2" />
+                  }
+                  @case ('pill') {
+                    <rect x="2" y="6" width="16" height="8" rx="4" />
+                  }
+                  @case ('diamond') {
+                    <polygon points="10,2 18,10 10,18 2,10" />
+                  }
+                  @default {
+                    <ellipse cx="10" cy="10" rx="7" ry="5" />
+                  }
+                }
+              </svg>
+              <span>{{ option.label }}</span>
+              @if (sharedNodeShape() === option.shape) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+        </div>
+      </ng-template>
+
+      <ng-template #alignMenu>
+        <div hlmDropdownMenu class="w-56">
+          <div hlmDropdownMenuLabel>Align</div>
+          @for (option of alignOptions; track option.kind) {
+            <button hlmDropdownMenuItem (triggered)="align(option.kind)">
+              <ng-icon [name]="option.icon" />
+              <span>{{ option.label }}</span>
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
+          <div hlmDropdownMenuLabel>Distribute</div>
+          @for (option of distributeOptions; track option.axis) {
+            <button
+              hlmDropdownMenuItem
+              [disabled]="graphService.selectedNodes().length < 3"
+              (triggered)="distribute(option.axis)"
+            >
+              <ng-icon [name]="option.icon" />
+              <span>{{ option.label }}</span>
+            </button>
+          }
+        </div>
+      </ng-template>
+
+      <ng-template #connectionMenu>
         <div hlmDropdownMenu class="w-64">
+          <div hlmDropdownMenuLabel>Color</div>
+          <button hlmDropdownMenuItem (triggered)="setConnectionColor(null)">
+            <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+            <span>Default</span>
+            @if (sharedConnectionColor() === null) {
+              <ng-icon name="lucideCheck" class="ml-auto" />
+            }
+          </button>
+          @for (entry of paletteEntries; track entry.value) {
+            <button hlmDropdownMenuItem (triggered)="setConnectionColor(entry.value)">
+              <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+              <span>{{ entry.name }}</span>
+              @if (sharedConnectionColor() === entry.value) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
           <div hlmDropdownMenuLabel>Start arrowhead</div>
           @for (opt of arrowheadOptions; track opt.type) {
             <button hlmDropdownMenuItem (triggered)="setArrowhead('start', opt.type)">
@@ -410,86 +457,28 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       line-height: 1;
       padding: 3px 4px;
     }
-    .swatch {
-      position: relative;
-      width: 18px;
-      height: 18px;
+    /* Menu swatches: the Palette color items inside the styling triggers
+       (ADR-0028); the dashed inner ring marks the Default swatch */
+    .menu-swatch {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
       border-radius: 50%;
       border: 2px solid var(--border);
-      padding: 0;
-      cursor: pointer;
-      transition: transform 0.15s ease, border-color 0.15s ease;
     }
-    .swatch::before {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border-radius: 50%;
-    }
-    .swatch:hover {
-      transform: scale(1.2);
-    }
-    .swatch.active {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
-    }
-    .swatch-default {
-      background: var(--dn-paper);
+    .menu-swatch-default {
       position: relative;
+      background: var(--dn-paper);
     }
-    .swatch-default::after {
+    .menu-swatch-default::after {
       content: '';
       position: absolute;
-      inset: 3px;
+      inset: 2px;
       border-radius: 50%;
       border: 1px dashed var(--muted-foreground);
     }
-    .ah-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted-foreground);
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    .ah-btn:hover {
-      color: var(--foreground);
-      background: var(--accent);
-    }
-    .ah-btn.active {
-      color: var(--primary);
-      border-color: var(--primary);
-      background: color-mix(in oklch, var(--primary) 15%, transparent);
-    }
-    .shape-btn svg {
-      width: 16px;
-      height: 16px;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.5;
-    }
     .flip-x {
       transform: scaleX(-1);
-    }
-    /* Touch adaptation: coarse pointers get larger controls and bigger hit
-       areas (WCAG 2.5.8); the swatch's ::before overlay is its hit zone. */
-    @media (pointer: coarse) {
-      .swatch {
-        width: 26px;
-        height: 26px;
-      }
-      .swatch::before {
-        inset: -7px;
-      }
-      .ah-btn {
-        width: 32px;
-        height: 32px;
-      }
     }
   `],
 })
@@ -598,7 +587,7 @@ export class ToolbarComponent {
     return conns.every(c => effectiveStrokeWeight(c) === first) ? first : undefined;
   };
 
-  // Live preview on the Stroke trigger: the shared pattern's dash and the
+  // Live preview on the Connection trigger: the shared pattern's dash and the
   // shared weight's width, falling back to the defaults when nothing shares.
   sharedStrokePreviewDash = (): string | null => {
     const pattern = this.sharedStrokePattern();
@@ -609,6 +598,32 @@ export class ToolbarComponent {
     const weight = this.sharedStrokeWeight();
     return this.strokeWeightOptions.find(o => o.weight === weight)?.previewWidth ?? 2;
   };
+
+  // Live preview on the Connection trigger: the shared color joins the stroke
+  // preview; absent or mixed falls back to the default Connection stroke.
+  connectionPreviewColor = (): string => this.sharedConnectionColor() ?? 'var(--dn-accent)';
+
+  // Live preview on the Node trigger: the shared Shape's silhouette filled
+  // with the shared color; mixed or absent values fall back to the defaults
+  // (rectangle silhouette, paper fill), mirroring the stroke preview rule.
+  nodePreviewShape = (): NodeShape => this.sharedNodeShape() ?? 'rectangle';
+  nodePreviewFill = (): string => this.sharedNodeColor() ?? 'var(--dn-paper)';
+
+  // Align/Distribute menu options (ADR-0028): actions under their section
+  // labels, so items carry short names — the label carries the intent.
+  alignOptions: { kind: AlignKind; icon: string; label: string }[] = [
+    { kind: 'left', icon: 'lucideAlignStartVertical', label: 'Left' },
+    { kind: 'center', icon: 'lucideAlignCenterVertical', label: 'Horizontal center' },
+    { kind: 'right', icon: 'lucideAlignEndVertical', label: 'Right' },
+    { kind: 'top', icon: 'lucideAlignStartHorizontal', label: 'Top' },
+    { kind: 'middle', icon: 'lucideAlignCenterHorizontal', label: 'Vertical middle' },
+    { kind: 'bottom', icon: 'lucideAlignEndHorizontal', label: 'Bottom' },
+  ];
+
+  distributeOptions: { axis: DistributeAxis; icon: string; label: string }[] = [
+    { axis: 'horizontal', icon: 'lucideAlignHorizontalSpaceBetween', label: 'Horizontally' },
+    { axis: 'vertical', icon: 'lucideAlignVerticalSpaceBetween', label: 'Vertically' },
+  ];
 
   // Bulk styling (ADR-0015): one compound Command over all selected targets;
   // the factories return null when nothing would change — no dead undo steps.

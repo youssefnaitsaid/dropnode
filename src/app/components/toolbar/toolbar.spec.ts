@@ -20,18 +20,31 @@ describe('ToolbarComponent', () => {
     fixture.detectChanges();
   });
 
-  it('shows four Shape controls for regular Nodes, ignores selected Groups, and undoes as one command', () => {
+  afterEach(() => {
+    // The styling triggers open CDK overlay menus into the document body
+    document.body.innerHTML = '';
+  });
+
+  it('shows one Node styling trigger and applies Shape to regular Nodes only, undoing as one command', async () => {
     const node = graphService.createNode('Node', 0, 0);
     const group = graphService.createGroup('Group', 400, 0);
     graphService.setSelection([node.id, group.id], []);
     fixture.detectChanges();
 
-    const buttons = fixture.nativeElement.querySelectorAll('button.shape-btn');
-    expect(buttons).toHaveLength(4);
-
-    const pill = Array.from(buttons).find(
-      button => (button as HTMLButtonElement).getAttribute('aria-label') === 'Pill',
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
     ) as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pill = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Pill',
+    ) as HTMLButtonElement;
+    expect(pill).toBeTruthy();
     pill.click();
     fixture.detectChanges();
 
@@ -43,18 +56,39 @@ describe('ToolbarComponent', () => {
     expect(graphService.nodes().find(item => item.id === node.id)?.shape).toBeUndefined();
   });
 
-  it('leaves every Shape button inactive for a mixed regular selection and hides them for Group-only selection', () => {
+  it('shows no Shape check for a mixed regular selection and disables Shape items for a Group-only selection', async () => {
     const first = graphService.createNode('First', 0, 0);
     const second = graphService.createNode('Second', 300, 0);
     graphService.setNodeShape(second.id, 'ellipse');
     graphService.setSelection([first.id, second.id], []);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelectorAll('button.shape-btn.active')).toHaveLength(0);
+    // Mixed regular selection: no shared Shape, so no item can read active
+    expect(fixture.componentInstance.sharedNodeShape()).toBeUndefined();
 
+    // Group-only selection: the trigger stays (Groups take color), but the
+    // Shape section is disabled and clicking does nothing
     graphService.selectNode(graphService.createGroup('Only Group', 600, 0).id);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelectorAll('button.shape-btn')).toHaveLength(0);
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pill = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Pill',
+    ) as HTMLButtonElement;
+    expect(pill.hasAttribute('disabled')).toBe(true);
+
+    pill.click();
+    fixture.detectChanges();
+    expect(historyService.canUndo()).toBe(false);
   });
 
   it('zooms in and out anchored on the visible Canvas center', () => {

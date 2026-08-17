@@ -47,7 +47,7 @@
 - Node auto-sizing updates go directly to GraphService and never create a History entry
 - a regular Node carries an optional Shape — rectangle by default, with pill, diamond, and ellipse as the only non-default values; Groups never carry Shape @implemented
 - Shape is visual-only: the Node's rectangular bounding box remains authoritative for Handles, hit testing, Marquee, alignment, containment, bounds, and Export, while Text stays centered in the shape's safe area @implemented
-- choosing a Shape from the toolbar or Command Palette applies it only to regular Nodes in the Selection as one undoable bulk Command; selected Groups are ignored, mixed Shapes show no active button, and an all-no-op choice creates no History entry @implemented
+- choosing a Shape from the toolbar's Node trigger or the Command Palette applies it only to regular Nodes in the Selection as one undoable bulk Command; selected Groups are ignored, the Shape section is disabled while no regular Node is selected, mixed Shapes show no active item, and an all-no-op choice creates no History entry @implemented
 - a Shape change grows an undersized regular Node around its existing center using a shape-specific Text-safe minimum and never shrinks an existing rect; Resize Grips remain free width/height resizing subject to that minimum @implemented
 - four Resize Grips show at the corners of a node only while it is the entire Selection (exactly one Node, nothing else); dragging one resizes with the opposite corner anchored
 - a grip drag clamps width and height to the Text-derived minimums (floors 120 and 48)
@@ -76,7 +76,7 @@
 
 - label: the palette holds exactly 8 curated colors (NODE_PALETTE); an absent color field means the default node background
   command: grep -q 'NODE_PALETTE' src/app/models/node.ts
-- a swatch row (default + 8 palette colors) appears in the toolbar center while any Node is in the Selection; clicking a swatch recolors every selected Node as one compound undo step, skipping Nodes already carrying the color — a swatch reads active only when ALL selected Nodes share its value, and an all-no-op click touches nothing
+- the Node styling trigger's Color section (default + 8 palette colors) appears in the toolbar while any Node is in the Selection; choosing a swatch recolors every selected Node as one compound undo step, skipping Nodes already carrying the color — an item reads active only when ALL selected Nodes share its value, and an all-no-op click touches nothing
 - Import rejects color values outside the palette wholesale with "Invalid node {id}: color must be a palette color"
 
 ## connections
@@ -92,8 +92,8 @@
 - quick-add spawn, parenting, and Connection are one undo step that also selects the spawned Node (redo re-selects); the auto-opened Text editor is UI-only — it follows the standard edit rules, commits as a separate SetNodeTextCommand, never reopens on redo, and Escape cancels only the edit
 - during a connection drag a dashed ghost bezier renders from the source Handle to the cursor
 - clicking a Connection path or its Text card selects the Connection; Delete or Backspace deletes it as one undoable Command; Ctrl+click toggles its Selection membership instead
-- the Connection swatch and Arrowhead rows show while any Connection is in the Selection and restyle every selected Connection as one compound undo step; a control reads active only when ALL selected Connections share its value
-- the Stroke Pattern (solid/dashed/dotted) and Stroke Weight (thin/normal/thick) rows follow the same toolbar rules: shown while any Connection is in the Selection, one compound undo step over all selected Connections, active only on a shared effective value, and an all-no-op click touches nothing @implemented
+- the Connection styling trigger (Color, Arrowhead, Stroke Pattern, and Stroke Weight sections) shows while any Connection is in the Selection and restyles every selected Connection as one compound undo step; a control reads active only when ALL selected Connections share its value
+- the Stroke Pattern (solid/dashed/dotted) and Stroke Weight (thin/normal/thick) sections of the Connection styling trigger follow the same toolbar rules: shown while any Connection is in the Selection, one compound undo step over all selected Connections, active only on a shared effective value, and an all-no-op click touches nothing @implemented
 - a Connection stores optional strokePattern and strokeWeight fields; absent means solid/normal, setting a field back to its default removes it, and createConnection writes neither (ADR-0020) @implemented
 - Import rejects a payload wholesale when strokePattern is outside solid/dashed/dotted or strokeWeight is outside thin/normal/thick, and canonicalizes explicitly-default stroke values to absent @implemented
 - dash and dot rhythms are computed as multiples of the stroke width so a pattern reads the same at every weight; Arrowheads always draw solid — they match the stroke's color and weight, never its pattern (ADR-0020) @implemented
@@ -161,7 +161,7 @@
 - Align moves each root along one axis to an edge or center-line of the roots' union bounding box, never touching sizes or the other coordinate; roots already in place add no undo weight and a fully aligned Selection pushes nothing onto History (the factory returns null) @implemented
 - Distribute sorts the roots by center along its axis, anchors the two outermost, and equalizes the edge gaps between neighbors; center ties keep their existing order, and when the roots overflow the span the shared gap goes negative — overlap is accepted @implemented
 - Align and Distribute never change Group membership: no root is adopted into a Group it lands on and no child is orphaned by being pushed outside its Group's frame — a child may be left overhanging (ADR-0018) @implemented
-- the toolbar shows an eight-button Align/Distribute cluster while the Selection holds at least two node roots, with the two Distribute buttons disabled below three roots; the multi-Selection Context Menu carries the same eight actions in an "Align" submenu under the same rules @implemented
+- the toolbar shows an Align trigger (Align and Distribute sections) while the Selection holds at least two node roots, with the two Distribute items disabled below three roots; the multi-Selection Context Menu carries the same eight actions in an "Align" submenu under the same rules @implemented
 
 ## tidy up
 
