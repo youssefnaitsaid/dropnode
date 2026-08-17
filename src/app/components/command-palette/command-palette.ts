@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideMoveDiagonal2 } from '@ng-icons/lucide';
 import {
   lucideAlignCenterHorizontal,
   lucideAlignCenterVertical,
@@ -110,6 +111,7 @@ interface PaletteGroup {
     lucideMaximize,
     lucideMessageCircle,
     lucideMinus,
+    lucideMoveDiagonal2,
     lucideNetwork,
     lucidePanelLeft,
     lucidePencil,
@@ -306,6 +308,7 @@ interface PaletteGroup {
               <span [attr.aria-live]="'polite'">{{ resultAnnouncement() }}</span>
               <span class="palette-footer-keys"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
               <span class="palette-footer-keys"><kbd>Enter</kbd> run</span>
+              <span class="palette-footer-keys"><kbd>[</kbd><kbd>]</kbd> Connections</span>
               <span class="palette-footer-keys"><kbd>Esc</kbd> close</span>
             </div>
           }
@@ -318,11 +321,10 @@ interface PaletteGroup {
       display: contents;
     }
 
-    .palette-content {
-      border-left-width: 3px;
-      border-left-color: var(--primary);
-    }
-
+    /* The panel keeps its 1px border-primary/35 hairline from the template;
+       the 3px left accent edge is gone — a colored side border above 1px is
+       the tell of assembled UIs, and the active item's inset bar (below) is
+       the only side accent that carries meaning. */
     .palette-shell {
       display: flex;
       flex-direction: column;
@@ -370,9 +372,15 @@ interface PaletteGroup {
       font-size: 15px;
     }
 
+    /* The field is borderless by design, but a focused search box still needs
+       a visible indicator (WCAG 2.4.7): a soft primary ring replaces the
+       default outline without adding a box. */
     .palette-input:focus {
       outline: none;
-      box-shadow: none;
+    }
+    .palette-input:focus-visible {
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
+      border-radius: 6px;
     }
 
     .palette-dismiss-hint,

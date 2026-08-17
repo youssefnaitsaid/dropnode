@@ -38,6 +38,8 @@ export class ToastService {
     @if (toastService.message(); as msg) {
       <div
         class="toast flex items-center gap-3 rounded-lg border border-border bg-popover text-popover-foreground pl-3.5 pr-2 py-2.5 shadow-lg max-w-sm"
+        [attr.role]="toastService.type() === 'error' ? 'alert' : 'status'"
+        [attr.aria-live]="toastService.type() === 'error' ? 'assertive' : 'polite'"
       >
         <ng-icon [name]="icon()" [class]="iconClass()" class="text-lg shrink-0" />
         <span class="text-sm font-medium">{{ msg }}</span>
@@ -57,8 +59,8 @@ export class ToastService {
   styles: [`
     :host {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      right: max(20px, env(safe-area-inset-right));
       z-index: var(--dn-z-toast);
     }
     .toast {
@@ -67,6 +69,11 @@ export class ToastService {
     @keyframes slideIn {
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .toast {
+        animation: none;
+      }
     }
   `],
 })

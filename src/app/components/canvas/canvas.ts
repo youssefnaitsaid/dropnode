@@ -11,6 +11,7 @@ import {
   lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
   lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
   lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
+  lucideMoveDiagonal2, lucideCheck, lucideMapPin,
 } from '@ng-icons/lucide';
 import {
   HlmDropdownMenu, HlmDropdownMenuItem, HlmDropdownMenuSub, HlmDropdownMenuSubTrigger,
@@ -21,6 +22,7 @@ import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { ClipboardService } from '../../services/clipboard.service';
 import { PresentationService } from '../../services/presentation.service';
+import { ResizeModeService } from '../../services/resize-mode.service';
 import {
   CreateNodeCommand,
   MoveNodeCommand,
@@ -66,21 +68,27 @@ import { Text } from '../../models/text';
       lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
       lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
       lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
+      lucideMoveDiagonal2, lucideCheck, lucideMapPin,
     }),
   ],
   template: `
-    <div class="canvas-viewport" [cdkContextMenuTriggerFor]="contextMenu">
+    <div class="canvas-viewport" role="region" aria-label="Canvas" [cdkContextMenuTriggerFor]="contextMenu">
       <div
         class="canvas-container"
         [class.panning]="isPanning"
         [class.space-pan]="spaceHeld()"
         (dblclick)="onCanvasDoubleClick($event)"
         (mousedown)="onCanvasMouseDown($event)"
+        (pointerdown)="onCanvasPointerDown($event)"
+        (pointermove)="onCanvasPointerMove($event)"
+        (pointerup)="onCanvasPointerUp($event)"
+        (pointercancel)="onCanvasPointerUp($event)"
         (contextmenu)="onContextMenu($event)"
         (wheel)="onWheel($event)"
       >
         <div
           class="canvas-transform"
+          [class.transforming]="isTransforming()"
           [style.transform]="transformStyle()"
         >
           <!-- ADR-0008 stacking: Group cards, then Connections, then regular nodes,
@@ -93,6 +101,9 @@ import { Text } from '../../models/text';
                 [soleSelected]="graphService.selectedNodeId() === node.id"
                 [snapTarget]="currentSnapTarget"
                 (startMove)="onNodeStartMove($event)"
+                (keyboardSelect)="onKeyboardSelect($event)"
+                (keyboardMove)="onKeyboardMove($event)"
+                (keyboardResize)="onKeyboardResize($event)"
                 (rename)="onNodeRename($event)"
                 (textCommit)="onNodeTextCommit($event)"
                 (handleDragStart)="onHandleDragStart($event)"
@@ -121,6 +132,9 @@ import { Text } from '../../models/text';
                 [soleSelected]="graphService.selectedNodeId() === node.id"
                 [snapTarget]="currentSnapTarget"
                 (startMove)="onNodeStartMove($event)"
+                (keyboardSelect)="onKeyboardSelect($event)"
+                (keyboardMove)="onKeyboardMove($event)"
+                (keyboardResize)="onKeyboardResize($event)"
                 (rename)="onNodeRename($event)"
                 (textCommit)="onNodeTextCommit($event)"
                 (handleDragStart)="onHandleDragStart($event)"
@@ -200,6 +214,17 @@ import { Text } from '../../models/text';
                 <span>Edit text</span>
               </button>
             }
+            <button
+              hlmDropdownMenuItem
+              [attr.aria-pressed]="resizeMode.mode()"
+              (triggered)="resizeMode.toggle()"
+            >
+              <ng-icon name="lucideMoveDiagonal2" />
+              <span>Resize mode</span>
+              @if (resizeMode.mode()) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
             <button hlmDropdownMenuItem (triggered)="contextMenuService.addPin()">
               <ng-icon name="lucideMessageCircle" />
               <span>Add pin</span>
@@ -235,6 +260,10 @@ import { Text } from '../../models/text';
             <button hlmDropdownMenuItem (triggered)="contextMenuService.editText()">
               <ng-icon name="lucideTag" />
               <span>Edit text</span>
+            </button>
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.addReroutePoint()">
+              <ng-icon name="lucideMapPin" />
+              <span>Add Reroute Point</span>
             </button>
             <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteTarget()">
               <ng-icon name="lucideTrash2" />
@@ -294,7 +323,7 @@ import { Text } from '../../models/text';
         </button>
         <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('center')">
           <ng-icon name="lucideAlignCenterVertical" />
-          <span>Align center</span>
+          <span>Align horizontal center</span>
         </button>
         <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('right')">
           <ng-icon name="lucideAlignEndVertical" />
@@ -306,7 +335,7 @@ import { Text } from '../../models/text';
         </button>
         <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('middle')">
           <ng-icon name="lucideAlignCenterHorizontal" />
-          <span>Align middle</span>
+          <span>Align vertical middle</span>
         </button>
         <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('bottom')">
           <ng-icon name="lucideAlignEndHorizontal" />
@@ -344,6 +373,11 @@ import { Text } from '../../models/text';
       position: relative;
       overflow: hidden;
       cursor: default;
+      /* Touch adaptation: the browser must never hijack canvas gestures (no
+         scroll, no double-tap zoom, no pinch). Effective for the whole
+         subtree, so Node/Handle/Text-card drags stream compatibility mouse
+         events instead of being canceled mid-drag. */
+      touch-action: none;
     }
     .canvas-container.space-pan {
       cursor: grab;
@@ -369,6 +403,8 @@ import { Text } from '../../models/text';
       top: 0;
       left: 0;
       transform-origin: 0 0;
+    }
+    .canvas-transform.transforming {
       will-change: transform;
     }
     .nodes-container {
@@ -382,6 +418,7 @@ export class CanvasComponent {
   graphService = inject(GraphService);
   contextMenuService = inject(ContextMenuService);
   presentationService = inject(PresentationService);
+  protected resizeMode = inject(ResizeModeService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
 
@@ -401,7 +438,7 @@ export class CanvasComponent {
 
   // Node drag state — a drag moves one or many roots (the whole Selection
   // when a member was grabbed, ADR-0015) rigidly by the same delta
-  private isDraggingNode = false;
+  protected isDraggingNode = false;
   private dragRoots: { id: string; startX: number; startY: number; isGroup: boolean }[] = [];
   private dragStartX = 0;
   private dragStartY = 0;
@@ -414,7 +451,7 @@ export class CanvasComponent {
   private dragIsSpawnedDuplicate = false;
 
   // Resize drag state
-  private isResizingNode = false;
+  protected isResizingNode = false;
   private resizeNodeId: string | null = null;
   private resizeCorner: GripCorner | null = null;
   private resizeAnchorX = 0;
@@ -430,6 +467,21 @@ export class CanvasComponent {
   // Pan state (ADR-0016: Space+drag and middle-mouse-drag; empty-canvas
   // left-drag is the Marquee)
   protected isPanning = false;
+
+  // Touch/pen gestures (adapt): touch has no middle button or Space, so one
+  // finger pans the empty Canvas and two fingers pinch-zoom around their
+  // midpoint. Element drags (Nodes, Handles, Text cards, Pins) run through
+  // the browser's compatibility mouse events — touch-action: none on the
+  // container lets those through — so only empty-canvas gestures need the
+  // pointer handlers here.
+  private touchPointers = new Map<number, { x: number; y: number }>();
+  private touchPanPointerId: number | null = null;
+  private pinchStartDist = 0;
+  private pinchStartZoom = 1;
+
+  protected isTransforming(): boolean {
+    return this.isPanning || this.isDraggingNode || this.isResizingNode;
+  }
   private panStartX = 0;
   private panStartY = 0;
   private panStartPanX = 0;
@@ -573,6 +625,9 @@ export class CanvasComponent {
   }
 
   onCanvasMouseDown(event: MouseEvent): void {
+    // A touch pan already owns this press — its compatibility mousedown must
+    // never also arm a Marquee or clear selection (touch pans, mouse marquees)
+    if (this.touchPanPointerId !== null) return;
     // Middle-mouse-drag pans from anywhere; Space turns a left-drag into a
     // pan even over elements (ADR-0016)
     if (event.button === 1 || (event.button === 0 && this.spaceHeld())) {
@@ -612,15 +667,176 @@ export class CanvasComponent {
     this.panStartPanY = vp.panY;
   }
 
+  onCanvasPointerDown(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    const isFirstFinger = this.touchPointers.size === 0;
+    // Present Mode is free-roam: pan over everything. Otherwise an element
+    // press belongs to its own (compatibility-mouse) drag, not a pan.
+    if (isFirstFinger && !this.presentationService.active()) {
+      const target = event.target as HTMLElement;
+      if (target.closest('app-node, [data-pin-id], .pin-popover, .connection-text-card, .reroute-point')) return;
+    }
+    // Capture so pointerup lands here even when the finger lifts off-canvas;
+    // jsdom lacks setPointerCapture, hence the optional calls (tests)
+    (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+    this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (this.touchPointers.size === 2) {
+      // Second finger: end the one-finger pan and start a pinch. No
+      // compatibility mouse events fire during multi-touch, so the pinch path
+      // below never double-pans.
+      this.isPanning = false;
+      this.touchPanPointerId = null;
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const points = [...this.touchPointers.values()];
+      this.pinchStartDist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      this.pinchStartZoom = this.graphService.viewportState().zoom;
+      return;
+    }
+    if (this.touchPointers.size > 2) return;
+
+    this.touchPanPointerId = event.pointerId;
+    this.startPan(event);
+  }
+
+  onCanvasPointerMove(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    if (!this.touchPointers.has(event.pointerId)) return;
+    this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (this.touchPointers.size >= 2 && this.pinchStartDist > 0) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const points = [...this.touchPointers.values()];
+      const mid = {
+        x: (points[0].x + points[1].x) / 2 - rect.left,
+        y: (points[0].y + points[1].y) / 2 - rect.top,
+      };
+      const dist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      const ratio = dist / this.pinchStartDist;
+      // zoomBy clamps to the zoom bounds and re-derives the pan from the
+      // clamped zoom, so the raw delta keeps the pinch midpoint anchored
+      const delta = this.pinchStartZoom * ratio - this.graphService.viewportState().zoom;
+      this.graphService.zoomBy(delta, mid.x, mid.y);
+    }
+  }
+
+  onCanvasPointerUp(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    const wasPanPointer = this.touchPanPointerId === event.pointerId;
+    this.touchPointers.delete(event.pointerId);
+    if (this.touchPanPointerId === event.pointerId) this.touchPanPointerId = null;
+    if (this.touchPointers.size < 2) this.pinchStartDist = 0;
+    // A pan's own compatibility mouseup ends isPanning; pointercancel has no
+    // compat counterpart, so end the pan here too (idempotent with onMouseUp)
+    if (wasPanPointer && this.touchPointers.size === 0) {
+      this.isPanning = false;
+    }
+  }
+
   // Space tracking for the pan gesture; ignored while typing so the editors
-  // keep their spacebar
+  // keep their spacebar. Shift+F10 / the Context Menu key opens the Canvas
+  // context menu for keyboard users (WCAG 2.1.1): the menu resolves its
+  // target exactly like a right-click, from the focused element downward.
   @HostListener('document:keydown', ['$event'])
   onDocumentKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'F10' && event.shiftKey || event.key === 'ContextMenu') {
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      event.preventDefault();
+      this.openContextMenuForKeyboard();
+      return;
+    }
     if (event.code !== 'Space') return;
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
     event.preventDefault(); // keep the page (and focused buttons) inert
     this.spaceHeld.set(true);
+  }
+
+  /**
+   * Keyboard path to the Context Menu. Dispatches a synthetic contextmenu on
+   * the element that represents the current target — the focused Node card,
+   * the selected Node/Connection, or the empty Canvas — so the existing
+   * target-resolution and open flow runs unchanged (synthetic events never
+   * summon the browser's native menu).
+   */
+  private openContextMenuForKeyboard(): void {
+    if (this.presentationService.active()) return;
+    // Element, not HTMLElement: SVG paths (Connection hit targets) are
+    // focusable too, and they are Elements, never HTMLElements
+    const active = document.activeElement instanceof Element ? document.activeElement : null;
+
+    // Focus is on a Node card: its menu (multi-Selection keep/collapse applies)
+    const nodeEl = active?.closest('[data-node-id]') as HTMLElement | null;
+    if (nodeEl) {
+      this.dispatchContextMenu(nodeEl);
+      return;
+    }
+
+    // Focus is on a Connection hit path (tab order or the [ / ] cycle):
+    // select it if needed, then open its menu — the keyboard path to a
+    // Connection's commands
+    const connHit = active?.closest('path.connection-hit') as SVGPathElement | null;
+    if (connHit) {
+      const connectionId = connHit.getAttribute('data-connection-id');
+      if (connectionId && !this.graphService.isConnectionSelected(connectionId)) {
+        this.graphService.selectConnection(connectionId);
+      }
+      this.dispatchContextMenu(connHit);
+      return;
+    }
+
+    // Focus is on a Reroute Point: its Connection's menu — the point can't
+    // carry its own menu, and its actions (Edit text, Delete) are the
+    // Connection's
+    const rerouteEl = active?.closest('.reroute-point') as SVGCircleElement | null;
+    if (rerouteEl) {
+      const connectionId = rerouteEl.getAttribute('data-connection-id');
+      if (connectionId) {
+        if (!this.graphService.isConnectionSelected(connectionId)) {
+          this.graphService.selectConnection(connectionId);
+        }
+        const hit = document.querySelector<SVGPathElement>(
+          `path.connection-hit[data-connection-id="${connectionId}"]`,
+        );
+        if (hit) this.dispatchContextMenu(hit);
+        return;
+      }
+    }
+
+    // A Selection exists: open on its selected Node, else its Connection
+    const selectedNodeId = this.graphService.selectedNodeId();
+    if (selectedNodeId) {
+      const card = document.querySelector<HTMLElement>(`[data-node-id="${selectedNodeId}"]`);
+      if (card) {
+        this.dispatchContextMenu(card);
+        return;
+      }
+    }
+    const selectedConnectionId = this.graphService.selectedConnectionId();
+    if (selectedConnectionId) {
+      const hit = document.querySelector<SVGPathElement>(
+        `path.connection-hit[data-connection-id="${selectedConnectionId}"]`,
+      );
+      if (hit) {
+        this.dispatchContextMenu(hit);
+        return;
+      }
+    }
+
+    // Nothing selected: the empty-Canvas menu, centered
+    const container = document.querySelector<HTMLElement>('.canvas-container');
+    if (container) this.dispatchContextMenu(container);
+  }
+
+  private dispatchContextMenu(el: HTMLElement | SVGPathElement): void {
+    const rect = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    }));
   }
 
   @HostListener('document:keyup', ['$event'])
@@ -739,6 +955,62 @@ export class CanvasComponent {
       .filter((n): n is GraphNode => n !== undefined)
       .map(n => ({ id: n.id, startX: n.x, startY: n.y, isGroup: n.kind === 'group' }));
     this.hasMoved = false;
+  }
+
+  // Keyboard select (Enter on a focused card): mirror a plain click.
+  onKeyboardSelect(event: { nodeId: string }): void {
+    if (this.presentationService.active()) return;
+    this.graphService.selectNode(event.nodeId);
+  }
+
+  // Keyboard nudge (arrow keys on a focused card): moving a member of a
+  // multi-Selection shifts the whole set as one undoable CompoundCommand,
+  // exactly like the drag commit — one nudge, one undo step.
+  onKeyboardResize(event: { nodeId: string; rect: NodeRect; originalRect: NodeRect }): void {
+    if (this.presentationService.active()) return;
+    // Select-first so the resize reads as the current target, mirroring the
+    // nudge path; one undoable ResizeNodeCommand per keystroke
+    this.graphService.selectNode(event.nodeId);
+    this.historyService.execute(new ResizeNodeCommand(
+      this.graphService,
+      event.nodeId,
+      event.rect,
+      event.originalRect,
+    ));
+  }
+
+  onKeyboardMove(event: { nodeId: string; dx: number; dy: number }): void {
+    if (this.presentationService.active()) return;
+    const byId = new Map(this.graphService.nodes().map(n => [n.id, n]));
+    const target = byId.get(event.nodeId);
+    if (!target) return;
+
+    if (this.graphService.isNodeSelected(event.nodeId) && this.graphService.selectionSize() > 1) {
+      const parts = this.graphService.selectedNodeIds()
+        .map(id => byId.get(id))
+        .filter((n): n is GraphNode => n !== undefined)
+        .map(n => n.kind === 'group'
+          ? new MoveGroupCommand(this.graphService, n.id, n.x + event.dx, n.y + event.dy, n.x, n.y)
+          : new MoveNodeCommand(this.graphService, n.id, n.x + event.dx, n.y + event.dy, n.x, n.y));
+      if (parts.length > 0) {
+        this.historyService.execute(new CompoundCommand('Move Selection', parts));
+      }
+      return;
+    }
+
+    // Single node: select it first so the nudge reads as the current target,
+    // then move. MoveNodeCommand captures the original position itself;
+    // MoveGroupCommand needs it explicit.
+    this.graphService.selectNode(event.nodeId);
+    if (target.kind === 'group') {
+      this.historyService.execute(new MoveGroupCommand(
+        this.graphService, target.id, target.x + event.dx, target.y + event.dy, target.x, target.y,
+      ));
+    } else {
+      this.historyService.execute(new MoveNodeCommand(
+        this.graphService, target.id, target.x + event.dx, target.y + event.dy,
+      ));
+    }
   }
 
   // Resize grip drag start

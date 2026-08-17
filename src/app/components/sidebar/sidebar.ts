@@ -32,6 +32,7 @@ import {
   lucideLink,
   lucideCloud,
 } from '@ng-icons/lucide';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { HlmSeparator } from '@spartan-ng/helm/separator';
@@ -67,10 +68,12 @@ type PendingDelete =
   selector: 'app-sidebar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown.escape)': 'onEscape()' },
   imports: [
     RouterLink,
     RouterLinkActive,
     NgIcon,
+    CdkTrapFocus,
     HlmButton,
     HlmTooltip,
     HlmSeparator,
@@ -110,10 +113,12 @@ type PendingDelete =
     }),
   ],
   template: `
+    <!-- Width comes from the app-frame grid track (app-shell.ts), so the
+         collapse animates grid-template-columns — a layout change the browser
+         can interpolate without the flex-width reflow — never width itself. -->
     <aside
-      class="flex h-full flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-[width] duration-200 ease-linear overflow-hidden"
-      [style.width.px]="sidebar.collapsed() ? 52 : 250"
-      aria-label="Primary"
+      class="flex h-full min-w-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden"
+      aria-label="Sidebar"
     >
       <!-- Header: brand + collapse toggle -->
       @if (sidebar.collapsed()) {
@@ -264,7 +269,7 @@ type PendingDelete =
                         hlmBtn
                         size="icon-sm"
                         variant="ghost"
-                        class="!size-6 text-muted-foreground"
+                        class="sidebar-row-action !size-6 text-muted-foreground"
                         (click)="addProject(collection)"
                         title="New project"
                         aria-label="New project"
@@ -275,7 +280,7 @@ type PendingDelete =
                         hlmBtn
                         size="icon-sm"
                         variant="ghost"
-                        class="!size-6 text-muted-foreground"
+                        class="sidebar-row-action !size-6 text-muted-foreground"
                         [hlmDropdownMenuTrigger]="collectionMenu"
                         title="Collection actions"
                         aria-label="Collection actions"
@@ -333,7 +338,7 @@ type PendingDelete =
                             hlmBtn
                             size="icon-sm"
                             variant="ghost"
-                            class="!size-6 text-muted-foreground"
+                            class="sidebar-row-action !size-6 text-muted-foreground"
                             [hlmDropdownMenuTrigger]="projectMenu"
                             title="Project actions"
                             aria-label="Project actions"
@@ -397,7 +402,7 @@ type PendingDelete =
                       }
                     </div>
                   } @empty {
-                    <div class="pl-8 pr-2 py-1 text-xs italic text-muted-foreground">No projects</div>
+                    <div class="pl-8 pr-2 py-1 text-xs text-muted-foreground">No projects</div>
                   }
                 }
               }
@@ -405,6 +410,18 @@ type PendingDelete =
           </div>
         }
       </nav>
+
+      <!-- Privacy promise (clarify): the app is local-first (ADR-0007), and
+           that fact was invisible. A quiet footer line on the expanded
+           Sidebar states where the data actually lives; the 52px rail has no
+           room, so it drops out there. -->
+      @if (!sidebar.collapsed()) {
+        <footer class="shrink-0 border-t border-sidebar-border px-4 py-3">
+          <p class="text-[11px] leading-relaxed text-muted-foreground">
+            Your work stays in this browser — nothing is uploaded.
+          </p>
+        </footer>
+      }
     </aside>
 
     <!-- Deletion confirmation modal -->
@@ -415,8 +432,11 @@ type PendingDelete =
           (click)="$event.stopPropagation()"
           role="alertdialog"
           aria-modal="true"
+          aria-labelledby="sidebar-delete-title"
+          cdkTrapFocus
+          [cdkTrapFocusAutoCapture]="true"
         >
-          <h2 class="text-lg font-semibold mb-2">
+          <h2 id="sidebar-delete-title" class="text-lg font-semibold mb-2">
             Delete {{ pending.kind === 'collection' ? 'collection' : 'project' }}?
           </h2>
           <p class="text-sm text-muted-foreground mb-5">
@@ -430,13 +450,24 @@ type PendingDelete =
             }
           </p>
           <div class="flex justify-end gap-2">
-            <button hlmBtn variant="outline" (click)="cancelDelete()">Cancel</button>
+            <button #cancelDeleteButton hlmBtn variant="outline" (click)="cancelDelete()">Cancel</button>
             <button hlmBtn variant="destructive" (click)="confirmDelete()">Delete</button>
           </div>
         </div>
       </div>
     }
   `,
+  styles: [`
+    /* Touch adaptation: hover/focus-revealed row actions jump from 24px
+       (WCAG 2.5.8 minimum) to a comfortable 28px on coarse pointers. The
+       !important beats the !size-6 utility's own important. */
+    @media (pointer: coarse) {
+      .sidebar-row-action {
+        width: 28px !important;
+        height: 28px !important;
+      }
+    }
+  `],
 })
 export class SidebarComponent {
   protected readonly sidebar = inject(SidebarService);
@@ -470,6 +501,7 @@ export class SidebarComponent {
   private renameCancelled = false;
 
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  private readonly cancelDeleteButton = viewChild<ElementRef<HTMLButtonElement>>('cancelDeleteButton');
   private lastNewCollectionRequest: number;
 
   constructor() {
@@ -483,6 +515,14 @@ export class SidebarComponent {
       if (input) {
         input.focus();
         input.select();
+      }
+    });
+
+    // Focus Cancel when the delete confirmation renders — Enter then backs
+    // out of the destructive choice, mirroring the export dialog's focus-in.
+    effect(() => {
+      if (this.pendingDelete()) {
+        this.cancelDeleteButton()?.nativeElement.focus();
       }
     });
 
@@ -579,6 +619,11 @@ export class SidebarComponent {
 
   cancelDelete(): void {
     this.pendingDelete.set(null);
+  }
+
+  /** Escape dismisses the confirmation with no side effects, like the backdrop. */
+  onEscape(): void {
+    if (this.pendingDelete()) this.cancelDelete();
   }
 
   confirmDelete(): void {

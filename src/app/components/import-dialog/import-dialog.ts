@@ -1,4 +1,5 @@
-import { Component, signal, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal, inject, ChangeDetectionStrategy, ElementRef, effect, viewChild } from '@angular/core';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUpload, lucideX } from '@ng-icons/lucide';
@@ -12,7 +13,7 @@ import { ToastService } from '../toast/toast';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'onEscape()' },
-  imports: [FormsModule, NgIcon, HlmButton, HlmTextarea],
+  imports: [FormsModule, NgIcon, HlmButton, HlmTextarea, CdkTrapFocus],
   providers: [provideIcons({ lucideUpload, lucideX })],
   template: `
     @if (isOpen()) {
@@ -23,42 +24,48 @@ import { ToastService } from '../toast/toast';
             role="dialog"
             aria-modal="true"
             aria-label="Import Graph"
+            cdkTrapFocus
+            [cdkTrapFocusAutoCapture]="true"
           >
           <div class="flex items-center justify-between mb-5">
             <h2 class="text-lg font-semibold">Import Graph</h2>
-            <button hlmBtn variant="ghost" size="icon-sm" (click)="close()" aria-label="Close">
+            <button #closeButton hlmBtn variant="ghost" size="icon-sm" (click)="close()" aria-label="Close">
               <ng-icon name="lucideX" />
             </button>
           </div>
 
-          <div class="flex gap-1 mb-4 rounded-lg bg-muted p-1">
+          <div class="flex gap-1 mb-4 rounded-lg bg-muted p-1" role="group" aria-label="Import source">
             <button
               hlmBtn
               [variant]="activeTab() === 'file' ? 'secondary' : 'ghost'"
               size="sm"
               class="flex-1"
+              [attr.aria-pressed]="activeTab() === 'file'"
               (click)="activeTab.set('file')"
-            >File Upload</button>
+            >Upload file</button>
             <button
               hlmBtn
               [variant]="activeTab() === 'text' ? 'secondary' : 'ghost'"
               size="sm"
               class="flex-1"
+              [attr.aria-pressed]="activeTab() === 'text'"
               (click)="activeTab.set('text')"
             >Paste JSON</button>
           </div>
 
           @if (activeTab() === 'file') {
-            <div class="rounded-lg border-2 border-dashed border-border p-8 text-center mb-4">
-              <ng-icon name="lucideUpload" class="text-2xl text-muted-foreground" />
+            <!-- The whole drop zone is the label: clicking anywhere opens the
+                 picker, and the control has a programmatic name (WCAG 3.3.2) -->
+            <label class="block cursor-pointer rounded-lg border-2 border-dashed border-border p-8 text-center mb-4">
+              <ng-icon name="lucideUpload" class="text-2xl text-muted-foreground" aria-hidden="true" />
               <input
                 type="file"
                 accept=".json"
                 (change)="onFileSelected($event)"
                 class="mt-3 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:text-primary-foreground hover:file:bg-primary/80"
               />
-              <p class="mt-2 text-xs text-muted-foreground">Select a .json file to import</p>
-            </div>
+              <span class="mt-2 block text-xs text-muted-foreground">Select a .json file to import</span>
+            </label>
           }
 
           @if (activeTab() === 'text') {
@@ -72,7 +79,7 @@ import { ToastService } from '../toast/toast';
           }
 
           @if (errorMessage()) {
-            <p class="mb-3 max-h-24 overflow-y-auto break-words text-sm text-destructive">{{ errorMessage() }}</p>
+            <p role="alert" class="mb-3 max-h-24 overflow-y-auto break-words text-sm text-destructive">{{ errorMessage() }}</p>
           }
 
           <div class="flex justify-end gap-2">
@@ -87,6 +94,16 @@ import { ToastService } from '../toast/toast';
 export class ImportDialogComponent {
   private graphService = inject(GraphService);
   private toastService = inject(ToastService);
+
+  private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
+
+  constructor() {
+    // Move focus into the dialog on open (export-dialog pattern), so
+    // Escape/Tab land inside it rather than on the canvas behind.
+    effect(() => {
+      this.closeButton()?.nativeElement.focus();
+    });
+  }
 
   isOpen = signal(false);
   activeTab = signal<'file' | 'text'>('file');

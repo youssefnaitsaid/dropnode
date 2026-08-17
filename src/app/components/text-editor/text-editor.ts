@@ -19,6 +19,7 @@ import {
   lucideList,
   lucideLink,
   lucideHighlighter,
+  lucideEllipsis,
 } from '@ng-icons/lucide';
 import { EditorState, AllSelection, Selection, Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -74,7 +75,7 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
   encapsulation: ViewEncapsulation.None,
   imports: [OverlayModule, NgIcon],
   providers: [
-    provideIcons({ lucideBold, lucideItalic, lucideList, lucideLink, lucideHighlighter }),
+    provideIcons({ lucideBold, lucideItalic, lucideList, lucideLink, lucideHighlighter, lucideEllipsis }),
   ],
   template: `
     <div
@@ -109,33 +110,46 @@ export function sizeOfSelection(state: EditorState): TextSize | 'M' | undefined 
           type="button" class="ft-btn" [class.active]="italicActive()"
           title="Italic (Ctrl+I)" aria-label="Italic" (click)="toggleItalic()"
         ><ng-icon name="lucideItalic" /></button>
-        <button
-          type="button" class="ft-btn" [class.active]="bulletsActive()"
-          title="Bulleted list" aria-label="Bulleted list" (click)="toggleBullets()"
-        ><ng-icon name="lucideList" /></button>
-        <button
-          type="button" class="ft-btn" [class.active]="linkActive()"
-          title="Link" aria-label="Link" (click)="onLinkButton()"
-        ><ng-icon name="lucideLink" /></button>
-        <button
-          type="button" class="ft-btn" [class.active]="highlightActive()"
-          title="Highlight" aria-label="Highlight" (click)="toggleHighlight()"
-        ><ng-icon name="lucideHighlighter" /></button>
 
-        <span class="ft-separator"></span>
+        <!-- Secondary formatting behind an overflow: bold/italic cover the
+             common label edit; bullets, links, highlight, and size stay one
+             tap away (critique: full toolbar per edit session is heavy) -->
+        <button
+          type="button" class="ft-btn" [class.active]="showMore()"
+          title="More formatting" aria-label="More formatting"
+          [attr.aria-expanded]="showMore()"
+          (click)="toggleMore()"
+        ><ng-icon name="lucideEllipsis" /></button>
 
-        <button
-          type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'S'"
-          title="Small text" aria-label="Small text" (click)="applySize('S')"
-        >S</button>
-        <button
-          type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'M'"
-          title="Medium text (default)" aria-label="Medium text" (click)="applySize('M')"
-        >M</button>
-        <button
-          type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'L'"
-          title="Large text" aria-label="Large text" (click)="applySize('L')"
-        >L</button>
+        @if (showMore()) {
+          <button
+            type="button" class="ft-btn" [class.active]="bulletsActive()"
+            title="Bulleted list" aria-label="Bulleted list" (click)="toggleBullets()"
+          ><ng-icon name="lucideList" /></button>
+          <button
+            type="button" class="ft-btn" [class.active]="linkActive()"
+            title="Link" aria-label="Link" (click)="onLinkButton()"
+          ><ng-icon name="lucideLink" /></button>
+          <button
+            type="button" class="ft-btn" [class.active]="highlightActive()"
+            title="Highlight" aria-label="Highlight" (click)="toggleHighlight()"
+          ><ng-icon name="lucideHighlighter" /></button>
+
+          <span class="ft-separator"></span>
+
+          <button
+            type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'S'"
+            title="Small text" aria-label="Small text" (click)="applySize('S')"
+          >S</button>
+          <button
+            type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'M'"
+            title="Medium text (default)" aria-label="Medium text" (click)="applySize('M')"
+          >M</button>
+          <button
+            type="button" class="ft-btn ft-size" [class.active]="sizeActive() === 'L'"
+            title="Large text" aria-label="Large text" (click)="applySize('L')"
+          >L</button>
+        }
 
         @if (linkInputOpen()) {
           <input
@@ -256,9 +270,15 @@ export class TextEditorComponent implements AfterViewInit, OnDestroy {
   highlightActive = signal(false);
   linkActive = signal(false);
   bulletsActive = signal(false);
+  /** Secondary formatting (bullets/link/highlight/size) behind the overflow. */
+  showMore = signal(false);
   // undefined = a mixed-size selection — no size button highlights
   sizeActive = signal<'S' | 'M' | 'L' | undefined>('M');
   linkInputOpen = signal(false);
+
+  toggleMore(): void {
+    this.showMore.update((v) => !v);
+  }
 
   private pmHost = viewChild.required<ElementRef<HTMLDivElement>>('pmHost');
   private linkInputRef = viewChild<ElementRef<HTMLInputElement>>('linkInput');

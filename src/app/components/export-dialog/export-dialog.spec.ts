@@ -1,15 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ImportDialogComponent } from './import-dialog';
+import { ExportDialogComponent } from './export-dialog';
 
-describe('ImportDialogComponent', () => {
-  let fixture: ComponentFixture<ImportDialogComponent>;
-  let component: ImportDialogComponent;
+describe('ExportDialogComponent', () => {
+  let fixture: ComponentFixture<ExportDialogComponent>;
+  let component: ExportDialogComponent;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [ImportDialogComponent],
+      imports: [ExportDialogComponent],
     });
-    fixture = TestBed.createComponent(ImportDialogComponent);
+    fixture = TestBed.createComponent(ExportDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -18,28 +18,25 @@ describe('ImportDialogComponent', () => {
     component.close();
   });
 
-  it('opens as an accessible dialog with focus containment and resets pasted text and errors', () => {
-    component.jsonText = 'stale json';
-    component.errorMessage.set('stale error');
+  it('opens as an accessible dialog with focus containment', () => {
     component.open();
     fixture.detectChanges();
 
     const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(dialog?.getAttribute('aria-label')).toBe('Export as');
     expect(dialog?.getAttribute('cdktrapfocus')).not.toBeNull();
-    expect(component.jsonText).toBe('');
-    expect(component.errorMessage()).toBeNull();
   });
 
-  it('shows the Paste JSON textarea only on the text tab', () => {
+  it('switches formats when unconstrained', () => {
     component.open();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('textarea')).toBeNull();
+    expect(component.format()).toBe('png');
 
-    component.activeTab.set('text');
+    component.setFormat('json');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('textarea')).not.toBeNull();
+    expect(component.format()).toBe('json');
   });
 
   it('closes on Escape while open', () => {

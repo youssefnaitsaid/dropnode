@@ -47,6 +47,8 @@ const VIEWPORT_STROKE = DN_TOKENS.minimapViewport;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<canvas #map
+    aria-label="Minimap — click or drag to recenter the Viewport"
+    title="Minimap — click or drag to recenter the Viewport"
     (pointerdown)="onPointerDown($event)"
     (pointermove)="onPointerMove($event)"
     (pointerup)="onPointerUp($event)"
@@ -54,8 +56,8 @@ const VIEWPORT_STROKE = DN_TOKENS.minimapViewport;
   styles: [`
     :host {
       position: absolute;
-      right: 16px;
-      bottom: 16px;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
       border-radius: 8px;
       overflow: hidden;
       border: 1px solid color-mix(in srgb, var(--dn-chip-ink) 15%, transparent);

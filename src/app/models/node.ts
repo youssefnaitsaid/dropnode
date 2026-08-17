@@ -26,6 +26,14 @@ export const NODE_PALETTE: readonly string[] = [
   '#86dced', '#9fb4ff', '#c3a3ff', '#f2a3e8',
 ];
 
+// The stable human-readable name of each Palette color (CONTEXT.md: Palette).
+// User-facing controls — swatch tooltips, aria-labels, Palette Entry labels —
+// use these names, never the raw hex. Order matches NODE_PALETTE exactly.
+export const NODE_PALETTE_NAMES: readonly string[] = [
+  'Rose', 'Peach', 'Yellow', 'Green',
+  'Cyan', 'Periwinkle', 'Lavender', 'Pink',
+];
+
 export interface GraphNode {
   id: string;
   // Text carried by a regular node (required for regular nodes; never on Groups)

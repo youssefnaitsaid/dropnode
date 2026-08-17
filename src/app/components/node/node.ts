@@ -10,12 +10,13 @@ import {
   NodeShape,
   shapeMinimumSize,
 } from '../../models/node-shape';
-import { Text, isTextEmpty } from '../../models/text';
+import { Text, isTextEmpty, textToPlainString } from '../../models/text';
 import { HandleComponent } from '../handle/handle';
 import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
+import { ResizeModeService } from '../../services/resize-mode.service';
 
 export type GripCorner = 'nw' | 'ne' | 'sw' | 'se';
 export interface NodeSizeChangedEvent {
@@ -46,8 +47,13 @@ const GROUP_FILL_ALPHA = '4D';
       [style.width.px]="node().width"
       [style.height.px]="node().height"
       [style.--selection-glow]="selectionGlow()"
+      [attr.tabindex]="presentationService.active() ? null : 0"
+      role="button"
+      [attr.aria-label]="cardAriaLabel()"
+      [attr.aria-pressed]="isSelected()"
       (mousedown)="onMouseDown($event)"
       (dblclick)="onDoubleClick($event)"
+      (keydown)="onCardKeydown($event)"
     >
       <div
         class="node-surface"
@@ -82,11 +88,13 @@ const GROUP_FILL_ALPHA = '4D';
         } @else {
           @if (isEditing()) {
             <div class="node-text">
-              <app-text-editor
-                [text]="nodeText()"
-                (commit)="onTextCommit($event)"
-                (cancelled)="onTextCancel()"
-              />
+              @defer (when isEditing()) {
+                <app-text-editor
+                  [text]="nodeText()"
+                  (commit)="onTextCommit($event)"
+                  (cancelled)="onTextCancel()"
+                />
+              }
             </div>
           } @else {
             <div #textWrap class="node-text">
@@ -153,6 +161,14 @@ const GROUP_FILL_ALPHA = '4D';
     .node-card:hover .node-surface {
       box-shadow: var(--dn-shadow-node-hover);
     }
+    /* Keyboard focus (WCAG 2.4.7): a visible ring around the card, distinct
+       from the selection glow — the outline draws on the host, so diamond
+       clip-paths can't swallow it */
+    .node-card:focus-visible {
+      outline: 2px solid var(--dn-accent);
+      outline-offset: 2px;
+      border-radius: 12px;
+    }
     .node-surface.shape-pill {
       border-radius: 9999px;
     }
@@ -167,14 +183,14 @@ const GROUP_FILL_ALPHA = '4D';
        same-element drop-shadow alike), so the diamond's resting, hover, and
        selection shadows are cast from the unclipped card instead */
     .node-card:has(.node-surface.shape-diamond) {
-      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+      filter: drop-shadow(0 2px 5px var(--dn-shadow-color));
       transition: filter 0.15s ease;
     }
     .node-card:has(.node-surface.shape-diamond):hover {
       filter: drop-shadow(0 6px 13px color-mix(in srgb, var(--dn-accent) 28%, transparent));
     }
     .node-card.presenting:has(.node-surface.shape-diamond):hover {
-      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+      filter: drop-shadow(0 2px 5px var(--dn-shadow-color));
     }
     /* Present Mode: the card is a picture, not a control — no drag cursor,
        no hover glow, no Handles. Text links keep their own pointer events
@@ -296,6 +312,11 @@ const GROUP_FILL_ALPHA = '4D';
       border: 2px solid var(--dn-canvas);
       z-index: var(--dn-z-grip);
     }
+    .grip::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+    }
     .grip-nw { top: -5px; left: -5px; cursor: nwse-resize; }
     .grip-ne { top: -5px; right: -5px; cursor: nesw-resize; }
     .grip-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
@@ -311,6 +332,12 @@ export class NodeComponent implements AfterViewInit {
   snapTarget = input<{ nodeId: string; handle: HandleSide } | null>(null);
 
   startMove = output<{ nodeId: string; event: MouseEvent }>();
+  // Keyboard selection and movement (keyboard-first editing, WCAG 2.1.1):
+  // Enter selects, arrow keys nudge. Movement goes upstream so the Canvas can
+  // commit it as undoable Move Commands like a drag's mouseup.
+  keyboardSelect = output<{ nodeId: string }>();
+  keyboardMove = output<{ nodeId: string; dx: number; dy: number }>();
+  keyboardResize = output<{ nodeId: string; rect: NodeRect; originalRect: NodeRect }>();
   // Group Label rename (Groups only)
   rename = output<{ nodeId: string; newLabel: string }>();
   // Regular node Text commit (one edit session = one Command upstream)
@@ -324,6 +351,7 @@ export class NodeComponent implements AfterViewInit {
   private editInput = viewChild<ElementRef<HTMLInputElement>>('editInput');
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
+  private resizeMode = inject(ResizeModeService);
   private viewReady = false;
   private measuredShape: NodeShape | null = null;
 
@@ -378,6 +406,17 @@ export class NodeComponent implements AfterViewInit {
 
   nodeText = computed<Text>(() => this.node().text ?? []);
 
+  // Screen-reader name for the card: a Group's label, or a regular Node's
+  // Text flattened to plain text (falling back to "Node" when empty).
+  cardAriaLabel = computed(() => {
+    if (this.isGroup()) {
+      const label = this.node().label?.trim();
+      return label ? `Group, ${label}` : 'Group';
+    }
+    const plain = textToPlainString(this.nodeText()).trim();
+    return plain ? plain : 'Node';
+  });
+
   cardBackground = computed(() => {
     const base = this.node().color ?? DEFAULT_NODE_BACKGROUND;
     return this.isGroup() ? base + GROUP_FILL_ALPHA : base;
@@ -401,6 +440,65 @@ export class NodeComponent implements AfterViewInit {
     if (event.button !== 0) return;
     event.stopPropagation();
     this.startMove.emit({ nodeId: this.node().id, event });
+  }
+
+  // Keyboard operation of the card (WCAG 2.1.1): Enter selects like a click;
+  // arrow keys nudge by 10px (1px with Shift). Ignored while editing, in
+  // Present Mode, and while focus is in an input/contenteditable so typing
+  // shortcuts keep working (keyboard-shortcuts guard parity).
+  onCardKeydown(event: KeyboardEvent): void {
+    if (this.isEditing() || this.presentationService.active()) return;
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.keyboardSelect.emit({ nodeId: this.node().id });
+      return;
+    }
+
+    const dx = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    const dy = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+    if (dx === 0 && dy === 0) return;
+    event.preventDefault();
+
+    // Resize mode (arrows) and Ctrl+arrows both resize: the pressed-side edge
+    // moves, the opposite edge stays anchored, clamped to the shape/text
+    // minimum the grips respect. The card computes (it owns the DOM min); the
+    // Canvas owns the Command.
+    if (this.resizeMode.mode() || event.ctrlKey) {
+      this.emitKeyboardResize(dx, dy, event.shiftKey);
+      return;
+    }
+
+    const step = event.shiftKey ? 1 : 10;
+    this.keyboardMove.emit({ nodeId: this.node().id, dx: dx * step, dy: dy * step });
+  }
+
+  private emitKeyboardResize(dx: number, dy: number, fine: boolean): void {
+    const node = this.node();
+    const minimum = this.shapeMinimum();
+    const delta = fine ? 1 : 10;
+    let { x, y, width, height } = node;
+    if (dx > 0) width = Math.max(minimum.width, width + delta);
+    if (dx < 0) {
+      const newWidth = Math.max(minimum.width, width - delta);
+      x += width - newWidth;
+      width = newWidth;
+    }
+    if (dy > 0) height = Math.max(minimum.height, height + delta);
+    if (dy < 0) {
+      const newHeight = Math.max(minimum.height, height - delta);
+      y += height - newHeight;
+      height = newHeight;
+    }
+    // Clamped at the minimum — a no-op, not an undo step
+    if (width === node.width && height === node.height) return;
+    this.keyboardResize.emit({
+      nodeId: node.id,
+      rect: { x, y, width, height },
+      originalRect: { x: node.x, y: node.y, width: node.width, height: node.height },
+    });
   }
 
   onDoubleClick(event: MouseEvent): void {

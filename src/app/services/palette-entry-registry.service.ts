@@ -10,7 +10,7 @@ import {
   StrokeWeight,
 } from '../models/connection';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
-import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE } from '../models/node';
+import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES } from '../models/node';
 import { NODE_SHAPES, NodeShape } from '../models/node-shape';
 import {
   PaletteCategory,
@@ -45,26 +45,23 @@ import { HistoryService } from './history.service';
 import { MinimapService } from './minimap.service';
 import { PinVisibilityService } from './pin-visibility.service';
 import { ImportDialogService } from './import-dialog.service';
+import { ConnectDialogService } from './connect-dialog.service';
 import { PresentationService } from './presentation.service';
 import { SidebarService } from './sidebar.service';
+import { ResizeModeService } from './resize-mode.service';
 
-const PALETTE_COLORS = [
-  { name: 'Rose', value: NODE_PALETTE[0] },
-  { name: 'Peach', value: NODE_PALETTE[1] },
-  { name: 'Yellow', value: NODE_PALETTE[2] },
-  { name: 'Green', value: NODE_PALETTE[3] },
-  { name: 'Cyan', value: NODE_PALETTE[4] },
-  { name: 'Periwinkle', value: NODE_PALETTE[5] },
-  { name: 'Lavender', value: NODE_PALETTE[6] },
-  { name: 'Pink', value: NODE_PALETTE[7] },
-] as const;
+// Names come from the model (NODE_PALETTE_NAMES) so every user-facing
+// surface — swatch tooltips, Palette Entry labels — says the same thing.
+const PALETTE_COLORS: readonly { name: string; value: string }[] = NODE_PALETTE.map(
+  (value, index) => ({ value, name: NODE_PALETTE_NAMES[index] ?? value }),
+);
 
 const ALIGNMENTS: readonly { kind: AlignKind; label: string }[] = [
   { kind: 'left', label: 'Align selected Nodes left' },
-  { kind: 'center', label: 'Align selected Nodes center' },
+  { kind: 'center', label: 'Align selected Nodes horizontal center' },
   { kind: 'right', label: 'Align selected Nodes right' },
   { kind: 'top', label: 'Align selected Nodes top' },
-  { kind: 'middle', label: 'Align selected Nodes middle' },
+  { kind: 'middle', label: 'Align selected Nodes vertical middle' },
   { kind: 'bottom', label: 'Align selected Nodes bottom' },
 ];
 
@@ -155,11 +152,13 @@ export class PaletteEntryRegistry {
   private readonly collectionService = inject(CollectionService);
   private readonly importDialogService = inject(ImportDialogService);
   private readonly exportDialogService = inject(ExportDialogService);
+  private readonly connectDialogService = inject(ConnectDialogService);
   private readonly exportService = inject(ExportService);
   private readonly presentationService = inject(PresentationService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
   private readonly pinVisibilityService = inject(PinVisibilityService);
+  private readonly resizeMode = inject(ResizeModeService);
   private readonly paletteService = inject(CommandPaletteService);
   private readonly router = inject(Router);
 
@@ -197,6 +196,17 @@ export class PaletteEntryRegistry {
         aliases: ['deselect', 'clear selected'], icon: 'lucideSquareX',
         available: selectionSize > 0, unavailableReason: 'Nothing is selected',
       }),
+      this.action(
+        'resize-mode',
+        this.resizeMode.mode() ? 'Exit Resize Mode' : 'Resize Mode',
+        'Selection',
+        () => this.resizeMode.toggle(),
+        {
+          aliases: ['resize', 'resize node', 'arrow resize'], icon: 'lucideMoveDiagonal2',
+          available: selectedNodeIds.length === 1,
+          unavailableReason: 'Select one Node first',
+        },
+      ),
       this.action('cut', 'Cut', 'Selection', () => this.clipboardService.cut(selectedNodeIds, selectedConnectionIds), {
         aliases: ['remove to clipboard'], shortcut: SHORTCUTS.cut, icon: 'lucideScissors',
         available: selectedNodeIds.length > 0, unavailableReason: 'Select a Node or Group first',
@@ -251,6 +261,11 @@ export class PaletteEntryRegistry {
       this.action('add-pin', 'Add pin', 'Nodes & Groups', () => this.addPin(), {
         // "Comment" is a hidden alias: the Figma lineage word users will type
         aliases: ['new pin', 'create pin', 'comment', 'add comment'], icon: 'lucideMessageCircle',
+      }),
+      this.action('connect-nodes', 'Connect Nodes…', 'Nodes & Groups', () => this.connectDialogService.requestOpen(), {
+        aliases: ['connect', 'link nodes', 'add connection', 'connect two nodes'], icon: 'lucideLink',
+        available: this.graphService.nodes().length >= 2,
+        unavailableReason: 'Add at least two Nodes first',
       }),
       this.action('edit-text', 'Edit Text', 'Nodes & Groups', () => this.editText(), {
         aliases: ['edit label', 'rename text'], icon: 'lucidePencil',

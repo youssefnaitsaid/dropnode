@@ -1042,10 +1042,10 @@ function movePartsFor(graphService: GraphService, roots: GraphNode[], targets: T
 
 const ALIGN_DESCRIPTIONS: Record<AlignKind, string> = {
   left: 'Align left',
-  center: 'Align center',
+  center: 'Align horizontal center',
   right: 'Align right',
   top: 'Align top',
-  middle: 'Align middle',
+  middle: 'Align vertical middle',
   bottom: 'Align bottom',
 };
 

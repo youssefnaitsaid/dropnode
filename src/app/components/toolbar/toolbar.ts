@@ -28,6 +28,7 @@ import {
   lucideAlignVerticalSpaceBetween,
   lucideNetwork,
   lucidePresentation,
+  lucideCheck,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmSeparator } from '@spartan-ng/helm/separator';
@@ -36,6 +37,7 @@ import {
   HlmDropdownMenuTrigger,
   HlmDropdownMenuItem,
   HlmDropdownMenuLabel,
+  HlmDropdownMenuSeparator,
 } from '@spartan-ng/helm/dropdown-menu';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -58,7 +60,7 @@ import {
   buildTidyUpCommand,
 } from '../../services/commands';
 import { AlignKind, DistributeAxis } from '../../models/align-distribute';
-import { NODE_PALETTE } from '../../models/node';
+import { NODE_PALETTE, NODE_PALETTE_NAMES } from '../../models/node';
 import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
 import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight } from '../../models/connection';
 
@@ -66,7 +68,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
   selector: 'app-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmButton, HlmSeparator, HlmDropdownMenu, HlmDropdownMenuTrigger, HlmDropdownMenuItem, HlmDropdownMenuLabel],
+  imports: [NgIcon, HlmButton, HlmSeparator, HlmDropdownMenu, HlmDropdownMenuTrigger, HlmDropdownMenuItem, HlmDropdownMenuLabel, HlmDropdownMenuSeparator],
   providers: [
     provideIcons({
       lucideUndo2,
@@ -95,15 +97,16 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideAlignVerticalSpaceBetween,
       lucideNetwork,
       lucidePresentation,
+      lucideCheck,
     }),
   ],
   template: `
-    <div class="flex items-center justify-between gap-2 px-4 py-1.5 bg-card border-b border-border">
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-medium text-muted-foreground">{{ graphService.nodeCount() }} nodes</span>
+    <div class="toolbar-row flex items-center justify-between gap-2 px-4 py-1.5 bg-card border-b border-border">
+      <div class="flex shrink-0 items-center gap-2">
+        <span class="text-sm font-medium text-muted-foreground">{{ graphService.nodeCount() }} {{ graphService.nodeCount() === 1 ? 'node' : 'nodes' }}</span>
       </div>
 
-      <div class="flex items-center gap-1">
+      <div class="flex min-w-0 shrink-0 items-center gap-1">
         <button hlmBtn variant="ghost" size="icon" (click)="undo()" [disabled]="!historyService.canUndo()" title="Undo (Ctrl+Z)" aria-label="Undo">
           <ng-icon name="lucideUndo2" />
         </button>
@@ -135,14 +138,14 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               aria-label="Default color"
               (click)="setColor(null)"
             ></button>
-            @for (color of palette; track color) {
+            @for (entry of paletteEntries; track entry.value) {
               <button
                 class="swatch"
-                [class.active]="sharedNodeColor() === color"
-                [style.background]="color"
-                [title]="color"
-                [attr.aria-label]="color"
-                (click)="setColor(color)"
+                [class.active]="sharedNodeColor() === entry.value"
+                [style.background]="entry.value"
+                [title]="entry.name"
+                [attr.aria-label]="entry.name"
+                (click)="setColor(entry.value)"
               ></button>
             }
           </div>
@@ -180,7 +183,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
             <button hlmBtn variant="ghost" size="icon" (click)="align('left')" title="Align left" aria-label="Align left">
               <ng-icon name="lucideAlignStartVertical" />
             </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('center')" title="Align center" aria-label="Align center">
+            <button hlmBtn variant="ghost" size="icon" (click)="align('center')" title="Align horizontal center" aria-label="Align horizontal center">
               <ng-icon name="lucideAlignCenterVertical" />
             </button>
             <button hlmBtn variant="ghost" size="icon" (click)="align('right')" title="Align right" aria-label="Align right">
@@ -189,7 +192,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
             <button hlmBtn variant="ghost" size="icon" (click)="align('top')" title="Align top" aria-label="Align top">
               <ng-icon name="lucideAlignStartHorizontal" />
             </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="align('middle')" title="Align middle" aria-label="Align middle">
+            <button hlmBtn variant="ghost" size="icon" (click)="align('middle')" title="Align vertical middle" aria-label="Align vertical middle">
               <ng-icon name="lucideAlignCenterHorizontal" />
             </button>
             <button hlmBtn variant="ghost" size="icon" (click)="align('bottom')" title="Align bottom" aria-label="Align bottom">
@@ -213,86 +216,105 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               aria-label="Default color"
               (click)="setConnectionColor(null)"
             ></button>
-            @for (color of palette; track color) {
+            @for (entry of paletteEntries; track entry.value) {
               <button
                 class="swatch"
-                [class.active]="sharedConnectionColor() === color"
-                [style.background]="color"
-                [title]="color"
-                [attr.aria-label]="color"
-                (click)="setConnectionColor(color)"
+                [class.active]="sharedConnectionColor() === entry.value"
+                [style.background]="entry.value"
+                [title]="entry.name"
+                [attr.aria-label]="entry.name"
+                (click)="setConnectionColor(entry.value)"
               ></button>
             }
           </div>
+          <!-- Stroke: one trigger with a live preview of the current
+               arrowheads/pattern/weight; the details live in the dropdown so a
+               Connection selection reads as two decisions (color, stroke)
+               instead of twenty-two buttons (critique: selection-toolbar
+               overload). -->
           <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-0.5" title="Start arrowhead (source end)" aria-label="Start arrowhead">
-            @for (opt of arrowheadOptions; track opt.type) {
-              <button
-                class="ah-btn"
-                [class.active]="sharedArrowhead('start') === opt.type"
-                [title]="opt.label"
-                [attr.aria-label]="'Start ' + opt.label"
-                (click)="setArrowhead('start', opt.type)"
-              >
-                <ng-icon [name]="opt.icon" class="flip-x" />
-              </button>
-            }
-          </div>
-          <div class="flex items-center gap-0.5" title="End arrowhead (target end)" aria-label="End arrowhead">
-            @for (opt of arrowheadOptions; track opt.type) {
-              <button
-                class="ah-btn"
-                [class.active]="sharedArrowhead('end') === opt.type"
-                [title]="opt.label"
-                [attr.aria-label]="'End ' + opt.label"
-                (click)="setArrowhead('end', opt.type)"
-              >
-                <ng-icon [name]="opt.icon" />
-              </button>
-            }
-          </div>
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <div class="flex items-center gap-0.5" title="Stroke pattern" aria-label="Stroke pattern">
-            @for (opt of strokePatternOptions; track opt.pattern) {
-              <button
-                class="ah-btn"
-                [class.active]="sharedStrokePattern() === opt.pattern"
-                [title]="opt.label"
-                [attr.aria-label]="opt.label + ' stroke'"
-                (click)="setStrokePattern(opt.pattern)"
-              >
-                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-                  <path d="M2 10 H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" [attr.stroke-dasharray]="opt.dash" />
-                </svg>
-              </button>
-            }
-          </div>
-          <div class="flex items-center gap-0.5" title="Stroke weight" aria-label="Stroke weight">
-            @for (opt of strokeWeightOptions; track opt.weight) {
-              <button
-                class="ah-btn"
-                [class.active]="sharedStrokeWeight() === opt.weight"
-                [title]="opt.label"
-                [attr.aria-label]="opt.label + ' stroke'"
-                (click)="setStrokeWeight(opt.weight)"
-              >
-                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-                  <path d="M2 10 H18" fill="none" stroke="currentColor" [attr.stroke-width]="opt.previewWidth" stroke-linecap="round" />
-                </svg>
-              </button>
-            }
-          </div>
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon"
+            [hlmDropdownMenuTrigger]="strokeMenu"
+            title="Stroke — arrowheads, pattern, weight"
+            aria-label="Stroke settings"
+          >
+            <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+              <path
+                d="M2 10 H18"
+                fill="none"
+                stroke="currentColor"
+                [attr.stroke-width]="sharedStrokePreviewWeight()"
+                stroke-linecap="round"
+                [attr.stroke-dasharray]="sharedStrokePreviewDash()"
+              />
+            </svg>
+          </button>
         }
       </div>
 
-      <div class="flex items-center gap-1">
-        <button hlmBtn variant="ghost" size="icon" (click)="zoomIn()" title="Zoom In" aria-label="Zoom in">
+      <ng-template #strokeMenu>
+        <div hlmDropdownMenu class="w-64">
+          <div hlmDropdownMenuLabel>Start arrowhead</div>
+          @for (opt of arrowheadOptions; track opt.type) {
+            <button hlmDropdownMenuItem (triggered)="setArrowhead('start', opt.type)">
+              <ng-icon [name]="opt.icon" class="flip-x" />
+              <span>{{ opt.label }}</span>
+              @if (sharedArrowhead('start') === opt.type) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
+          <div hlmDropdownMenuLabel>End arrowhead</div>
+          @for (opt of arrowheadOptions; track opt.type) {
+            <button hlmDropdownMenuItem (triggered)="setArrowhead('end', opt.type)">
+              <ng-icon [name]="opt.icon" />
+              <span>{{ opt.label }}</span>
+              @if (sharedArrowhead('end') === opt.type) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
+          <div hlmDropdownMenuLabel>Pattern</div>
+          @for (opt of strokePatternOptions; track opt.pattern) {
+            <button hlmDropdownMenuItem (triggered)="setStrokePattern(opt.pattern)">
+              <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                <path d="M2 10 H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" [attr.stroke-dasharray]="opt.dash" />
+              </svg>
+              <span>{{ opt.label }}</span>
+              @if (sharedStrokePattern() === opt.pattern) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+          <hlm-dropdown-menu-separator />
+          <div hlmDropdownMenuLabel>Weight</div>
+          @for (opt of strokeWeightOptions; track opt.weight) {
+            <button hlmDropdownMenuItem (triggered)="setStrokeWeight(opt.weight)">
+              <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                <path d="M2 10 H18" fill="none" stroke="currentColor" [attr.stroke-width]="opt.previewWidth" stroke-linecap="round" />
+              </svg>
+              <span>{{ opt.label }}</span>
+              @if (sharedStrokeWeight() === opt.weight) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
+        </div>
+      </ng-template>
+
+      <div class="flex shrink-0 items-center gap-1">
+        <button hlmBtn variant="ghost" size="icon" (click)="zoomIn()" title="Zoom in" aria-label="Zoom in">
           <ng-icon name="lucideZoomIn" />
         </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="zoomOut()" title="Zoom Out" aria-label="Zoom out">
+        <button hlmBtn variant="ghost" size="icon" (click)="zoomOut()" title="Zoom out" aria-label="Zoom out">
           <ng-icon name="lucideZoomOut" />
         </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="zoomToFit()" title="Zoom to Fit" aria-label="Zoom to fit">
+        <button hlmBtn variant="ghost" size="icon" (click)="zoomToFit()" title="Zoom to fit" aria-label="Zoom to fit">
           <ng-icon name="lucideMaximize" />
         </button>
         <button hlmBtn variant="ghost" size="icon" (click)="tidyUp()" title="Tidy up" aria-label="Tidy up">
@@ -372,6 +394,12 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
     :host {
       display: block;
     }
+    /* Narrow viewports: the selection clusters can outgrow the row — scroll
+       the overflow instead of bursting the layout (clusters stay unshrunk) */
+    .toolbar-row {
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
     .command-trigger kbd {
       border: 1px solid var(--border);
       border-radius: 4px;
@@ -383,6 +411,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       padding: 3px 4px;
     }
     .swatch {
+      position: relative;
       width: 18px;
       height: 18px;
       border-radius: 50%;
@@ -390,6 +419,12 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       padding: 0;
       cursor: pointer;
       transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .swatch::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
     }
     .swatch:hover {
       transform: scale(1.2);
@@ -441,6 +476,21 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
     .flip-x {
       transform: scaleX(-1);
     }
+    /* Touch adaptation: coarse pointers get larger controls and bigger hit
+       areas (WCAG 2.5.8); the swatch's ::before overlay is its hit zone. */
+    @media (pointer: coarse) {
+      .swatch {
+        width: 26px;
+        height: 26px;
+      }
+      .swatch::before {
+        inset: -7px;
+      }
+      .ah-btn {
+        width: 32px;
+        height: 32px;
+      }
+    }
   `],
 })
 export class ToolbarComponent {
@@ -463,7 +513,11 @@ export class ToolbarComponent {
     this.commandPaletteService.open(target instanceof HTMLElement ? target : null);
   }
 
-  palette = NODE_PALETTE;
+  // The Palette with its canonical names (CONTEXT.md): user-facing controls
+  // show the name, never the raw hex
+  readonly paletteEntries: readonly { name: string; value: string }[] = NODE_PALETTE.map(
+    (value, index) => ({ value, name: NODE_PALETTE_NAMES[index] ?? value }),
+  );
   selectedRegularNodes = computed(() =>
     this.graphService.selectedNodes().filter(node => node.kind !== 'group')
   );
@@ -542,6 +596,18 @@ export class ToolbarComponent {
     if (conns.length === 0) return undefined;
     const first = effectiveStrokeWeight(conns[0]);
     return conns.every(c => effectiveStrokeWeight(c) === first) ? first : undefined;
+  };
+
+  // Live preview on the Stroke trigger: the shared pattern's dash and the
+  // shared weight's width, falling back to the defaults when nothing shares.
+  sharedStrokePreviewDash = (): string | null => {
+    const pattern = this.sharedStrokePattern();
+    return this.strokePatternOptions.find(o => o.pattern === pattern)?.dash ?? null;
+  };
+
+  sharedStrokePreviewWeight = (): number => {
+    const weight = this.sharedStrokeWeight();
+    return this.strokeWeightOptions.find(o => o.weight === weight)?.previewWidth ?? 2;
   };
 
   // Bulk styling (ADR-0015): one compound Command over all selected targets;

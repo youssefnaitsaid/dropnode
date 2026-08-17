@@ -7,8 +7,11 @@ import { PresentationService } from '../services/presentation.service';
 import { CommandPaletteService } from '../services/command-palette.service';
 import { KeyboardScopeService } from '../services/keyboard-scope.service';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
+import { KeyboardConnectionService } from '../services/keyboard-connection.service';
+import { ResizeModeService } from '../services/resize-mode.service';
 import {
-  DeleteConnectionCommand, DeleteNodeCompoundCommand, buildDeleteSelectionCommand,
+  DeleteConnectionCommand, DeleteNodeCompoundCommand, RemoveConnectionReroutePointCommand,
+  buildDeleteSelectionCommand,
 } from '../services/commands';
 
 @Directive({
@@ -24,6 +27,8 @@ export class KeyboardShortcuts {
   private commandPaletteService = inject(CommandPaletteService);
   private keyboardScope = inject(KeyboardScopeService);
   private canvasViewport = inject(CanvasViewportService);
+  private keyboardConnection = inject(KeyboardConnectionService);
+  private resizeMode = inject(ResizeModeService);
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
@@ -161,11 +166,100 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Delete/Backspace: delete the Selection. A single element keeps its
-    // exact single-target Command (a lone Group still releases children); a
-    // multi-Selection deletes as one compound step where a Group is removed
-    // WITH its children (ADR-0015).
+    // Armed Handle flow (keyboard Connection creation): Tab cycles between
+    // Handles — the ghost follows focus — and Escape cancels the pending
+    // Connection. Escape must short-circuit before the selection-clear below,
+    // or cancelling would also wipe the user's Selection.
+    if (this.keyboardConnection.pending()) {
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        this.keyboardConnection.cycleHandleFocus(event.shiftKey ? -1 : 1);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.keyboardConnection.cancel();
+        return;
+      }
+    }
+
+    // Tab while a Reroute Point is focused: cycle the selected Connection's
+    // points. Runs after the pending-Connection block — the two flows are
+    // mutually exclusive by construction.
+    if (event.key === 'Tab') {
+      const rerouteEl = document.activeElement instanceof Element
+        ? document.activeElement.closest('.reroute-point')
+        : null;
+      if (rerouteEl) {
+        event.preventDefault();
+        this.keyboardConnection.cycleReroutePoints(event.shiftKey ? -1 : 1);
+        return;
+      }
+    }
+
+    // [ / ]: cycle the focusable Connections — the dense-canvas path to reach
+    // a Connection without wading the tab order. Shift extends the Selection
+    // (the app's additive convention). Dead while a Connection is pending, so
+    // the ghost's focus flow is never yanked elsewhere.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '[' || event.key === ']')) {
+      if (this.keyboardConnection.pending()) return;
+      event.preventDefault();
+      this.keyboardConnection.cycleConnections(event.key === ']' ? 1 : -1, event.shiftKey);
+      return;
+    }
+
+    // Viewport pan when nothing is focused: arrow keys pan 40 screen px
+    // (10 with Shift). The focus state owns the arrow grammar — a focused
+    // Node card nudges or resizes with the same keys, and interactive
+    // elements (buttons, selects, inputs) keep their native arrow behavior.
+    // Panning never touches History, matching every other Viewport change.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight' ||
+         event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      const active = document.activeElement;
+      const canvasFocused = active === document.body ||
+        (active instanceof Element &&
+         (active.classList.contains('canvas-container') || active.classList.contains('canvas-viewport')));
+      if (!canvasFocused) return; // let the focused element handle arrows
+      event.preventDefault();
+      const viewport = this.graphService.viewportState();
+      const screenStep = event.shiftKey ? 10 : 40;
+      const dx = event.key === 'ArrowLeft' ? -screenStep : event.key === 'ArrowRight' ? screenStep : 0;
+      const dy = event.key === 'ArrowUp' ? -screenStep : event.key === 'ArrowDown' ? screenStep : 0;
+      this.graphService.setViewport({
+        panX: viewport.panX + dx / viewport.zoom,
+        panY: viewport.panY + dy / viewport.zoom,
+      });
+      return;
+    }
+
+    // Delete/Backspace: a focused Reroute Point is removed (its Connection's
+    // selection is untouched); otherwise the Selection is deleted. A single
+    // element keeps its exact single-target Command (a lone Group still
+    // releases children); a multi-Selection deletes as one compound step where
+    // a Group is removed WITH its children (ADR-0015).
     if (event.key === 'Delete' || event.key === 'Backspace') {
+      const rerouteEl = document.activeElement instanceof Element
+        ? document.activeElement.closest('.reroute-point')
+        : null;
+      if (rerouteEl) {
+        const connectionId = rerouteEl.getAttribute('data-connection-id');
+        const indexAttr = rerouteEl.getAttribute('data-reroute-point-index');
+        if (connectionId && indexAttr !== null && Number.isInteger(Number(indexAttr))) {
+          event.preventDefault();
+          this.historyService.execute(new RemoveConnectionReroutePointCommand(
+            this.graphService,
+            connectionId,
+            Number(indexAttr),
+          ));
+          // The removed circle is gone; hand focus back to its Connection
+          const hit = document.querySelector<SVGPathElement>(
+            `path.connection-hit[data-connection-id="${connectionId}"]`,
+          );
+          hit?.focus();
+          return;
+        }
+      }
       if (this.graphService.selectionSize() > 1) {
         event.preventDefault();
         const cmd = buildDeleteSelectionCommand(
@@ -192,8 +286,14 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Escape: clear the whole Selection
+    // Escape: Resize mode is modal, so it exits first (keeping the Selection
+    // — the user was resizing, not dismissing); otherwise clear the Selection
     if (event.key === 'Escape') {
+      if (this.resizeMode.mode()) {
+        event.preventDefault();
+        this.resizeMode.exit();
+        return;
+      }
       this.graphService.clearSelection();
       (document.activeElement as HTMLElement)?.blur();
       return;

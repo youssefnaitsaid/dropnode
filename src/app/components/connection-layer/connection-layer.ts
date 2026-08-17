@@ -5,8 +5,12 @@ import { Connection, ArrowheadType, effectiveArrowhead, effectiveTextPosition, e
 import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, textPositionFromRoute } from '../../models/curve';
 import { Text, isTextEmpty } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
+import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
+import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
+import { MoveConnectionReroutePointCommand } from '../../services/commands';
+import { textToPlainString } from '../../models/text';
 import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
 
@@ -51,8 +55,12 @@ interface DragState {
           [attr.d]="getConnectionPath(conn)"
           [attr.data-connection-id]="conn.id"
           class="connection-hit"
+          [attr.tabindex]="presentationService.active() ? null : 0"
+          role="button"
+          [attr.aria-label]="connectionAriaLabel(conn)"
           (mousedown)="onConnectionMouseDown(conn, $event)"
           (dblclick)="onConnectionCurveDoubleClick(conn, $event)"
+          (keydown)="onConnectionKeydown(conn, $event)"
         />
         <path
           [attr.d]="getConnectionPath(conn)"
@@ -77,14 +85,18 @@ interface DragState {
               [style.stroke]="strokeColor(conn)"
               [attr.data-connection-id]="conn.id"
               [attr.data-reroute-point-index]="$index"
+              [attr.tabindex]="presentationService.active() ? null : 0"
+              role="button"
+              [attr.aria-label]="'Reroute point ' + ($index + 1) + ' of ' + (conn.reroutePoints?.length ?? 0)"
               (mousedown)="onReroutePointMouseDown(conn, $index, $event)"
               (dblclick)="onReroutePointDoubleClick(conn, $index, $event)"
+              (keydown)="onReroutePointKeydown(conn, $index, $event)"
             />
           }
         }
       }
 
-      @if (dragState()) {
+      @if (dragState() || keyboardPending()) {
         <path
           [attr.d]="getGhostPath()"
           class="connection-ghost"
@@ -104,11 +116,13 @@ interface DragState {
             (dblclick)="$event.stopPropagation()"
             (contextmenu)="$event.stopPropagation()"
           >
-            <app-text-editor
-              [text]="conn.text ?? []"
-              (commit)="onTextEditorCommit(conn, $event)"
-              (cancelled)="cancelTextEdit()"
-            />
+            @defer (when editingConnectionId() === conn.id) {
+              <app-text-editor
+                [text]="conn.text ?? []"
+                (commit)="onTextEditorCommit(conn, $event)"
+                (cancelled)="cancelTextEdit()"
+              />
+            }
           </div>
         } @else if (conn.text) {
           <div
@@ -166,6 +180,14 @@ interface DragState {
     .connection-hit:hover + .connection-path.selected {
       stroke-width: calc((var(--sw, 2.5) + 1.5) * 1px);
     }
+    /* Keyboard focus (WCAG 2.4.7): the invisible hit path can't draw a ring,
+       so focus widens and glows the visible path beside it — the same
+       selection language, distinguishable by the glow (selection uses the
+       Connection's own color, focus uses the accent) */
+    .connection-hit:focus-visible + .connection-path {
+      stroke-width: calc((var(--sw, 2.5) + 2) * 1px);
+      filter: drop-shadow(0 0 4px var(--dn-accent));
+    }
     .connection-ghost {
       fill: none;
       stroke: var(--dn-accent);
@@ -180,6 +202,13 @@ interface DragState {
       stroke-width: 2px;
       pointer-events: all;
       cursor: grab;
+    }
+    /* Keyboard focus (WCAG 2.4.7): the accent ring on the point — the same
+       language as the Connection focus glow and Handle ring */
+    .reroute-point:focus-visible {
+      stroke: var(--dn-accent);
+      stroke-width: 4px;
+      filter: drop-shadow(0 0 3px var(--dn-accent));
     }
     .reroute-point:active {
       cursor: grabbing;
@@ -221,7 +250,11 @@ interface DragState {
 })
 export class ConnectionLayerComponent {
   private graphService = inject(GraphService);
+  private historyService = inject(HistoryService);
   protected presentationService = inject(PresentationService);
+  private keyboardConnection = inject(KeyboardConnectionService);
+
+  keyboardPending = this.keyboardConnection.pending;
 
   nodes = this.graphService.nodes;
   connections = this.graphService.connections;
@@ -369,11 +402,21 @@ export class ConnectionLayerComponent {
 
   getGhostPath(): string {
     const state = this.dragState();
-    if (!state) return '';
-    const start = this.getHandlePos(state.sourceNodeId, state.sourceHandle);
-    const end = { x: state.currentX, y: state.currentY };
-    const endHandle = state.targetHandle ?? oppositeHandle(state.sourceHandle);
-    return this.formatRoute(connectionRoute(start, end, state.sourceHandle, endHandle));
+    if (state) {
+      const start = this.getHandlePos(state.sourceNodeId, state.sourceHandle);
+      const end = { x: state.currentX, y: state.currentY };
+      const endHandle = state.targetHandle ?? oppositeHandle(state.sourceHandle);
+      return this.formatRoute(connectionRoute(start, end, state.sourceHandle, endHandle));
+    }
+    // Keyboard pending: the ghost follows the focused Handle (the commit
+    // target); nothing focused yet keeps it collapsed at the source Handle.
+    const pending = this.keyboardPending();
+    if (!pending) return '';
+    const start = this.getHandlePos(pending.sourceNodeId, pending.sourceHandle);
+    const focused = this.keyboardConnection.focusedHandle();
+    const end = focused ? this.getHandlePos(focused.nodeId, focused.handle) : start;
+    const endHandle = focused?.handle ?? oppositeHandle(pending.sourceHandle);
+    return this.formatRoute(connectionRoute(start, end, pending.sourceHandle, endHandle));
   }
 
   private formatRoute(route: ConnectionRoute): string {
@@ -440,6 +483,29 @@ export class ConnectionLayerComponent {
     return null;
   }
 
+  // Screen-reader name for a Connection: "Connection from A to B", using the
+  // same name source as the Node cards (Group label / flattened Text)
+  connectionAriaLabel(conn: Connection): string {
+    const name = (nodeId: string): string => {
+      const node = this.nodes().find(n => n.id === nodeId);
+      if (!node) return 'Node';
+      return node.kind === 'group'
+        ? (node.label?.trim() || 'Group')
+        : (textToPlainString(node.text ?? []).trim() || 'Node');
+    };
+    return `Connection from ${name(conn.sourceNodeId)} to ${name(conn.targetNodeId)}`;
+  }
+
+  // Keyboard selection (WCAG 2.1.1): Enter selects like a click, Shift+Enter
+  // toggles membership like Shift+click — the app's additive convention
+  onConnectionKeydown(conn: Connection, event: KeyboardEvent): void {
+    if (this.presentationService.active()) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.connectionSelect.emit({ connectionId: conn.id, additive: event.shiftKey });
+    }
+  }
+
   onConnectionMouseDown(conn: Connection, event: MouseEvent): void {
     // Left button only — right-click is reserved for the context menu, and
     // middle-drag must bubble up so the Canvas can pan
@@ -472,6 +538,28 @@ export class ConnectionLayerComponent {
   onTextCardDoubleClick(conn: Connection, event: MouseEvent): void {
     event.stopPropagation();
     this.editingConnectionId.set(conn.id);
+  }
+
+  // Keyboard move of a Reroute Point (shape brief): arrows shift the focused
+  // point 10px (1px with Shift) as one undoable Command per step, matching the
+  // nudge semantics. Delete is handled globally (focused point → remove).
+  onReroutePointKeydown(conn: Connection, pointIndex: number, event: KeyboardEvent): void {
+    if (this.presentationService.active()) return;
+    const dx = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    const dy = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+    if (dx === 0 && dy === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = conn.reroutePoints?.[pointIndex];
+    if (!point) return;
+    const step = event.shiftKey ? 1 : 10;
+    const command = new MoveConnectionReroutePointCommand(
+      this.graphService,
+      conn.id,
+      pointIndex,
+      { x: point.x + dx * step, y: point.y + dy * step },
+    );
+    this.historyService.execute(command);
   }
 
   onReroutePointMouseDown(conn: Connection, pointIndex: number, event: MouseEvent): void {

@@ -134,6 +134,7 @@ clips same-element shadows — see the node component comments).
 
 | Token | Value | Used by |
 | --- | --- | --- |
+| `--dn-shadow-color` | `rgba(0, 0, 0, 0.45)` | Shadow black — the tone the elevation shadows and the diamond `drop-shadow` tint from |
 | `--dn-shadow-node` | `0 2px 10px rgba(0, 0, 0, 0.45)` | Node resting |
 | `--dn-shadow-node-hover` | `0 6px 20px rgba(124, 92, 255, 0.28)` | Node hover |
 | `--dn-shadow-chip` | `0 6px 24px rgba(0, 0, 0, 0.45)` | Formatting Toolbar |

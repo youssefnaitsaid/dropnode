@@ -61,7 +61,10 @@ import { Text } from '../../models/text';
     :host {
       display: block;
       line-height: 1.4;
-      overflow-wrap: normal;
+      /* break-word (not anywhere): long unbroken runs like URLs wrap inside a
+         shrunken Node instead of spilling, while min-content sizing still
+         grows the Node to fit — only break-word leaves min-content alone */
+      overflow-wrap: break-word;
       white-space: pre-wrap;
     }
     .tv-block {
@@ -95,9 +98,12 @@ export class TextViewComponent {
   text = input.required<Text>();
 
   onLinkClick(event: MouseEvent, url: string): void {
-    // Plain click must keep select/drag semantics; Ctrl+Click follows the link
+    // Plain click must keep select/drag semantics; Ctrl/Cmd+Click follows the
+    // link. Keyboard activation (Enter on the focused link) fires a click with
+    // detail === 0 — that must follow the link too, or keyboard users could
+    // never open one (WCAG 2.1.1 / 2.4.4).
     event.preventDefault();
-    if (event.ctrlKey || event.metaKey) {
+    if (event.ctrlKey || event.metaKey || event.detail === 0) {
       window.open(url, '_blank', 'noopener');
     }
   }

@@ -2,6 +2,7 @@ import {
   Component, signal, computed, inject, effect, viewChild, ElementRef,
   ChangeDetectionStrategy, OnDestroy, untracked,
 } from '@angular/core';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX, lucideDownload } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -24,7 +25,7 @@ const PREVIEW_DEBOUNCE_MS = 150;
   selector: 'app-export-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmButton],
+  imports: [NgIcon, HlmButton, CdkTrapFocus],
   providers: [provideIcons({ lucideX, lucideDownload })],
   host: { '(document:keydown.escape)': 'onEscape()' },
   template: `
@@ -36,6 +37,8 @@ const PREVIEW_DEBOUNCE_MS = 150;
           role="dialog"
           aria-modal="true"
           aria-label="Export as"
+          cdkTrapFocus
+          [cdkTrapFocusAutoCapture]="true"
         >
           <div class="flex items-center justify-between mb-5">
             <h2 class="text-lg font-semibold">Export as…</h2>

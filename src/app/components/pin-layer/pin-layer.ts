@@ -48,7 +48,11 @@ type PopoverState =
           [style.left.px]="item.x"
           [style.top.px]="item.y"
           [class.dragging]="dragPinId() === item.pin.id"
+          [attr.tabindex]="presentationService.active() ? null : 0"
+          role="button"
+          [attr.aria-label]="'Pin: ' + item.pin.message"
           (mousedown)="onPinMouseDown($event, item.pin)"
+          (keydown)="onPinKeydown(item.pin, $event)"
         >
           <ng-icon name="lucideMessageCircle" />
         </div>
@@ -100,7 +104,7 @@ type PopoverState =
       justify-content: center;
       background: var(--dn-accent);
       color: var(--dn-accent-ink);
-      border: 2px solid rgba(255, 255, 255, 0.85);
+      border: 2px solid color-mix(in srgb, var(--dn-accent-ink) 85%, transparent);
       box-shadow: var(--dn-shadow-pin);
       cursor: grab;
       user-select: none;
@@ -110,6 +114,11 @@ type PopoverState =
     }
     .pin.dragging {
       cursor: grabbing;
+    }
+    /* Keyboard focus (WCAG 2.4.7): the accent ring, matching the Handle */
+    .pin:focus-visible {
+      outline: 2px solid var(--dn-accent);
+      outline-offset: 3px;
     }
     .pin-popover {
       position: absolute;
@@ -149,7 +158,7 @@ export class PinLayerComponent {
   private graphService = inject(GraphService);
   private historyService = inject(HistoryService);
   private contextMenuService = inject(ContextMenuService);
-  private presentationService = inject(PresentationService);
+  protected presentationService = inject(PresentationService);
   private pinVisibility = inject(PinVisibilityService);
 
   readonly draft = signal('');
@@ -217,6 +226,42 @@ export class PinLayerComponent {
     }
     return positioned;
   });
+
+  // Keyboard operation of a Pin (shape brief): arrows shift it 10px (1px with
+  // Shift) as one undoable MovePinCommand per step within its own anchor kind
+  // (no re-anchoring, matching the drag); Enter opens the edit popover.
+  onPinKeydown(pin: Pin, event: KeyboardEvent): void {
+    if (this.presentationService.active()) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.contextMenuService.requestEditPin(pin.id);
+      return;
+    }
+    const dx = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    const dy = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+    if (dx === 0 && dy === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = this.graphService.pinPoint(pin.id);
+    if (!point) return;
+    const step = event.shiftKey ? 1 : 10;
+    const x = point.x + dx * step;
+    const y = point.y + dy * step;
+    const anchor = pin.anchor;
+    if (anchor.kind === 'canvas') {
+      this.historyService.execute(new MovePinCommand(this.graphService, pin.id, { kind: 'canvas', x, y }));
+      return;
+    }
+    const node = this.graphService.nodes().find(n => n.id === anchor.nodeId);
+    if (!node) return;
+    this.historyService.execute(new MovePinCommand(this.graphService, pin.id, {
+      kind: 'node',
+      nodeId: node.id,
+      offsetX: x - node.x,
+      offsetY: y - node.y,
+    }));
+  }
 
   onPinMouseDown(event: MouseEvent, pin: Pin): void {
     if (this.presentationService.active()) return;

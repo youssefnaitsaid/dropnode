@@ -5,12 +5,14 @@ import { ClipboardService } from './clipboard.service';
 import { ExportDialogService } from './export-dialog.service';
 import {
   CreateNodeCommand, CreateGroupCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
-  DeletePinCommand,
+  DeletePinCommand, AddConnectionReroutePointCommand,
   buildDeleteSelectionCommand, buildAlignSelectionCommand, buildDistributeSelectionCommand,
 } from './commands';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
 import { ExportScopeRequest } from '../models/export-image';
 import { PinAnchor } from '../models/pin';
+import { MAX_REROUTE_POINTS } from '../models/connection';
+import { connectionRoute, routePointAt } from '../models/curve';
 
 /** What a right-click landed on, and — for the empty Canvas — nothing more. */
 export type ContextTarget =
@@ -253,6 +255,44 @@ export class ContextMenuService {
   /** Request an inline Connection Text editor without opening a Context Menu. */
   requestConnectionText(connectionId: string): void {
     this.connectionTextRequest.set(connectionId);
+  }
+
+  /** Keyboard Enter on a focused Pin: open its edit popover. */
+  requestEditPin(pinId: string): void {
+    this.pinEditRequest.set(pinId);
+  }
+
+  /**
+   * Context Menu "Add Reroute Point": append a point at the route's
+   * midpoint (the route's default text position) and focus it, so arrows
+   * move it immediately (shape brief). Silent past the drag path's 32-point
+   * ceiling, matching the mouse add's guard.
+   */
+  addReroutePoint(): void {
+    const target = this.target();
+    if (target?.kind !== 'connection') return;
+    const conn = this.graphService.connections().find(c => c.id === target.connectionId);
+    if (!conn) return;
+    const points = conn.reroutePoints ?? [];
+    if (points.length >= MAX_REROUTE_POINTS) return;
+    const start = this.graphService.getHandlePosition(conn.sourceNodeId, conn.sourceHandle);
+    const end = this.graphService.getHandlePosition(conn.targetNodeId, conn.targetHandle);
+    if (!start || !end) return;
+    const route = connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints);
+    const midpoint = routePointAt(route, 0.5);
+    this.historyService.execute(new AddConnectionReroutePointCommand(
+      this.graphService,
+      conn.id,
+      midpoint,
+      points.length,
+    ));
+    // The new point renders once the Command lands; focus it so arrows move it
+    queueMicrotask(() => {
+      const pointEls = document.querySelectorAll<SVGCircleElement>(
+        `.reroute-point[data-connection-id="${conn.id}"]`,
+      );
+      pointEls[pointEls.length - 1]?.focus();
+    });
   }
 
   // Clipboard actions apply to Nodes and Groups only — a Connection or the

@@ -89,12 +89,15 @@ export class SidebarService {
     }
   }
 
-  /** Read the stored preference; any missing or malformed value means expanded. */
+  /** Read the stored preference; defaults to collapsed on narrow screens (<=640px), expanded on desktop. */
   private readStoredState(): boolean {
     try {
       const raw = localStorage.getItem(SIDEBAR_STORAGE_KEY);
       if (raw === 'true') return true;
       if (raw === 'false') return false;
+      if (typeof window !== 'undefined' && window.innerWidth <= 640) {
+        return true;
+      }
       return false;
     } catch {
       return false;

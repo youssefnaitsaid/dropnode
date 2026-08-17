@@ -302,22 +302,7 @@ export class GraphService {
     targetNodeId: string,
     targetHandle: HandleSide
   ): Connection | null {
-    // Prevent self-connections
-    if (sourceNodeId === targetNodeId) return null;
-
-    // Prevent connections between a Group and its own children
-    const source = this.nodes().find(n => n.id === sourceNodeId);
-    const target = this.nodes().find(n => n.id === targetNodeId);
-    if (source?.parentId === targetNodeId || target?.parentId === sourceNodeId) return null;
-
-    // Prevent duplicate connections
-    const exists = this.connections().some(
-      c => c.sourceNodeId === sourceNodeId &&
-           c.sourceHandle === sourceHandle &&
-           c.targetNodeId === targetNodeId &&
-           c.targetHandle === targetHandle
-    );
-    if (exists) return null;
+    if (this.connectionViolation(sourceNodeId, sourceHandle, targetNodeId, targetHandle)) return null;
 
     const connection: Connection = {
       id: this.generateId('conn'),
@@ -328,6 +313,38 @@ export class GraphService {
     };
     this.connections.update(conns => [...conns, connection]);
     return connection;
+  }
+
+  /**
+   * Why createConnection would refuse a Connection, or null if it would
+   * succeed. The single source of truth for the three guards — the keyboard
+   * Connection path and the Connect dialog map the violation to user-facing
+   * copy instead of re-implementing the rules.
+   */
+  connectionViolation(
+    sourceNodeId: string,
+    sourceHandle: HandleSide,
+    targetNodeId: string,
+    targetHandle: HandleSide
+  ): 'self' | 'group-child' | 'duplicate' | null {
+    // Prevent self-connections
+    if (sourceNodeId === targetNodeId) return 'self';
+
+    // Prevent connections between a Group and its own children
+    const source = this.nodes().find(n => n.id === sourceNodeId);
+    const target = this.nodes().find(n => n.id === targetNodeId);
+    if (source?.parentId === targetNodeId || target?.parentId === sourceNodeId) return 'group-child';
+
+    // Prevent duplicate connections
+    const exists = this.connections().some(
+      c => c.sourceNodeId === sourceNodeId &&
+           c.sourceHandle === sourceHandle &&
+           c.targetNodeId === targetNodeId &&
+           c.targetHandle === targetHandle
+    );
+    if (exists) return 'duplicate';
+
+    return null;
   }
 
   deleteConnection(id: string): Connection | undefined {

@@ -569,4 +569,35 @@ describe('ContextMenuService', () => {
       expect(service.pinEditRequest()).toBeNull();
     });
   });
+
+  describe('addReroutePoint', () => {
+    it('appends a point at the route midpoint, undoably', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 320, 0);
+      const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      service.openFor({ kind: 'connection', connectionId: conn.id }, 160, 0);
+
+      service.addReroutePoint();
+
+      const points = graphService.connections()[0].reroutePoints!;
+      expect(points).toHaveLength(1);
+      // Midpoint of the right→left route: between the two Handle anchors
+      // (the curve bows, so it is not the straight-line midpoint)
+      expect(points[0].x).toBeGreaterThan(160);
+      expect(points[0].x).toBeLessThan(320);
+      expect(points[0].y).toBe(24);
+
+      historyService.undo();
+      expect(graphService.connections()[0].reroutePoints).toBeUndefined();
+    });
+
+    it('does nothing without a Connection target', () => {
+      const a = graphService.createNode('A', 0, 0);
+      service.openFor({ kind: 'node', nodeId: a.id }, 0, 0);
+
+      service.addReroutePoint();
+
+      expect(graphService.connections()).toHaveLength(0);
+    });
+  });
 });

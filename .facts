@@ -181,6 +181,7 @@
 - wheel zoom steps by 0.1 per tick, centered on the cursor so the point under the cursor stays fixed on screen
 - toolbar zoom buttons and the Zoom In / Zoom Out Palette Entries step by 0.1 centered on the visible Canvas' center, so the Canvas center point stays fixed on screen — the same centering rule as wheel zoom with a different anchor
 - left-drag on empty Canvas draws a Marquee, not a pan (ADR-0016); panning is hold-Space + left-drag (grab cursor, from anywhere, even over elements) or middle-mouse-drag, and never changes the Selection
+- touch and pen input add two gestures the mouse lacks: one finger on empty Canvas pans (touch has no Space or middle button) and two fingers pinch-zoom around their midpoint; the Canvas subtree is touch-action: none, so Node/Handle/Text-card/Pin drags stream compatibility mouse events instead of being canceled mid-drag, and the touch pan's compatibility mousedown never arms a Marquee @implemented
 - a Canvas with no stored Viewport to restore (fresh Scratch Canvas, corrupt-Project fallback) initializes at pan (0,0) and zoom 1; importing or clearing a graph does NOT reset the Viewport
 - every page load opens framed: whichever graph activation lands — a stored Project, a ?data share link, or the stashed Scratch snapshot — applies Zoom to Fit instead of restoring its remembered Viewport, and switching Projects on the same route re-frames; the deferred fit waits one frame for the laid-out canvas size, and an empty graph keeps the default Viewport @implemented
 - pan and zoom apply as one shared CSS translate+scale transform covering both the DOM node layer and the SVG connection layer
@@ -278,7 +279,7 @@
 - Collection ids follow col_{timestamp}_{counter} and Project ids proj_{timestamp}_{counter}; duplicate Collection and Project names are allowed
 - / redirects to the most recently opened Project; a ?data share link or an empty store stays on the Scratch Canvas
 - an unknown or deleted /p/:projectId redirects to / with a "Project not found" error toast
-- editing auto-saves: Graph State and Viewport changes persist to the current Project debounced at 300ms; there is no save button and no dirty state
+- editing auto-saves: Graph State and Viewport changes persist to the current Project debounced at 300ms; there is no save button, and a bottom-left "Saving…/Saved" indicator reports the debounced write on Project routes only (the Scratch Canvas is never persisted and shows no indicator) @implemented
 - the per-Project Viewport is stored outside Graph State — exported JSON and ?data links carry the graph's nodes, connections, and Pins, never the Viewport
 - deleting a Collection cascade-deletes all its Projects; Collection and Project deletion are permanent (not undoable) and both guarded by a confirmation modal, the Collection modal stating its project count
 - deleting the Project being viewed navigates to the most recently opened surviving Project, or to / when none remain
@@ -295,7 +296,16 @@
 ## shortcuts
 
 - all keyboard shortcuts are ignored while focus is in an input, textarea, or contenteditable element
-- Delete or Backspace deletes the Selection — a single Connection or Node exactly as before, a multi-Selection as one compound step; Escape clears the whole Selection and blurs the active element
+- Shift+F10 (or the Context Menu key) opens the Canvas context menu for the focused Node card, the focused Connection or Reroute Point, the selected Node/Connection, or the empty Canvas — the menu resolves its target exactly like a right-click, through the same synthetic-contextmenu pipeline @implemented
+- every Node card is keyboard-focusable (never in Present Mode) and screen-reader named from its label or Text; Enter selects it, arrow keys nudge it 10px (1px with Shift) as undoable Move Commands — moving a member of a multi-Selection shifts the whole set as one compound undo step @implemented
+- every Handle is keyboard-focusable (never in Present Mode) and labeled "Connect from <node name>"; Enter on a Handle arms a pending Connection (the keyboard twin of the drag), Tab cycles between Handles with the ghost following focus, Enter on the target Handle commits the same undoable CreateConnectionCommand as the drag, and Escape cancels — self-links, Group↔child, and duplicates reject with a reason toast @implemented
+- every Connection is keyboard-focusable (never in Present Mode), screen-reader named "Connection from A to B", and selected by Enter (Shift+Enter toggles membership); [ and ] cycle the focusable Connections in document order (Shift extends Selection), dead while a pending Connection is composed @implemented
+- the "Connect Nodes…" Palette Entry opens a dialog picking From/To Nodes with auto-facing Handles and the same validation as the drag path; it is unavailable until two Nodes exist @implemented
+- Delete or Backspace deletes the Selection — a single Connection or Node exactly as before, a multi-Selection as one compound step; a focused Reroute Point is removed instead (refocusing its Connection); Escape clears the whole Selection and blurs the active element, except in Resize mode where it exits the mode keeping the Selection @implemented
+- in Resize mode (or with Ctrl+arrows) arrow keys on a focused Node card resize it 10px (1px with Shift), the pressed-side edge moving with the opposite edge anchored and clamped to the shape/text minimum — one undoable ResizeNodeCommand per step; Resize mode toggles from the Node Context Menu and a Palette Entry and is exited with Escape @implemented
+- a Connection's Reroute Points are keyboard-focusable (never in Present Mode); "Add Reroute Point" in the Connection menu appends one at the route midpoint and focuses it, Tab cycles the visible points, arrows move the focused point 10px (1px with Shift) as one undoable Command per step @implemented
+- every Pin is keyboard-focusable (never in Present Mode) and labeled "Pin: <message>"; arrows shift a focused Pin 10px (1px with Shift) within its own anchor kind as one undoable MovePinCommand per step, and Enter opens its edit popover @implemented
+- with nothing focused (focus on the page body or the Canvas containers), arrow keys pan the Viewport 40 screen px (10 with Shift), converted to world units by the current zoom — a Viewport change with no History entry, matching every other pan; the focus state owns the arrow grammar, so a focused Node card nudges/resizes and interactive elements keep native arrow behavior @implemented
 - Ctrl+X cuts and Ctrl+C copies the Selection's Nodes and Groups; Ctrl+V pastes at the cursor; Ctrl+D duplicates the Selection's Nodes and Groups; Ctrl+A selects all — no selection (or an empty Clipboard for paste) is a silent no-op
 - Shift+1 runs Zoom to fit and Shift+2 Zoom to selection, keyed off event.code (Digit1/Digit2) for layout independence and suppressed by the input-focus guard @spec
 

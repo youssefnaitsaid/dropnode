@@ -2,9 +2,11 @@ import {
   Component,
   ChangeDetectionStrategy,
   OnDestroy,
+  computed,
   effect,
   inject,
   input,
+  signal,
   untracked,
 } from '@angular/core';
 import { CanvasComponent } from '../canvas/canvas';
@@ -30,19 +32,38 @@ import { PresentationService } from '../../services/presentation.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CanvasComponent, ToolbarComponent, MinimapComponent],
   template: `
+    <h1 class="sr-only">{{ projectTitle() }}</h1>
     @if (!presentationService.active()) {
       <app-toolbar [scratchMode]="!projectId()" />
     }
     <app-canvas />
+    <!-- First-run affordance on an empty Canvas (never blocks interaction:
+         pointer-events none, gone with the first Node). An empty graph can't
+         enter Present Mode, so no Present guard is needed. -->
+    @if (graphService.nodes().length === 0) {
+      <div class="empty-canvas-hint">
+        <span class="empty-canvas-hint-line">Double-click or double-tap the Canvas to add a Node</span>
+        <span class="empty-canvas-hint-sub">Commands (Ctrl+K) opens the palette · Right-click for more actions</span>
+      </div>
+    }
     <!-- Hidden when empty (nothing to map), when the user toggled it off,
          and in Present Mode (it's chrome). -->
     @if (!presentationService.active() && !minimapService.hidden() && graphService.nodes().length > 0) {
       <app-minimap />
     }
-    <!-- Present Mode's only overlay: a non-interactive Step counter -->
+    <!-- Present Mode's only overlay: a non-interactive Step counter. Live so
+         screen readers announce each Step change (WCAG 4.1.3). -->
     @if (presentationService.active()) {
-      <div class="step-counter">
+      <div class="step-counter" role="status" aria-live="polite">
         {{ presentationService.stepIndex() + 1 }} / {{ presentationService.stepCount() }}
+      </div>
+    }
+    <!-- Auto-save indicator: visible only on a Project route (the Scratch
+         Canvas is never persisted, so there is nothing to report). Live so
+         screen readers hear "Saved" land after the debounce settles. -->
+    @if (projectId() && !presentationService.active()) {
+      <div class="save-indicator" role="status" aria-live="polite">
+        {{ saveState() === 'saving' ? 'Saving…' : 'Saved' }}
       </div>
     }
   `,
@@ -61,7 +82,7 @@ import { PresentationService } from '../../services/presentation.service';
     }
     .step-counter {
       position: absolute;
-      bottom: 16px;
+      bottom: max(16px, env(safe-area-inset-bottom));
       left: 50%;
       transform: translateX(-50%);
       padding: 4px 12px;
@@ -73,6 +94,58 @@ import { PresentationService } from '../../services/presentation.service';
       font-weight: 500;
       pointer-events: none;
       user-select: none;
+    }
+    /* Auto-save state, bottom-left (Minimap owns bottom-right, Step counter
+       owns bottom-center). Deliberately quieter than the Step counter: it
+       reports background persistence, never a primary action. */
+    .save-indicator {
+      position: absolute;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      left: max(16px, env(safe-area-inset-left));
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: color-mix(in srgb, var(--dn-canvas) 75%, transparent);
+      border: 1px solid color-mix(in srgb, var(--dn-chip-ink) 15%, transparent);
+      color: color-mix(in srgb, var(--dn-chip-ink) 72%, transparent);
+      font-size: 12px;
+      font-weight: 500;
+      pointer-events: none;
+      user-select: none;
+    }
+    .empty-canvas-hint {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: none;
+      user-select: none;
+      text-align: center;
+      padding: 0 24px;
+      /* Delayed fade: share-link/stash loads start empty, and the hint must
+         not flash before their graph lands */
+      animation: empty-hint-in 0.3s ease 0.5s both;
+    }
+    @keyframes empty-hint-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .empty-canvas-hint-line {
+      color: color-mix(in srgb, var(--dn-chip-ink) 72%, transparent);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .empty-canvas-hint-sub {
+      color: color-mix(in srgb, var(--dn-chip-ink) 55%, transparent);
+      font-size: 12px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .empty-canvas-hint {
+        animation: none;
+        opacity: 1;
+      }
     }
   `],
 })
@@ -87,7 +160,16 @@ export class EditorPageComponent implements OnDestroy {
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
 
+  projectTitle = computed(() => {
+    const id = this.projectId();
+    if (!id) return 'Dropnode Scratch Canvas';
+    return this.collectionService.getProject(id)?.name ?? 'Dropnode Project';
+  });
+
   private currentProjectId: string | null = null;
+
+  /** Auto-save state for the bottom-left indicator (Project routes only). */
+  protected saveState = signal<'saving' | 'saved'>('saved');
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingSave: (() => void) | null = null;
@@ -112,6 +194,7 @@ export class EditorPageComponent implements OnDestroy {
       const presenting = this.presentationService.active();
       const id = this.currentProjectId;
       if (!id || presenting) return;
+      this.saveState.set('saving');
       this.scheduleSave(() => {
         this.collectionService.saveProjectGraph(id, { nodes, connections });
         this.collectionService.saveProjectViewport(id, viewport);
@@ -205,5 +288,7 @@ export class EditorPageComponent implements OnDestroy {
     }
     this.pendingSave?.();
     this.pendingSave = null;
+    // The write landed (or nothing was pending) — the indicator settles.
+    this.saveState.set('saved');
   }
 }
