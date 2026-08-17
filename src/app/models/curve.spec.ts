@@ -74,6 +74,59 @@ describe('connectionRoute', () => {
       .toBeLessThan(route.segments[route.segments.length - 1].end.x);
   });
 
+  it('sweeps the endpoints with the plain curve offset when points sit beyond the sweep', () => {
+    // A single mid-route point must barely change the look: the routed
+    // endpoint control points equal the plain Connection's exactly.
+    const start = { x: 0, y: 0 };
+    const end = { x: 300, y: 100 };
+    const route = connectionRoute(start, end, 'right', 'left', [{ x: 150, y: 50 }]);
+    const plain = connectionCurve(start, end, 'right', 'left');
+
+    expect(route.segments[0].cp1).toEqual(plain.cp1);
+    expect(route.segments[route.segments.length - 1].cp2).toEqual(plain.cp2);
+  });
+
+  it('caps the departure sweep at a Reroute Point inside the plain sweep', () => {
+    // Plain offset would be 120, but the point sits 60 ahead of the source
+    // Handle, so the control point stops at its forward projection.
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 60, y: 80 }],
+    );
+
+    expect(route.segments[0].cp1).toEqual({ x: 60, y: 0 });
+  });
+
+  it('caps the arrival sweep at the last Reroute Point', () => {
+    // The last point sits 60 ahead of the target Handle (toward the source),
+    // capping the arrival control point at its forward projection.
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: 240, y: -60 }],
+    );
+
+    expect(route.segments[route.segments.length - 1].cp2).toEqual({ x: 240, y: 0 });
+  });
+
+  it('does not sweep forward past a Reroute Point behind the Handle', () => {
+    // A point behind the Handle leaves no room for a forward sweep.
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      'right',
+      'left',
+      [{ x: -20, y: 0 }],
+    );
+
+    expect(route.segments[0].cp1).toEqual({ x: 0, y: 0 });
+  });
+
   it('keeps interior tangents continuous while bounding every segment control point', () => {
     const route = connectionRoute(
       { x: 0, y: 0 },

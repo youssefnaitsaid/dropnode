@@ -118,6 +118,7 @@
 - Connections without Reroute Points render as the existing cubic Bézier @implemented
 - a Connection with Reroute Points renders as a bounded piecewise cubic Bézier through its source Handle, every ordered Reroute Point, and its target Handle @implemented
 - routed Connection endpoint tangents follow their Handles @implemented
+- routed Connection endpoint tangent magnitudes use the plain curve's span-based offset (clamp(0.4 × span, 40, 150)), capped so the departure/arrival control point never passes the first/last Reroute Point along the Handle direction @implemented
 - Handle positions are the midpoints of the Node's four edges, computed from x, y, width, height
 - a Connection may carry 1–32 ordered Reroute Points as absolute Canvas coordinates `{x, y}` @implemented
 - Reroute Point coordinates are finite @implemented

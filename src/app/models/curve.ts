@@ -131,6 +131,13 @@ function routeControlOffset(start: Point, end: Point): number {
   return Math.min(Math.max(distance(start, end) * 0.4, 40), 150);
 }
 
+/** How far a point lies ahead of a Handle along its Handle direction; a point
+ *  behind the Handle returns zero (no forward sweep possible). */
+function forwardProjection(point: Point, handle: Point, side: HandleSide): number {
+  const dir = handleDirection(side);
+  return Math.max((point.x - handle.x) * dir.x + (point.y - handle.y) * dir.y, 0);
+}
+
 const ROUTE_LENGTH_SAMPLES = 40;
 
 function segmentLength(curve: Curve, untilT = 1): number {
@@ -173,11 +180,20 @@ export function connectionRoute(
   const vertices = [start, ...reroutePoints, end];
   const tangents: Point[] = vertices.map((vertex, index) => {
     if (index === 0) {
-      const length = Math.min(routeControlOffset(vertex, vertices[1]), distance(vertex, vertices[1]));
+      // The plain Connection's span-based sweep, capped so the departure
+      // control point never passes the first Reroute Point along the Handle
+      // direction (a point behind the Handle clamps the sweep to zero).
+      const length = Math.min(
+        routeControlOffset(start, end),
+        forwardProjection(vertices[1], start, startHandle),
+      );
       return scale(handleDirection(startHandle), length);
     }
     if (index === vertices.length - 1) {
-      const length = Math.min(routeControlOffset(vertices[index - 1], vertex), distance(vertices[index - 1], vertex));
+      const length = Math.min(
+        routeControlOffset(start, end),
+        forwardProjection(vertices[index - 1], end, endHandle),
+      );
       return scale(handleDirection(endHandle), -length);
     }
     return scale(subtract(vertices[index + 1], vertices[index - 1]), 0.5);
