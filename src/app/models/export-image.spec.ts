@@ -141,7 +141,7 @@ describe('Export Theme mapping', () => {
       nodeBackground: '#f0f0f5',
       nodeText: '#1a1a2e',
       groupBorder: 'rgba(255, 255, 255, 0.1)',
-      groupLabel: '#1a1a2e',
+      groupLabel: '#ffffff',
       connectionTextBackground: '#2b2d31',
       connectionTextColor: '#ffffff',
     });

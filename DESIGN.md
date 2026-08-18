@@ -24,12 +24,13 @@ hierarchy, tuned for a graph editor —
   `#383a40`. Boundaries come from color, not borders — Discord's signature.
 - **Nodes are off-white paper with near-black ink** (`#f0f0f5` surface,
   `#1a1a2e` text — user-mandated), so the graph glows bright on the slate
-  canvas. Group fills stay translucent (30% alpha) so children show through.
+  canvas. Groups render beneath Connections and regular Nodes (ADR-0008)
+  so children stay visible without needing translucent fills.
 - **One blurple** (`#5865F2`) is the accent for everything interactive:
   default Connection stroke, Handles, Resize Grips, the text caret, chrome
   buttons, focus rings. Chrome (`--primary`) and canvas (`--dn-accent`) are
   the same literal value by design.
-- **One red** (`#f23f43`) means magnetic feedback: a Handle snapping a
+- **One white** (`#ffffff`) means magnetic feedback: a Handle snapping a
   connection drag, an Alignment Guide lighting up mid-drag.
 - **One yellow** (`#f0b232`) is the Text highlight mark.
 - The **Palette** (below) is the only sanctioned color variety — user-applied,
@@ -71,7 +72,7 @@ both files, and a row here.
 | `--dn-chip-input` | `#1e1f22` | Input field inside a chip (link input) |
 | `--dn-accent` | `#5865F2` | The blurple — default Connection stroke, Handles, Grips, caret, chrome `--primary` |
 | `--dn-accent-ink` | `#ffffff` | Ink on accent fills |
-| `--dn-danger` | `#f23f43` | Handle snap highlight, Alignment Guide |
+| `--dn-danger` | `#ffffff` | Handle snap highlight, Alignment Guide |
 | `--dn-highlight` | `#f0b232` | Text highlight mark (`mark` / `.tv-highlight`) |
 | `--dn-sel-edge` | `#949ba4` | 1px edge ring under the selection glow |
 
@@ -107,20 +108,20 @@ matches the toolbar swatch row and the Command Palette names):
 
 | Name | Value |
 | --- | --- |
-| Rose | `#ff8fa3` |
-| Peach | `#ffb37a` |
-| Yellow | `#ffe08a` |
-| Green | `#9fe0a3` |
-| Cyan | `#86dced` |
-| Periwinkle | `#9fb4ff` |
-| Lavender | `#c3a3ff` |
-| Pink | `#f2a3e8` |
+| PastelBlue | `#B3EBF2` |
+| PastelRed | `#FF746C` |
+| LightGray | `#D3D3D3` |
+| Beige | `#EDE8D0` |
+| Emerald | `#50C878` |
+| Lavender | `#D3D3FF` |
+| Pink | `#F2A3E8` |
+| LightOrange | `#FFDBBB` |
 
 An element without an applied Palette color shows its default appearance
 (Node: `--dn-paper`; Connection: `--dn-accent`). Applied colors are stored in
 Graph State — changing the palette array changes rendering of *new* choices
 only and must never re-map stored hexes (ADR-0006). The Minimap's selection
-highlight is Cyan (`DN_TOKENS.minimapAccent`). A selected element's glow
+highlight is PastelBlue (`DN_TOKENS.minimapAccent`). A selected element's glow
 (`--selection-glow`) is its own solid color identity, so Palette colors
 double as feedback; an uncolored Node's default glow is `--dn-paper`.
 

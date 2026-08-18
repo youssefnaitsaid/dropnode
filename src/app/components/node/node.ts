@@ -25,8 +25,7 @@ export interface NodeSizeChangedEvent {
   preserveCenter: boolean;
 }
 
-// 30% alpha suffix so Group fills stay see-through over children
-const GROUP_FILL_ALPHA = '4D';
+
 
 @Component({
   selector: 'app-node',
@@ -216,8 +215,10 @@ const GROUP_FILL_ALPHA = '4D';
     .node-card.selected:has(.node-surface.shape-diamond) {
       filter: drop-shadow(0 0 1px var(--dn-sel-edge)) drop-shadow(0 0 6px var(--selection-glow, var(--dn-paper)));
     }
-    /* Lift a selected node (and its glow) above neighbouring cards */
-    :host:has(.node-card.selected) {
+    /* Lift a selected node (and its glow) above neighbouring cards,
+       but NOT groups — they render below children by ADR-0008 stacking
+       and a z-index lift would cover the children with the solid fill. */
+    :host:has(.node-card.selected):not(:has(.group-card)) {
       z-index: var(--dn-z-selected);
     }
     /* While editing, the card hosts a text editor — not a drag target */
@@ -229,8 +230,6 @@ const GROUP_FILL_ALPHA = '4D';
       padding: 0;
       align-items: flex-start;
       justify-content: flex-start;
-      border-style: dashed;
-      border-width: 2px;
       border-color: var(--dn-group-edge);
       box-shadow: none;
     }
@@ -246,7 +245,7 @@ const GROUP_FILL_ALPHA = '4D';
     }
     .group-label {
       /* Ink on the dark label strip: light, not the (now-dark) paper */
-      color: var(--dn-ink);
+      color: var(--dn-group-ink);
       font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
@@ -275,7 +274,7 @@ const GROUP_FILL_ALPHA = '4D';
       text-align: center;
     }
     .group-label-input {
-      color: var(--dn-ink);
+      color: var(--dn-group-ink);
       font-size: 12px;
       font-weight: 600;
       text-align: left;
@@ -418,10 +417,7 @@ export class NodeComponent implements AfterViewInit {
     return plain ? plain : 'Node';
   });
 
-  cardBackground = computed(() => {
-    const base = this.node().color ?? DEFAULT_NODE_BACKGROUND;
-    return this.isGroup() ? base + GROUP_FILL_ALPHA : base;
-  });
+  cardBackground = computed(() => this.node().color ?? DEFAULT_NODE_BACKGROUND);
 
   // The selection glow tracks the element's own color identity — the solid
   // base color, never a Group's translucent fill, so the glow stays visible

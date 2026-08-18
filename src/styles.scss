@@ -113,6 +113,7 @@ body {
   --dn-node-edge: rgba(0, 0, 0, 0.3);              /* Node surface border */
   --dn-group-edge: rgba(255, 255, 255, 0.1);       /* dashed Group border */
   --dn-group-strip: rgba(0, 0, 0, 0.25);           /* Group Label strip fill */
+  --dn-group-ink: #ffffff;                          /* Group Label */
   --dn-chip: #2b2d31;                              /* floating chips: Connection Text, Pin popover, Formatting Toolbar */
   --dn-chip-ink: #ffffff;                          /* ink on chips and overlays — pure white (user-mandated) */
   --dn-chip-input: #1e1f22;                        /* input field inside a chip */
@@ -120,7 +121,7 @@ body {
   /* Accent & semantic */
   --dn-accent: #5865F2;                            /* the Dropnode blurple: default Connection stroke, Handles, Grips, caret */
   --dn-accent-ink: #ffffff;                        /* ink on accent fills */
-  --dn-danger: #f23f43;                            /* Handle snap highlight, Alignment Guide */
+  --dn-danger: #ffffff;                            /* Handle snap highlight, Alignment Guide */
   --dn-highlight: #f0b232;                         /* Text highlight mark */
   --dn-sel-edge: #949ba4;                          /* 1px edge ring under the selection glow */
 

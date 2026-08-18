@@ -22,7 +22,7 @@ export const DN_TOKENS = {
   /** Ink on accent fills (--dn-accent-ink) */
   accentInk: '#ffffff',
   /** Snap highlight / Alignment Guide (--dn-danger) */
-  danger: '#f23f43',
+  danger: '#ffffff',
   /** Text highlight mark (--dn-highlight) */
   highlight: '#f0b232',
   /** Chip surface: Connection Text cards, Pin popover, Formatting Toolbar (--dn-chip) */
@@ -31,6 +31,8 @@ export const DN_TOKENS = {
   chipInk: '#ffffff',
   /** Dashed Group border (--dn-group-edge) */
   groupEdge: 'rgba(255, 255, 255, 0.1)',
+  /** Group label (--dn-group-ink) */
+  groupInk: '#ffffff',
 
   // Minimap tones (2D-context draws; flattened per ADR-0001's palette).
   // Nodes are off-white paper again, so node/group glyphs derive from
@@ -43,8 +45,8 @@ export const DN_TOKENS = {
   minimapConnection: 'rgba(219, 222, 225, 0.35)',
   /** Minimap Viewport outline (--dn-chip-ink at 90%) */
   minimapViewport: 'rgba(219, 222, 225, 0.9)',
-  /** Minimap Selection highlight — the Palette's Cyan */
-  minimapAccent: '#86dced',
+  /** Minimap Selection highlight — the Palette's PastelBlue */
+  minimapAccent: '#B3EBF2',
 } as const;
 
 export type DesignTokenName = keyof typeof DN_TOKENS;

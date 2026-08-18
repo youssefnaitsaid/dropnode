@@ -159,7 +159,7 @@ export const EXPORT_THEMES: Record<ExportTheme, ExportThemeColors> = {
     nodeBackground: DN_TOKENS.paper,
     nodeText: DN_TOKENS.ink,
     groupBorder: DN_TOKENS.groupEdge,
-    groupLabel: DN_TOKENS.ink,
+    groupLabel: DN_TOKENS.groupInk,
     connectionTextBackground: DN_TOKENS.chip,
     connectionTextColor: DN_TOKENS.chipInk,
   },

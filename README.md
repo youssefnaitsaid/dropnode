@@ -154,7 +154,7 @@ Exported and imported graphs share one schema — the complete serializable stat
       "id": "n1",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "Webhook trigger", "bold": true }] }],
       "shape": "pill",
-      "color": "#ff8fa3",
+      "color": "#FF746C",
       "x": 60, "y": 200, "width": 160, "height": 48,
       "parentId": "g1"
     },
@@ -172,7 +172,7 @@ Exported and imported graphs share one schema — the complete serializable stat
       "sourceHandle": "right",
       "targetNodeId": "n2",
       "targetHandle": "left",
-      "color": "#86dced",
+      "color": "#B3EBF2",
       "strokePattern": "dashed",
       "endArrowhead": "triangle",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "feedback" }] }],

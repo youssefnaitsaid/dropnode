@@ -4,7 +4,7 @@
       "id": "n1",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "Webhook trigger" }] }],
       "shape": "pill",
-      "color": "#ff8fa3",
+      "color": "#FF746C",
       "x": 60,
       "y": 200,
       "width": 160,
@@ -23,7 +23,7 @@
     {
       "id": "n3",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "Plan steps" }] }],
-      "color": "#9fb4ff",
+      "color": "#D3D3FF",
       "x": 580,
       "y": 200,
       "width": 160,
@@ -33,7 +33,7 @@
       "id": "n4",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "Review" }] }],
       "shape": "diamond",
-      "color": "#ffe08a",
+      "color": "#EDE8D0",
       "x": 840,
       "y": 120,
       "width": 180,
@@ -53,7 +53,7 @@
       "id": "n6",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "Final answer" }] }],
       "shape": "ellipse",
-      "color": "#9fe0a3",
+      "color": "#50C878",
       "x": 1120,
       "y": 300,
       "width": 180,
@@ -85,7 +85,7 @@
       "sourceHandle": "right",
       "targetNodeId": "n2",
       "targetHandle": "left",
-      "color": "#ff8fa3"
+      "color": "#FF746C"
     },
     {
       "id": "c2",
@@ -100,7 +100,7 @@
       "sourceHandle": "right",
       "targetNodeId": "n4",
       "targetHandle": "left",
-      "color": "#9fb4ff",
+      "color": "#D3D3FF",
       "strokePattern": "dashed"
     },
     {
@@ -109,7 +109,7 @@
       "sourceHandle": "bottom",
       "targetNodeId": "n5",
       "targetHandle": "top",
-      "color": "#ffe08a",
+      "color": "#EDE8D0",
       "strokeWeight": "thick",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "decision" }] }],
       "textPosition": 0.5
@@ -120,7 +120,7 @@
       "sourceHandle": "right",
       "targetNodeId": "n6",
       "targetHandle": "left",
-      "color": "#9fe0a3",
+      "color": "#50C878",
       "strokePattern": "dotted",
       "startArrowhead": "triangle",
       "endArrowhead": "triangle"
@@ -131,14 +131,9 @@
       "sourceHandle": "left",
       "targetNodeId": "n3",
       "targetHandle": "bottom",
-      "color": "#86dced",
+      "color": "#B3EBF2",
       "text": [{ "kind": "paragraph", "runs": [{ "text": "feedback" }] }],
-      "textPosition": 0.6,
-      "reroutePoints": [
-        { "x": 820, "y": 430 },
-        { "x": 700, "y": 430 },
-        { "x": 660, "y": 380 }
-      ]
+      "textPosition": 0.6
     }
   ],
   "pins": [

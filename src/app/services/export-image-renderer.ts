@@ -4,8 +4,7 @@ import {
 } from '../models/export-image';
 import { GraphNode } from '../models/node';
 
-// Mirrors the node component's translucent Group fill (30% alpha suffix)
-const GROUP_FILL_ALPHA = '4D';
+
 
 /** Render-time options for the snapshot; none are ever stored in Graph State. */
 export interface RenderOptions {
@@ -164,7 +163,7 @@ export class ExportImageRenderer {
       if (!card) continue;
       const base = themedNodeBackground(node.color, colors);
       const surface = card.querySelector<HTMLElement>('.node-surface') ?? card;
-      surface.style.background = node.kind === 'group' ? base + GROUP_FILL_ALPHA : base;
+      surface.style.background = base;
     }
     clone.querySelectorAll<HTMLElement>('.group-card').forEach(el => {
       el.style.borderColor = colors.groupBorder;

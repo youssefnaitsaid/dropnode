@@ -22,16 +22,16 @@ export function oppositeHandle(handle: HandleSide): HandleSide {
 // data — its hexes are stored in Graph State and documented in DESIGN.md.
 export const DEFAULT_NODE_BACKGROUND = DN_TOKENS.paper;
 export const NODE_PALETTE: readonly string[] = [
-  '#ff8fa3', '#ffb37a', '#ffe08a', '#9fe0a3',
-  '#86dced', '#9fb4ff', '#c3a3ff', '#f2a3e8',
+  '#B3EBF2', '#FF746C', '#D3D3D3', '#EDE8D0',
+  '#50C878', '#D3D3FF', '#F2A3E8', '#FFDBBB',
 ];
 
 // The stable human-readable name of each Palette color (CONTEXT.md: Palette).
 // User-facing controls — swatch tooltips, aria-labels, Palette Entry labels —
 // use these names, never the raw hex. Order matches NODE_PALETTE exactly.
 export const NODE_PALETTE_NAMES: readonly string[] = [
-  'Rose', 'Peach', 'Yellow', 'Green',
-  'Cyan', 'Periwinkle', 'Lavender', 'Pink',
+  'PastelBlue', 'PastelRed', 'LightGray', 'Beige',
+  'Emerald', 'Lavender', 'Pink', 'LightOrange',
 ];
 
 export interface GraphNode {

@@ -70,7 +70,7 @@
 - a Group can be resized no smaller than its children's bounding box plus 16 canvas units of padding; a childless Group clamps to the same 120x48 floor as a Node; resize never changes membership
 - label: double-clicking a Group's label strip edits its label inline; double-clicking its body creates a "New Node" child at the cursor as one undo step
   command: grep -q 'createChild' src/app/components/node/node.ts
-- Groups render beneath regular nodes and draw their fill at 30% alpha so children stay visible
+- Groups render beneath Connections and regular nodes (ADR-0008 stacking) so children stay visible; their fill is solid (no alpha)
 
 ## colors
 

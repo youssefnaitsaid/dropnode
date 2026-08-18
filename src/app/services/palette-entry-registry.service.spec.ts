@@ -33,7 +33,7 @@ describe('PaletteEntryRegistry', () => {
 
   it('exposes canonical intent-level entries with aliases and categories', () => {
     const fit = find('zoom-to-fit');
-    const rose = find('node-color-rose');
+    const pastelblue = find('node-color-pastelblue');
     const defaultColor = find('node-color-default');
     const diamond = find('node-shape-diamond');
     const toggleMinimap = find('toggle-minimap');
@@ -42,8 +42,8 @@ describe('PaletteEntryRegistry', () => {
     expect(fit.category).toBe('Viewport');
     expect(fit.aliases).toContain('frame canvas');
     expect(fit.shortcut).toBe('Shift+1');
-    expect(rose.label).toBe('Set selected Nodes to Rose');
-    expect(rose.swatch).toBe('#ff8fa3');
+    expect(pastelblue.label).toBe('Set selected Nodes to PastelBlue');
+    expect(pastelblue.swatch).toBe('#B3EBF2');
     expect(defaultColor.swatch).toBe('#f0f0f5');
     expect(diamond.label).toBe('Set selected Nodes to Diamond shape');
     expect(diamond.category).toBe('Nodes & Groups');
@@ -81,14 +81,14 @@ describe('PaletteEntryRegistry', () => {
     expect(ids).toEqual([
       'add-reroute-point',
       'connection-color-default',
-      'connection-color-cyan',
-      'connection-color-green',
+      'connection-color-beige',
+      'connection-color-emerald',
       'connection-color-lavender',
-      'connection-color-peach',
-      'connection-color-periwinkle',
+      'connection-color-lightgray',
+      'connection-color-lightorange',
       'connection-color-pink',
-      'connection-color-rose',
-      'connection-color-yellow',
+      'connection-color-pastelred',
+      'connection-color-pastelblue',
       'connection-pattern-dashed',
       'connection-pattern-dotted',
       'connection-pattern-solid',
@@ -147,8 +147,8 @@ describe('PaletteEntryRegistry', () => {
     const node = graphService.createNode('A', 0, 0);
     graphService.selectNode(node.id);
 
-    expect(registry.execute('node-color-rose')).toBe(true);
-    expect(graphService.nodes()[0].color).toBe('#ff8fa3');
+    expect(registry.execute('node-color-pastelblue')).toBe(true);
+    expect(graphService.nodes()[0].color).toBe('#B3EBF2');
     expect(historyService.canUndo()).toBe(true);
   });
 
