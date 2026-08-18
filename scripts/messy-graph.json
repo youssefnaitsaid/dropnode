@@ -1,0 +1,156 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Webhook trigger" }] }],
+      "shape": "pill",
+      "color": "#ff8fa3",
+      "x": 400,
+      "y": 80,
+      "width": 160,
+      "height": 48,
+      "parentId": "g1"
+    },
+    {
+      "id": "n2",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Parse input" }] }],
+      "x": 120,
+      "y": 320,
+      "width": 160,
+      "height": 48,
+      "parentId": "g1"
+    },
+    {
+      "id": "n3",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Plan steps" }] }],
+      "color": "#9fb4ff",
+      "x": 700,
+      "y": 60,
+      "width": 160,
+      "height": 48
+    },
+    {
+      "id": "n4",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Review" }] }],
+      "shape": "diamond",
+      "color": "#ffe08a",
+      "x": 300,
+      "y": 500,
+      "width": 180,
+      "height": 60,
+      "parentId": "g2"
+    },
+    {
+      "id": "n5",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Ship" }] }],
+      "x": 880,
+      "y": 420,
+      "width": 160,
+      "height": 48,
+      "parentId": "g2"
+    },
+    {
+      "id": "n6",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "Final answer" }] }],
+      "shape": "ellipse",
+      "color": "#9fe0a3",
+      "x": 560,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g1",
+      "kind": "group",
+      "label": "Research",
+      "x": 104,
+      "y": 36,
+      "width": 472,
+      "height": 320
+    },
+    {
+      "id": "g2",
+      "kind": "group",
+      "label": "Execution",
+      "x": 284,
+      "y": 376,
+      "width": 772,
+      "height": 172
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "sourceNodeId": "n1",
+      "sourceHandle": "right",
+      "targetNodeId": "n2",
+      "targetHandle": "left",
+      "color": "#ff8fa3"
+    },
+    {
+      "id": "c2",
+      "sourceNodeId": "n2",
+      "sourceHandle": "right",
+      "targetNodeId": "n3",
+      "targetHandle": "left"
+    },
+    {
+      "id": "c3",
+      "sourceNodeId": "n3",
+      "sourceHandle": "right",
+      "targetNodeId": "n4",
+      "targetHandle": "left",
+      "color": "#9fb4ff",
+      "strokePattern": "dashed"
+    },
+    {
+      "id": "c4",
+      "sourceNodeId": "n4",
+      "sourceHandle": "bottom",
+      "targetNodeId": "n5",
+      "targetHandle": "top",
+      "color": "#ffe08a",
+      "strokeWeight": "thick",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "decision" }] }],
+      "textPosition": 0.5
+    },
+    {
+      "id": "c5",
+      "sourceNodeId": "n5",
+      "sourceHandle": "right",
+      "targetNodeId": "n6",
+      "targetHandle": "left",
+      "color": "#9fe0a3",
+      "strokePattern": "dotted",
+      "startArrowhead": "triangle",
+      "endArrowhead": "triangle"
+    },
+    {
+      "id": "c6",
+      "sourceNodeId": "n5",
+      "sourceHandle": "left",
+      "targetNodeId": "n3",
+      "targetHandle": "bottom",
+      "color": "#86dced",
+      "text": [{ "kind": "paragraph", "runs": [{ "text": "feedback" }] }],
+      "textPosition": 0.6,
+      "reroutePoints": [
+        { "x": 820, "y": 430 },
+        { "x": 700, "y": 430 },
+        { "x": 660, "y": 380 }
+      ]
+    }
+  ],
+  "pins": [
+    {
+      "id": "pin1",
+      "anchor": { "kind": "canvas", "x": 500, "y": 60 },
+      "message": "TODO: add auth middleware"
+    },
+    {
+      "id": "pin2",
+      "anchor": { "kind": "node", "nodeId": "n4", "offsetX": 200, "offsetY": -40 },
+      "message": "Reviewed 2026-08-18"
+    }
+  ]
+}

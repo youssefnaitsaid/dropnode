@@ -59,6 +59,7 @@ import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { ToastService } from '../toast/toast';
 import { Collection, Project } from '../../models/collection';
+import { APP_VERSION } from '../../version';
 
 type PendingDelete =
   | { kind: 'collection'; id: string; name: string; projectCount: number }
@@ -141,13 +142,17 @@ type PendingDelete =
           </button>
         </div>
       } @else {
-        <div class="flex items-center gap-2 h-14 px-2.5 shrink-0">
+        <div class="flex items-center gap-2 h-12 px-2.5 shrink-0">
           <span
             class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-[length:--spacing(4.5)]"
           >
             <ng-icon name="lucideWaypoints" />
           </span>
-          <span class="text-base font-bold tracking-tight truncate">dropnode</span>
+          <span class="text-base font-bold tracking-tight truncate">Dropnode</span>
+          <span
+            class="shrink-0 rounded px-1 py-px text-[11px] font-medium leading-4 text-muted-foreground bg-muted"
+          >v{{ version }}</span
+          >
           <button
             hlmBtn
             size="icon"
@@ -470,6 +475,7 @@ type PendingDelete =
   `],
 })
 export class SidebarComponent {
+  protected readonly version = APP_VERSION;
   protected readonly sidebar = inject(SidebarService);
   protected readonly collectionService = inject(CollectionService);
   protected readonly exportService = inject(ExportService);
