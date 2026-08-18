@@ -37,17 +37,19 @@ import { ToastService } from '../toast/toast';
           <div class="flex gap-1 mb-4 rounded-lg bg-muted p-1" role="group" aria-label="Import source">
             <button
               hlmBtn
-              [variant]="activeTab() === 'file' ? 'secondary' : 'ghost'"
+              variant="ghost"
               size="sm"
-              class="flex-1"
+              class="flex-1 export-seg"
+              [class.export-seg-active]="activeTab() === 'file'"
               [attr.aria-pressed]="activeTab() === 'file'"
               (click)="activeTab.set('file')"
             >Upload file</button>
             <button
               hlmBtn
-              [variant]="activeTab() === 'text' ? 'secondary' : 'ghost'"
+              variant="ghost"
               size="sm"
-              class="flex-1"
+              class="flex-1 export-seg"
+              [class.export-seg-active]="activeTab() === 'text'"
               [attr.aria-pressed]="activeTab() === 'text'"
               (click)="activeTab.set('text')"
             >Paste JSON</button>
@@ -90,6 +92,18 @@ import { ToastService } from '../toast/toast';
       </div>
     }
   `,
+  styles: [`
+    /* Same segmented-pill polish as the Export dialog (DESIGN.md 2026-08):
+       the active tab is a solid blurple fill, hover tints toward blurple. */
+    .export-seg:hover {
+      background: color-mix(in oklch, var(--primary) 15%, transparent) !important;
+    }
+    .export-seg.export-seg-active,
+    .export-seg.export-seg-active:hover {
+      background: var(--primary) !important;
+      color: var(--primary-foreground) !important;
+    }
+  `],
 })
 export class ImportDialogComponent {
   private graphService = inject(GraphService);

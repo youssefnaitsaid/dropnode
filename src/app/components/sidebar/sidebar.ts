@@ -118,7 +118,7 @@ type PendingDelete =
          collapse animates grid-template-columns — a layout change the browser
          can interpolate without the flex-width reflow — never width itself. -->
     <aside
-      class="flex h-full min-w-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden"
+      class="flex h-full min-w-0 flex-col bg-sidebar text-sidebar-foreground border-r overflow-hidden"
       aria-label="Sidebar"
     >
       <!-- Header: brand + collapse toggle -->
@@ -150,7 +150,7 @@ type PendingDelete =
           </span>
           <span class="text-base font-bold tracking-tight truncate">Dropnode</span>
           <span
-            class="shrink-0 rounded px-1 py-px text-[11px] font-medium leading-4 text-muted-foreground bg-muted"
+            class="shrink-0 rounded px-1 py-px text-[11px] font-medium leading-4 text-sidebar-foreground bg-muted"
           >v{{ version }}</span
           >
           <button
@@ -188,7 +188,7 @@ type PendingDelete =
               hlmBtn
               size="icon"
               variant="ghost"
-              class="text-muted-foreground"
+              class="text-sidebar-foreground"
               (click)="sidebar.setCollapsed(false)"
               [hlmTooltip]="'Collections'"
               position="right"
@@ -200,13 +200,13 @@ type PendingDelete =
         } @else {
           <div class="px-2 py-2">
             <div class="flex items-center px-2 py-1">
-              <span class="text-xs font-medium text-muted-foreground">Collections</span>
+              <span class="text-xs font-medium text-sidebar-foreground">Collections</span>
               <span class="ml-auto flex items-center">
                 <button
                   hlmBtn
                   size="icon-sm"
                   variant="ghost"
-                  class="text-muted-foreground"
+                  class="text-sidebar-foreground"
                   (click)="collectionFileInput.click()"
                   title="Import collection"
                   aria-label="Import collection"
@@ -217,7 +217,7 @@ type PendingDelete =
                   hlmBtn
                   size="icon-sm"
                   variant="ghost"
-                  class="text-muted-foreground"
+                  class="text-sidebar-foreground"
                   (click)="newCollection()"
                   title="New collection"
                   aria-label="New collection"
@@ -233,7 +233,7 @@ type PendingDelete =
                     <ng-icon name="lucideLibrary" />
                   </div>
                   <div hlmEmptyTitle class="!text-sm">No collections yet</div>
-                  <div hlmEmptyDescription class="!text-xs">
+                  <div hlmEmptyDescription class="!text-xs !text-sidebar-foreground">
                     Create a collection to organize your projects.
                   </div>
                 </div>
@@ -249,7 +249,7 @@ type PendingDelete =
                   class="group/col flex h-8 items-center gap-1 rounded-md px-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-within:bg-sidebar-accent"
                 >
                   <button
-                    class="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                    class="flex size-5 shrink-0 items-center justify-center rounded-sm text-sidebar-foreground hover:text-sidebar-foreground"
                     (click)="sidebar.toggleCollection(collection.id)"
                     [attr.aria-label]="sidebar.isCollectionCollapsed(collection.id) ? 'Expand collection' : 'Collapse collection'"
                     [attr.aria-expanded]="!sidebar.isCollectionCollapsed(collection.id)"
@@ -274,7 +274,7 @@ type PendingDelete =
                         hlmBtn
                         size="icon-sm"
                         variant="ghost"
-                        class="sidebar-row-action !size-6 text-muted-foreground"
+                        class="sidebar-row-action !size-6 text-sidebar-foreground"
                         (click)="addProject(collection)"
                         title="New project"
                         aria-label="New project"
@@ -285,7 +285,7 @@ type PendingDelete =
                         hlmBtn
                         size="icon-sm"
                         variant="ghost"
-                        class="sidebar-row-action !size-6 text-muted-foreground"
+                        class="sidebar-row-action !size-6 text-sidebar-foreground"
                         [hlmDropdownMenuTrigger]="collectionMenu"
                         title="Collection actions"
                         aria-label="Collection actions"
@@ -321,7 +321,7 @@ type PendingDelete =
                       routerLinkActive="bg-sidebar-accent text-sidebar-accent-foreground"
                     >
                       @if (renamingId() === project.id) {
-                        <ng-icon name="lucideFile" class="shrink-0 text-[length:--spacing(3.5)] text-muted-foreground" />
+                        <ng-icon name="lucideFile" class="shrink-0 text-[length:--spacing(3.5)] text-sidebar-foreground" />
                         <input
                           #renameInput
                           class="min-w-0 flex-1 rounded-sm border border-input bg-background px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -335,7 +335,7 @@ type PendingDelete =
                           [routerLink]="['/p', project.id]"
                           [title]="project.name"
                         >
-                          <ng-icon name="lucideFile" class="shrink-0 text-[length:--spacing(3.5)] text-muted-foreground" />
+                          <ng-icon name="lucideFile" class="shrink-0 text-[length:--spacing(3.5)] text-sidebar-foreground" />
                           <span class="min-w-0 flex-1 truncate text-sm">{{ project.name }}</span>
                         </a>
                         <span class="hidden shrink-0 items-center group-hover/proj:flex group-focus-within/proj:flex">
@@ -343,7 +343,7 @@ type PendingDelete =
                             hlmBtn
                             size="icon-sm"
                             variant="ghost"
-                            class="sidebar-row-action !size-6 text-muted-foreground"
+                            class="sidebar-row-action !size-6 text-sidebar-foreground"
                             [hlmDropdownMenuTrigger]="projectMenu"
                             title="Project actions"
                             aria-label="Project actions"
@@ -407,7 +407,7 @@ type PendingDelete =
                       }
                     </div>
                   } @empty {
-                    <div class="pl-8 pr-2 py-1 text-xs text-muted-foreground">No projects</div>
+                    <div class="pl-8 pr-2 py-1 text-xs text-sidebar-foreground">No projects</div>
                   }
                 }
               }
@@ -421,8 +421,8 @@ type PendingDelete =
            Sidebar states where the data actually lives; the 52px rail has no
            room, so it drops out there. -->
       @if (!sidebar.collapsed()) {
-        <footer class="shrink-0 border-t border-sidebar-border px-4 py-3">
-          <p class="text-[11px] leading-relaxed text-muted-foreground">
+        <footer class="shrink-0 border-t px-4 py-3">
+          <p class="text-[11px] leading-relaxed text-sidebar-foreground">
             Your work stays in this browser, nothing is uploaded.
           </p>
         </footer>
@@ -463,6 +463,13 @@ type PendingDelete =
     }
   `,
   styles: [`
+    /* Sidebar ink is user-mandated pure white (DESIGN.md flag log 2026-08):
+       ghost-variant icon buttons keep white through their own hover instead
+       of dropping to the global --foreground. Scoped to the aside so the
+       delete modal's destructive/outline buttons are untouched. */
+    aside button:hover {
+      color: var(--sidebar-foreground) !important;
+    }
     /* Touch adaptation: hover/focus-revealed row actions jump from 24px
        (WCAG 2.5.8 minimum) to a comfortable 28px on coarse pointers. The
        !important beats the !size-6 utility's own important. */

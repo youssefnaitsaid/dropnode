@@ -6,21 +6,32 @@ light-theme CSS variable block in `src/styles.scss` is inert spartan/shadcn
 default config — never style against it. (The *Export Theme* "light" value is
 a different concept: a PNG-only appearance, see [Export themes](#export-themes).)
 
+> **2026-08 redesign — "blurple-dark" with luminous Nodes.** The previous
+> refined-dark identity was replaced on explicit user direction with a
+> Discord-derived world: layered slate surfaces, one **blurple** accent —
+> while the Nodes kept their **off-white paper with near-black ink**
+> (user-mandated). This file is the contract for that world. See the flag
+> log at the bottom for what changed and what was deliberately kept.
+
 ## Identity
 
-Dropnode's look is the **refined-dark canvas**: a near-black dotted Canvas
-where light pastel Nodes are the bright material. The signature is contrast of
-materials, not decoration —
+Dropnode's look is the **blurple-dark layered canvas**: Discord's surface
+hierarchy, tuned for a graph editor —
 
-- **Canvas** is deep, quiet space (`#0e0e11` with a 26px dot grid).
-- **Nodes** are light paper surfaces (`#f0f0f5` default) with dark ink text —
-  they glow against the Canvas by sheer luminance, not by borders or fills.
-- **One purple** (`#7c5cff`) is the accent for everything interactive:
+- **Surfaces layer like Discord.** The Canvas is the "chat" surface
+  (`#313338` with a 26px dot grid); the Sidebar is the "channel list"
+  (`#2b2d31`); menus and popovers drop to `#111214`; hover/input chips sit at
+  `#383a40`. Boundaries come from color, not borders — Discord's signature.
+- **Nodes are off-white paper with near-black ink** (`#f0f0f5` surface,
+  `#1a1a2e` text — user-mandated), so the graph glows bright on the slate
+  canvas. Group fills stay translucent (30% alpha) so children show through.
+- **One blurple** (`#5865F2`) is the accent for everything interactive:
   default Connection stroke, Handles, Resize Grips, the text caret, chrome
   buttons, focus rings. Chrome (`--primary`) and canvas (`--dn-accent`) are
   the same literal value by design.
-- **One red** (`#ff6b6b`) means magnetic feedback: a Handle snapping a
+- **One red** (`#f23f43`) means magnetic feedback: a Handle snapping a
   connection drag, an Alignment Guide lighting up mid-drag.
+- **One yellow** (`#f0b232`) is the Text highlight mark.
 - The **Palette** (below) is the only sanctioned color variety — user-applied,
   never decorative.
 
@@ -48,34 +59,45 @@ both files, and a row here.
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--dn-canvas` | `#0e0e11` | Canvas backdrop |
-| `--dn-canvas-dot` | `rgba(255, 255, 255, 0.05)` | Canvas grid dots (26px pitch) |
-| `--dn-paper` | `#f0f0f5` | Default Node surface; Group Label ink |
-| `--dn-ink` | `#1a1a2e` | Node Text on light surfaces |
-| `--dn-node-edge` | `rgba(15, 15, 18, 0.15)` | Node surface border |
-| `--dn-group-edge` | `rgba(255, 255, 255, 0.22)` | Dashed Group border |
-| `--dn-group-strip` | `rgba(58, 58, 92, 0.35)` | Group Label strip fill |
-| `--dn-chip` | `#1c1c22` | Floating chips: Connection Text cards, Pin popover, Formatting Toolbar |
-| `--dn-chip-ink` | `#e8e8ee` | Ink on chips and canvas overlays (Step counter, Minimap strokes) |
-| `--dn-chip-input` | `#121216` | Input field inside a chip (link input) |
-| `--dn-accent` | `#7c5cff` | The purple — default Connection stroke, Handles, Grips, caret, chrome `--primary` |
+| `--dn-canvas` | `#313338` | Canvas backdrop (Discord chat surface) |
+| `--dn-canvas-dot` | `rgba(255, 255, 255, 0.04)` | Canvas grid dots (26px pitch) |
+| `--dn-paper` | `#f0f0f5` | Default Node surface — off-white (user-mandated) |
+| `--dn-ink` | `#1a1a2e` | Node Text, Group Label ink — near-black (user-mandated) |
+| `--dn-node-edge` | `rgba(0, 0, 0, 0.3)` | Node surface border |
+| `--dn-group-edge` | `rgba(255, 255, 255, 0.1)` | Dashed Group border |
+| `--dn-group-strip` | `rgba(0, 0, 0, 0.25)` | Group Label strip fill |
+| `--dn-chip` | `#2b2d31` | Floating chips: Connection Text cards, Pin popover, Formatting Toolbar |
+| `--dn-chip-ink` | `#dbdee1` | Ink on chips and canvas overlays (Step counter, Minimap strokes, default selection glow) |
+| `--dn-chip-input` | `#1e1f22` | Input field inside a chip (link input) |
+| `--dn-accent` | `#5865F2` | The blurple — default Connection stroke, Handles, Grips, caret, chrome `--primary` |
 | `--dn-accent-ink` | `#ffffff` | Ink on accent fills |
-| `--dn-danger` | `#ff6b6b` | Handle snap highlight, Alignment Guide |
-| `--dn-highlight` | `#ffe066` | Text highlight mark (`mark` / `.tv-highlight`) |
-| `--dn-sel-edge` | `#808080` | 1px edge ring under the selection glow |
+| `--dn-danger` | `#f23f43` | Handle snap highlight, Alignment Guide |
+| `--dn-highlight` | `#f0b232` | Text highlight mark (`mark` / `.tv-highlight`) |
+| `--dn-sel-edge` | `#949ba4` | 1px edge ring under the selection glow |
 
 Derived translucency is composed, never duplicated: use
 `color-mix(in srgb, var(--dn-accent) 45%, transparent)` rather than
 re-hardcoding an `rgba()` of the same hue (see Marquee fill, chip borders,
 Formatting Toolbar hovers, Minimap glass).
 
-Chrome (Sidebar, Toolbar, dialogs, Command Palette, toasts) is themed through
-the spartan/shadcn semantic variables (`--background`, `--primary`,
-`--muted-foreground`, `--border`, …) defined in `src/styles.scss`. Those stay
-in oklch except `--primary`/`--ring`/`--sidebar-primary`/`--sidebar-ring`,
-which are literal `#7c5cff` so chrome and canvas can never drift apart
-(asserted by the sync spec). Semantic tailwind colors in chrome:
-success = `text-emerald-400`, error = `text-destructive`, info = `text-primary`.
+Chrome (Sidebar, Toolbar, dialogs, Command Palette, toasts, chips) is themed
+through the spartan/shadcn semantic variables defined in `src/styles.scss`.
+Since the 2026-08 sidebar consolidation, **all chrome shares the Sidebar's
+design system** (user-mandated): every surface — cards, menus, popovers,
+hover chips — is the Sidebar slate `#2b2d31` (`--card`, `--popover`,
+`--muted`, `--accent`, `--secondary`), hovers lift to `#35373c`, and **all
+ink is pure white** (`--foreground`, `--card-foreground`,
+`--popover-foreground`, `--muted-foreground`, `--accent-foreground`,
+`--sidebar-foreground` all literal `#ffffff`), resting or hovered. The one
+exception is `--background` `#313338` (the canvas slate): it only shows on
+input wells and the rename fields, so fields read as lighter wells against
+the darker surfaces. Hairline `--border`/`--input` stay white 6%.
+`--primary`/`--ring`/`--sidebar-primary`/`--sidebar-ring` are literal
+`#5865F2` so chrome and canvas can never drift apart (asserted by the sync
+spec). Floating canvas chips (`--dn-chip` `#2b2d31`) take the same pure
+white ink (`--dn-chip-ink` `#ffffff`). Semantic Tailwind colors in chrome:
+success = `text-emerald-400`, error = `text-destructive`, info =
+`text-primary`.
 
 ## The Palette
 
@@ -100,16 +122,19 @@ Graph State — changing the palette array changes rendering of *new* choices
 only and must never re-map stored hexes (ADR-0006). The Minimap's selection
 highlight is Cyan (`DN_TOKENS.minimapAccent`). A selected element's glow
 (`--selection-glow`) is its own solid color identity, so Palette colors
-double as feedback.
+double as feedback; an uncolored Node's default glow is `--dn-paper`.
 
 ## Export themes
 
 `EXPORT_THEMES` in `src/app/models/export-image.ts` — render-time only, never
 stored (ADR-0014). **Dark** composes from `DN_TOKENS` and must keep mirroring
-the on-screen editor. **Light** is an export-only appearance: white background
-(`#ffffff`) and a dark Group border (`rgba(15, 15, 18, 0.3)`) are the only two
-color literals without an on-screen token counterpart; everything else
-reuses `paper`/`ink`. Palette-applied colors pass through untouched in both.
+the on-screen editor (slate Canvas, off-white Nodes, dark Connection Text
+chips). **Light** has been fully independent since the 2026-08 redesign (the
+on-screen defaults are dark-on-dark chrome, so "flip the dark-only defaults"
+no longer yields a legible light image): its own literals — white
+background, `#f2f3f5` cards, `#1e1f22` ink, dark Group border — with no
+on-screen token counterparts. Palette-applied colors pass through untouched
+in both.
 
 ## Layering (z-index ladder)
 
@@ -136,20 +161,21 @@ clips same-element shadows — see the node component comments).
 | --- | --- | --- |
 | `--dn-shadow-color` | `rgba(0, 0, 0, 0.45)` | Shadow black — the tone the elevation shadows and the diamond `drop-shadow` tint from |
 | `--dn-shadow-node` | `0 2px 10px rgba(0, 0, 0, 0.45)` | Node resting |
-| `--dn-shadow-node-hover` | `0 6px 20px rgba(124, 92, 255, 0.28)` | Node hover |
+| `--dn-shadow-node-hover` | `0 6px 20px rgba(88, 101, 242, 0.3)` | Node hover |
 | `--dn-shadow-chip` | `0 6px 24px rgba(0, 0, 0, 0.45)` | Formatting Toolbar |
 | `--dn-shadow-pop` | `0 8px 24px rgba(0, 0, 0, 0.5)` | Pin popover |
 | `--dn-shadow-pin` | `0 2px 8px rgba(0, 0, 0, 0.45)` | Pin bubble |
 
 Selection is a glow, not a shadow: `0 0 6px 2px var(--selection-glow)` over
 a 1px `--dn-sel-edge` ring — the glow uses the element's own color identity
-(`node.color` or `--dn-paper` fallback).
+(`node.color`, or `--dn-paper` for uncolored Nodes).
 
 ## Radius, spacing, sizing
 
 - Node surface radius **10px** (pill → `9999px`, ellipse → `50%`, diamond →
-  clip-path). Connection Text cards 10px. Small controls 6px, chips 8px,
-  Marks 2px, full-round pills for Handles/Pins/Step counter.
+  clip-path). Connection Text cards 10px. Chrome `--radius` is **8px**
+  (Discord's panel radius); small controls 6px, chips 8px, Marks 2px,
+  full-round pills for Handles/Pins/Step counter.
 - Text metrics are per-host via `--tv-size-s` / `--tv-size-l` (Node Text
   11/14/18px; Connection Text 10/12/15px, base 12px). Group Labels 12px/600.
   Canvas body text line-height 1.4.
@@ -177,27 +203,121 @@ scale/brightness only.
    it casually — stored graphs depend on its hexes.
 5. `design-tokens.spec.ts` is the tripwire: if it fails, the mirror broke.
 
-## Flag log — 2026-08 polish pass
+## Flag log
 
-Hardcoded values found and fixed (each now resolves through the token layer):
+### 2026-08 redesign — refined-dark → blurple-dark (Discord-derived)
 
-- `#7c5cff` ×15 — canvas accent across 7 files (Handles, Grips, Marquee,
-  Connection stroke/ghost/reroute/text-card borders, Pin bubble, caret,
-  Formatting Toolbar, link input, export-dialog checkbox).
-- `#0e0e11` ×3 — Canvas backdrop, Grip border, dark Export Theme.
-- `#f0f0f5` ×5 — default Node surface (toolbar swatch, Node fallbacks,
-  Export Themes, `DEFAULT_NODE_BACKGROUND`).
-- `#1a1a2e` ×4 — Node Text ink (node, Export Themes).
-- `#1c1c22` / `#e8e8ee` ×7 — chip surface/ink (Connection Text cards,
-  Formatting Toolbar, Pin popover, link input, Step counter, Export Theme).
-- `#ff6b6b` ×3 — snap highlight + Alignment Guide + dark Export parity.
-- `#ffe066` ×2 — highlight mark (text-view, text-editor).
-- `#86dced` + 4 Minimap rgba tones — Minimap 2D-context draws.
-- `grey` (CSS keyword) ×3 — selection edge ring → `--dn-sel-edge` (#808080).
-- Bare z-index values ×8 across 6 files → `--dn-z-*` ladder.
-- **Chrome/canvas accent drift**: chrome `--primary` was
-  `oklch(0.62 0.233 293.5)` ≈ `#925cff` while the canvas used `#7c5cff` —
-  two purples. Unified on `#7c5cff` (the value baked into exports and docs).
+Replaced on explicit user direction ("similar to Discord design"). The
+changed values are the ones that appear in the tables above; highlights:
 
-Deliberate non-fixes: `NODE_PALETTE` hexes and the two light-Export-only
-literals stay as data (see [Token sources](#token-sources)).
+- Accent `#7c5cff` → `#5865F2` (Discord blurple) across canvas and chrome
+  (`--dn-accent`, `--primary`, `--ring`, `--sidebar-primary`,
+  `--dn-shadow-node-hover` tint).
+- Canvas `#0e0e11` → `#313338` (Discord chat surface), dots to white 4%.
+- Chrome semantic surfaces remapped to Discord's layer stack (sidebar
+  `#2b2d31`, menus `#111214`, hover `#383a40`, muted text `#949ba4`, hairline
+  white 6% borders).
+- Danger `#ff6b6b` → `#f23f43`; highlight `#ffe066` → `#f0b232`;
+  `--dn-sel-edge` → `#949ba4`; `--radius` → 8px.
+- Export light theme became fully independent (white bg, `#f2f3f5` cards,
+  `#1e1f22` ink) since "flip the dark-only defaults" no longer applies.
+
+### 2026-08 correction — Nodes stay luminous (user-mandated)
+
+A first pass made the Nodes dark chips (`#383a40` surface, `#dbdee1` ink) to
+match Discord's all-dark world; the user explicitly overrode it: **default
+Node background must be off-white and default Node text near-black**. Nodes
+are `--dn-paper` `#f0f0f5` with `--dn-ink` `#1a1a2e` — the pre-redesign
+luminous material, now glowing on the Discord slate Canvas. Knock-on effects:
+
+- Group Label ink stays `--dn-ink` (dark ink reads correctly on the
+  light-translucent Group fill and its darkened strip).
+- The default selection-glow fallback stays `--dn-paper`.
+- Minimap Node/Group glyphs derive from `--dn-paper` again; hairlines and
+  the Viewport outline derive from `--dn-chip-ink`.
+- `--dn-node-edge` is `rgba(0, 0, 0, 0.3)` so the bright cards stay crisply
+  separated on the lighter Canvas.
+
+### 2026-08 correction — Sidebar ink is pure white (user-mandated)
+
+In the blurple-dark pass the Sidebar text was Discord's near-white
+`#dbdee1` and its labels/icons used the global muted gray `#949ba4`. The
+user explicitly overrode it: **Sidebar text must be white and hover-revealed
+icons white too**. `--sidebar-foreground` and `--sidebar-accent-foreground`
+are now literal `#ffffff`; every `text-muted-foreground` in the Sidebar
+body (the Collections label, row chevrons/actions, file icons, "No
+projects", the version badge, and the footer line) now uses
+`text-sidebar-foreground`; and a scoped `aside button:hover` rule keeps
+ghost-variant icons white through their own hover instead of dropping to
+`--foreground`. Deliberately untouched: `--muted-foreground` stays `#949ba4`
+for dropdown menus and dialogs, which keep their gray secondary hierarchy.
+
+### 2026-08 correction — Toolbar joins the Sidebar surface (user-mandated)
+
+The Toolbar originally kept the canvas surface (`bg-card` `#313338`) with
+near-white inherited text and muted gray readouts. The user overrode it:
+**Toolbar text and icons must be white, and its background must match the
+Sidebar's**. The Toolbar row is now `bg-sidebar` (`#2b2d31`) with
+`text-sidebar-foreground` (pure white), the node-count and zoom readouts
+switched from `text-muted-foreground`, the Commands kbd keycap inks
+`--sidebar-foreground`, and a scoped `.toolbar-row button:hover` rule keeps
+ghost/outline icons white through their own hover. The Toolbar now shares
+the Sidebar's tokens, so the two can never drift apart.
+
+### 2026-08 consolidation — all chrome adopts the Sidebar system (user-mandated)
+
+The user extended the Sidebar design to every remaining chrome surface:
+"for the entire components except sidebar, toolbar and canvas-container,
+apply the same design system in the sidebar." The chrome tokens collapsed
+from Discord's multi-layer stack to one surface + one ink:
+
+- `--card`/`--popover` `#313338`/`#111214` → `#2b2d31` (the Sidebar slate);
+  `--muted`/`--accent`/`--secondary` `#383a40`/`#3f4148` → `#35373c` (the
+  Sidebar hover), so dialogs, dropdown menus, the Command Palette, and
+  toasts read as Sidebar surfaces.
+- All ink → pure white: `--foreground` `#dbdee1` → `#ffffff`,
+  `--muted-foreground` `#949ba4` → `#ffffff` (and the card/popover/…
+  -foreground mirrors), so there is no gray secondary text left in chrome.
+- `--background` deliberately stays `#313338` — the only lighter surface —
+  so input wells and rename fields read as lighter wells against the darker
+  cards.
+- Floating canvas chips keep `--dn-chip` `#2b2d31` and their ink goes pure
+  white (`--dn-chip-ink` `#dbdee1` → `#ffffff`), so Connection Text cards,
+  the Pin popover, the Formatting Toolbar, the Step counter, and the Minimap
+  strokes match the chrome.
+- Excluded by the user: the Sidebar and Toolbar (already consolidated) and
+  the canvas-container, which keeps its own `--dn-canvas` `#313338` dot-grid
+  world with off-white Nodes.
+
+Deliberate non-fixes: `NODE_PALETTE` hexes, the light-export literals, and
+the semantic colors (`--dn-accent`, `--dn-danger`, `--dn-highlight`) stay as
+data; the blurple accent is untouched everywhere.
+
+### 2026-08 polish — segmented pills in the Import/Export dialogs
+
+In the consolidated chrome, the segmented controls (Export format/theme,
+Import source tabs) rendered their active pill with `variant="secondary"`
+— `--secondary` `#35373c` on a `--muted` `#35373c` track, so the active
+pill was invisible. User direction: **give the active buttons a background
+and replace the gray hover mix
+(`color-mix(in oklch, var(--secondary), var(--foreground) 5%)`) with a
+polish color.** The pills now use a shared `.export-seg` style in both
+dialogs: the active pill is a solid blurple fill (`var(--primary)`,
+white ink), any pill's hover tints 15% toward the blurple, and the active
+pill's hover stays solid blurple.
+
+### 2026-08 de-slop — Command Palette joins the Sidebar system
+
+User direction: "apply the same design system in the sidebar for the
+hlm-dialog-content commands palette. remove any additional UI style slop."
+The palette dropped every decorative layer: the blurple-tinted shell
+(`color-mix(card 96%, primary 4%)`) is now flat `var(--card)`, the tinted
+header and content borders are plain `--border` hairlines, the decorative
+command-mark chip is gone, the active item lost its tinted border and 3px
+inset accent bar (now a flat `--muted` highlight, matching Sidebar rows),
+and the kbd chips and focus ring are flat (`--ring`). Result: a Sidebar-
+surface panel with pure white ink and no color-mix tinting anywhere.
+
+Deliberate non-fixes: `NODE_PALETTE` hexes and the light-export literals stay
+as data (see [Token sources](#token-sources)); radii and density beyond
+`--radius` keep their pre-redesign values (a later pass may tighten them).

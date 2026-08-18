@@ -135,31 +135,32 @@ describe('expandExportScope', () => {
 describe('Export Theme mapping', () => {
   it('dark mirrors the on-screen editor colors', () => {
     // Known-good literals from the live canvas/node/connection styling
+    // (blurple-dark chrome with off-white Nodes, 2026-08 redesign)
     expect(EXPORT_THEMES.dark).toEqual({
-      background: '#0e0e11',
+      background: '#313338',
       nodeBackground: '#f0f0f5',
       nodeText: '#1a1a2e',
-      groupBorder: 'rgba(255, 255, 255, 0.22)',
-      groupLabel: '#f0f0f5',
-      connectionTextBackground: '#1c1c22',
-      connectionTextColor: '#e8e8ee',
+      groupBorder: 'rgba(255, 255, 255, 0.1)',
+      groupLabel: '#1a1a2e',
+      connectionTextBackground: '#2b2d31',
+      connectionTextColor: '#ffffff',
     });
   });
 
-  it('light swaps the background and dark-only defaults for light-legible ones', () => {
+  it('light is its own Discord-light palette, independent of the dark world', () => {
     expect(EXPORT_THEMES.light).toEqual({
       background: '#ffffff',
-      nodeBackground: '#f0f0f5',
-      nodeText: '#1a1a2e',
+      nodeBackground: '#f2f3f5',
+      nodeText: '#1e1f22',
       groupBorder: 'rgba(15, 15, 18, 0.3)',
-      groupLabel: '#1a1a2e',
+      groupLabel: '#1e1f22',
       connectionTextBackground: '#ffffff',
-      connectionTextColor: '#1a1a2e',
+      connectionTextColor: '#1e1f22',
     });
   });
 
   it('a node without a Palette color takes the theme default background', () => {
-    expect(themedNodeBackground(undefined, EXPORT_THEMES.light)).toBe('#f0f0f5');
+    expect(themedNodeBackground(undefined, EXPORT_THEMES.light)).toBe('#f2f3f5');
     expect(themedNodeBackground(undefined, EXPORT_THEMES.dark)).toBe('#f0f0f5');
   });
 

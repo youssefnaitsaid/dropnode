@@ -245,7 +245,8 @@ const GROUP_FILL_ALPHA = '4D';
       background: var(--dn-group-strip);
     }
     .group-label {
-      color: var(--dn-paper);
+      /* Ink on the dark label strip: light, not the (now-dark) paper */
+      color: var(--dn-ink);
       font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
@@ -274,7 +275,7 @@ const GROUP_FILL_ALPHA = '4D';
       text-align: center;
     }
     .group-label-input {
-      color: var(--dn-paper);
+      color: var(--dn-ink);
       font-size: 12px;
       font-weight: 600;
       text-align: left;

@@ -150,7 +150,7 @@ type PopoverState =
     .pin-popover-hint {
       margin: 0.5rem 0.125rem 0.125rem;
       font-size: 11px;
-      color: color-mix(in srgb, var(--dn-chip-ink) 50%, transparent);
+      color: var(--dn-chip-ink);
     }
   `],
 })

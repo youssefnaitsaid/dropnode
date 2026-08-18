@@ -151,29 +151,30 @@ export interface ExportThemeColors {
 
 export const EXPORT_THEMES: Record<ExportTheme, ExportThemeColors> = {
   // Mirrors the on-screen editor (values composed from the design tokens,
-  // DESIGN.md "Export themes"): near-black Canvas, light Nodes,
-  // translucent-white Group chrome, dark Connection Text chips.
+  // DESIGN.md "Export themes"): the Discord-derived blurple-dark world —
+  // slate Canvas, dark chip Nodes with light text, dark Connection Text
+  // chips.
   dark: {
     background: DN_TOKENS.canvas,
     nodeBackground: DN_TOKENS.paper,
     nodeText: DN_TOKENS.ink,
     groupBorder: DN_TOKENS.groupEdge,
-    groupLabel: DN_TOKENS.paper,
+    groupLabel: DN_TOKENS.ink,
     connectionTextBackground: DN_TOKENS.chip,
     connectionTextColor: DN_TOKENS.chipInk,
   },
-  // White background; the dark-only defaults flip (Group chrome, Connection
-  // Text chips) — default Node fills, Node Text, and the purple Connection
-  // stroke stay legible on white as-is. White and the dark Group border are
-  // light-only values with no on-screen token counterpart.
+  // White background; since the 2026-08 redesign the on-screen defaults are
+  // dark-on-dark, the light theme is fully independent (its own literals,
+  // DESIGN.md "Export themes"): light cards, dark ink, Discord-light
+  // palette. Only the Palette-applied colors pass through unchanged.
   light: {
     background: '#ffffff',
-    nodeBackground: DN_TOKENS.paper,
-    nodeText: DN_TOKENS.ink,
+    nodeBackground: '#f2f3f5',
+    nodeText: '#1e1f22',
     groupBorder: 'rgba(15, 15, 18, 0.3)',
-    groupLabel: DN_TOKENS.ink,
+    groupLabel: '#1e1f22',
     connectionTextBackground: '#ffffff',
-    connectionTextColor: DN_TOKENS.ink,
+    connectionTextColor: '#1e1f22',
   },
 };
 

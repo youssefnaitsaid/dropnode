@@ -142,7 +142,7 @@ interface PaletteGroup {
     >
       <hlm-dialog-content
         *hlmDialogPortal
-        class="palette-content w-[min(720px,calc(100vw-2rem))] max-w-none sm:max-w-none overflow-hidden border-primary/35 bg-card p-0 shadow-2xl"
+        class="palette-content w-[min(720px,calc(100vw-2rem))] max-w-none sm:max-w-none overflow-hidden border-border bg-card p-0 shadow-2xl"
         [showCloseButton]="false"
       >
         <hlm-dialog-header class="sr-only">
@@ -168,10 +168,6 @@ interface PaletteGroup {
               >
                 <ng-icon name="lucideArrowLeft" />
               </button>
-            } @else {
-              <span class="palette-mark" aria-hidden="true">
-                <ng-icon name="lucideCommand" />
-              </span>
             }
             <span class="palette-input-icon" aria-hidden="true">
               <ng-icon name="lucideSearch" />
@@ -323,15 +319,15 @@ interface PaletteGroup {
       display: contents;
     }
 
-    /* The panel keeps its 1px border-primary/35 hairline from the template;
-       the 3px left accent edge is gone — a colored side border above 1px is
-       the tell of assembled UIs, and the active item's inset bar (below) is
-       the only side accent that carries meaning. */
+    /* Sidebar-system palette (2026-08): a flat --card surface (the Sidebar
+       slate) with pure white ink, plain --border hairlines, and flat
+       --muted highlights — the decorative blurple tints, the command mark
+       chip, and the active item's inset accent bar are gone. */
     .palette-shell {
       display: flex;
       flex-direction: column;
       min-height: 0;
-      background: color-mix(in srgb, var(--card) 96%, var(--primary) 4%);
+      background: var(--card);
     }
 
     .palette-header {
@@ -339,24 +335,7 @@ interface PaletteGroup {
       align-items: center;
       gap: 10px;
       padding: 12px 14px;
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, var(--primary) 18%);
-    }
-
-    .palette-mark,
-    .palette-back {
-      display: inline-flex;
-      flex: 0 0 auto;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary);
-    }
-
-    .palette-mark {
-      width: 28px;
-      height: 28px;
-      border: 1px solid color-mix(in srgb, var(--primary) 55%, var(--border));
-      border-radius: 8px;
-      background: color-mix(in srgb, var(--primary) 15%, var(--card));
+      border-bottom: 1px solid var(--border);
     }
 
     .palette-input-icon {
@@ -375,13 +354,13 @@ interface PaletteGroup {
     }
 
     /* The field is borderless by design, but a focused search box still needs
-       a visible indicator (WCAG 2.4.7): a soft primary ring replaces the
-       default outline without adding a box. */
+       a visible indicator (WCAG 2.4.7): a solid ring replaces the default
+       outline without adding a box. */
     .palette-input:focus {
       outline: none;
     }
     .palette-input:focus-visible {
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
+      box-shadow: 0 0 0 2px var(--ring);
       border-radius: 6px;
     }
 
@@ -390,7 +369,6 @@ interface PaletteGroup {
     .palette-shortcut,
     .palette-enter-hint {
       border: 1px solid var(--border);
-      border-bottom-color: color-mix(in srgb, var(--border) 70%, var(--foreground));
       border-radius: 5px;
       background: var(--muted);
       color: var(--muted-foreground);
@@ -432,9 +410,7 @@ interface PaletteGroup {
 
     .palette-item.palette-active,
     .palette-item[data-palette-active] {
-      border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
-      background: color-mix(in srgb, var(--primary) 14%, var(--muted));
-      box-shadow: inset 3px 0 var(--primary);
+      background: var(--muted);
     }
 
     .palette-swatch {
@@ -442,8 +418,7 @@ interface PaletteGroup {
       height: 18px;
       flex: 0 0 18px;
       border-radius: 5px;
-      border: 2px solid color-mix(in srgb, var(--foreground) 20%, transparent);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
+      border: 2px solid var(--border);
     }
 
     .palette-item-icon,

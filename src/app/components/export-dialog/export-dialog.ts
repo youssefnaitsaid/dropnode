@@ -54,14 +54,18 @@ const PREVIEW_DEBOUNCE_MS = 150;
                 <div class="flex gap-1 rounded-lg bg-muted p-1">
                   <button
                     hlmBtn
-                    [variant]="format() === 'png' ? 'secondary' : 'ghost'"
+                    variant="ghost"
                     size="sm"
+                    class="export-seg"
+                    [class.export-seg-active]="format() === 'png'"
                     (click)="setFormat('png')"
                   >PNG</button>
                   <button
                     hlmBtn
-                    [variant]="format() === 'json' ? 'secondary' : 'ghost'"
+                    variant="ghost"
                     size="sm"
+                    class="export-seg"
+                    [class.export-seg-active]="format() === 'json'"
                     (click)="setFormat('json')"
                   >JSON</button>
                 </div>
@@ -74,14 +78,18 @@ const PREVIEW_DEBOUNCE_MS = 150;
                 <div class="flex gap-1 rounded-lg bg-muted p-1">
                   <button
                     hlmBtn
-                    [variant]="theme() === 'dark' ? 'secondary' : 'ghost'"
+                    variant="ghost"
                     size="sm"
+                    class="export-seg"
+                    [class.export-seg-active]="theme() === 'dark'"
                     (click)="setTheme('dark')"
                   >Dark</button>
                   <button
                     hlmBtn
-                    [variant]="theme() === 'light' ? 'secondary' : 'ghost'"
+                    variant="ghost"
                     size="sm"
+                    class="export-seg"
+                    [class.export-seg-active]="theme() === 'light'"
                     (click)="setTheme('light')"
                   >Light</button>
                 </div>
@@ -102,7 +110,7 @@ const PREVIEW_DEBOUNCE_MS = 150;
           }
 
           <!-- Preview: the artifact itself, never an approximation -->
-          <div class="mb-5 h-[320px] overflow-auto rounded-lg border border-border bg-background/60 p-2">
+          <div class="mb-5 h-[320px] overflow-auto rounded-lg border border-border bg-background/60">
             @if (format() === 'png') {
               @if (previewUrl(); as url) {
                 <img [src]="url" alt="PNG export preview" class="mx-auto max-w-full object-contain" />
@@ -127,6 +135,20 @@ const PREVIEW_DEBOUNCE_MS = 150;
       </div>
     }
   `,
+  styles: [`
+    /* Segmented pills (polish): the active pill is a solid blurple fill,
+       and any pill's hover tints toward the blurple — replacing the gray
+       ghost/secondary hovers. !important beats the spartan ghost variant's
+       hover:bg-muted so the accent always shows. */
+    .export-seg:hover {
+      background: color-mix(in oklch, var(--primary) 15%, transparent) !important;
+    }
+    .export-seg.export-seg-active,
+    .export-seg.export-seg-active:hover {
+      background: var(--primary) !important;
+      color: var(--primary-foreground) !important;
+    }
+  `],
 })
 export class ExportDialogComponent implements OnDestroy {
   private exportService = inject(ExportService);

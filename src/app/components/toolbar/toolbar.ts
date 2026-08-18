@@ -101,9 +101,12 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
     }),
   ],
   template: `
-    <div class="toolbar-row flex items-center justify-between gap-2 px-4 py-1.5 bg-card border-b border-border">
+    <!-- The Toolbar shares the Sidebar's surface and ink (user-mandated
+         2026-08): bg-sidebar with pure white text and icons, so the top
+         band reads as one block with the Sidebar column. -->
+    <div class="toolbar-row flex items-center justify-between gap-2 px-4 py-1.5 bg-sidebar text-sidebar-foreground border-b border-border">
       <div class="flex shrink-0 items-center gap-2">
-        <span class="text-sm font-medium text-muted-foreground">{{ graphService.nodeCount() }} {{ graphService.nodeCount() === 1 ? 'node' : 'nodes' }}</span>
+        <span class="text-sm font-medium text-sidebar-foreground">{{ graphService.nodeCount() }} {{ graphService.nodeCount() === 1 ? 'node' : 'nodes' }}</span>
       </div>
 
       <div class="flex min-w-0 shrink-0 items-center gap-1">
@@ -378,7 +381,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         >
           <ng-icon name="lucidePresentation" />
         </button>
-        <span class="min-w-10 text-center text-sm font-medium text-muted-foreground">{{ zoomPercent() }}%</span>
+        <span class="min-w-10 text-center text-sm font-medium text-sidebar-foreground">{{ zoomPercent() }}%</span>
         @if (scratchMode()) {
           <hlm-separator orientation="vertical" class="mx-1" />
           <button hlmBtn variant="ghost" size="icon" (click)="openImport()" title="Import" aria-label="Import">
@@ -451,11 +454,17 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       border: 1px solid var(--border);
       border-radius: 4px;
       background: var(--muted);
-      color: var(--muted-foreground);
+      color: var(--sidebar-foreground);
       font-family: inherit;
       font-size: 10px;
       line-height: 1;
       padding: 3px 4px;
+    }
+    /* Toolbar ink is pure white like the Sidebar (DESIGN.md flag log
+       2026-08): ghost and outline buttons keep white through their own
+       hover instead of dropping to the global --foreground. */
+    .toolbar-row button:hover {
+      color: var(--sidebar-foreground) !important;
     }
     /* Menu swatches: the Palette color items inside the styling triggers
        (ADR-0028); the dashed inner ring marks the Default swatch */

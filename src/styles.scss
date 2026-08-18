@@ -28,7 +28,7 @@ body {
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
     sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -60,35 +60,40 @@ body {
 :root.dark {
   color-scheme: dark;
 
-  /* Chrome accent unified with the canvas accent (DESIGN.md): one purple,
-     #7c5cff, everywhere — previously chrome drifted at oklch(0.62 0.233 293.5)
-     ≈ #925cff while the canvas used #7c5cff. */
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #7c5cff;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #7c5cff;
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #7c5cff;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #7c5cff;
+  /* Chrome accent unified with the canvas accent (DESIGN.md): one blurple,
+     #5865F2, everywhere — the Discord-derived identity (2026-08 redesign).
+     All chrome shares the Sidebar's design system (user-mandated): every
+     surface — cards, menus, popovers, hover chips — is the Sidebar slate
+     #2b2d31 with #35373c hovers, and all ink is pure white. --background
+     stays the canvas slate #313338 so input wells and the rename fields
+     read as lighter wells against the darker surfaces; the Canvas itself
+     (canvas-container) is excluded and keeps its own --dn-canvas world. */
+  --background: #313338;
+  --foreground: #ffffff;
+  --card: #2b2d31;
+  --card-foreground: #ffffff;
+  --popover: #2b2d31;
+  --popover-foreground: #ffffff;
+  --primary: #5865F2;
+  --primary-foreground: #ffffff;
+  --secondary: #35373c;
+  --secondary-foreground: #ffffff;
+  --muted: #35373c;
+  --muted-foreground: #ffffff;
+  --accent: #35373c;
+  --accent-foreground: #ffffff;
+  --destructive: #f23f43;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: #5865F2;
+  --sidebar: #2b2d31;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #5865F2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #35373c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(0, 0, 0, 0.2);
+  --sidebar-ring: #5865F2;
 }
 
 /* ── Dropnode design tokens ──────────────────────────────────────────
@@ -100,29 +105,29 @@ body {
    export pipeline inlines these rules into its snapshot, so var()
    references are export-safe. */
 :root {
-  /* Surfaces & ink */
-  --dn-canvas: #0e0e11;                            /* Canvas backdrop */
-  --dn-canvas-dot: rgba(255, 255, 255, 0.05);      /* Canvas grid dots */
-  --dn-paper: #f0f0f5;                             /* default Node surface; Group Label ink */
-  --dn-ink: #1a1a2e;                               /* Node Text on light surfaces */
-  --dn-node-edge: rgba(15, 15, 18, 0.15);          /* Node surface border */
-  --dn-group-edge: rgba(255, 255, 255, 0.22);      /* dashed Group border */
-  --dn-group-strip: rgba(58, 58, 92, 0.35);        /* Group Label strip fill */
-  --dn-chip: #1c1c22;                              /* floating chips: Connection Text, Pin popover, Formatting Toolbar */
-  --dn-chip-ink: #e8e8ee;                          /* ink on chips and overlays */
-  --dn-chip-input: #121216;                        /* input field inside a chip */
+  /* Surfaces & ink (2026-08 redesign: Discord-derived blurple-dark world) */
+  --dn-canvas: #313338;                            /* Canvas backdrop — Discord chat surface */
+  --dn-canvas-dot: rgba(255, 255, 255, 0.04);      /* Canvas grid dots */
+  --dn-paper: #f0f0f5;                             /* default Node surface — off-white (user-mandated) */
+  --dn-ink: #1a1a2e;                               /* Node Text — near-black (user-mandated) */
+  --dn-node-edge: rgba(0, 0, 0, 0.3);              /* Node surface border */
+  --dn-group-edge: rgba(255, 255, 255, 0.1);       /* dashed Group border */
+  --dn-group-strip: rgba(0, 0, 0, 0.25);           /* Group Label strip fill */
+  --dn-chip: #2b2d31;                              /* floating chips: Connection Text, Pin popover, Formatting Toolbar */
+  --dn-chip-ink: #ffffff;                          /* ink on chips and overlays — pure white (user-mandated) */
+  --dn-chip-input: #1e1f22;                        /* input field inside a chip */
 
   /* Accent & semantic */
-  --dn-accent: #7c5cff;                            /* the Dropnode purple: default Connection stroke, Handles, Grips, caret */
+  --dn-accent: #5865F2;                            /* the Dropnode blurple: default Connection stroke, Handles, Grips, caret */
   --dn-accent-ink: #ffffff;                        /* ink on accent fills */
-  --dn-danger: #ff6b6b;                            /* Handle snap highlight, Alignment Guide */
-  --dn-highlight: #ffe066;                         /* Text highlight mark */
-  --dn-sel-edge: #808080;                          /* 1px edge ring under the selection glow */
+  --dn-danger: #f23f43;                            /* Handle snap highlight, Alignment Guide */
+  --dn-highlight: #f0b232;                         /* Text highlight mark */
+  --dn-sel-edge: #949ba4;                          /* 1px edge ring under the selection glow */
 
   /* Elevation (canvas elements) */
   --dn-shadow-color: rgba(0, 0, 0, 0.45);          /* shadow black — the tone every elevation shadow and the diamond drop-shadow tint from */
   --dn-shadow-node: 0 2px 10px rgba(0, 0, 0, 0.45);
-  --dn-shadow-node-hover: 0 6px 20px rgba(124, 92, 255, 0.28);
+  --dn-shadow-node-hover: 0 6px 20px rgba(88, 101, 242, 0.3);
   --dn-shadow-chip: 0 6px 24px rgba(0, 0, 0, 0.45);
   --dn-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
   --dn-shadow-pin: 0 2px 8px rgba(0, 0, 0, 0.45);
