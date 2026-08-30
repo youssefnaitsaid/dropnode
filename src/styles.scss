@@ -124,6 +124,7 @@ body {
   --dn-danger: #ffffff;                            /* Handle snap highlight, Alignment Guide */
   --dn-highlight: #f0b232;                         /* Text highlight mark */
   --dn-sel-edge: #949ba4;                          /* 1px edge ring under the selection glow */
+  --dn-dim-opacity: 0.25;                          /* Chain Highlight dim for non-chain elements (ADR-0029) */
 
   /* Elevation (canvas elements) */
   --dn-shadow-color: rgba(0, 0, 0, 0.45);          /* shadow black — the tone every elevation shadow and the diamond drop-shadow tint from */

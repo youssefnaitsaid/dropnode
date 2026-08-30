@@ -190,7 +190,10 @@ One duration everywhere: **0.15s ease** for state transitions (node shadow,
 Handle grow, swatch scale, stroke growth). Exceptions: connection stroke
 growth shares the 0.15s; Toast slide-in 0.3s ease; Present Mode has no motion
 budget of its own. Nothing loops, nothing parallaxes; hover feedback is
-scale/brightness only.
+scale/brightness only — except **Chain Highlight** (ADR-0029): the traveling light
+loops with a fixed **1.2s linear** duration (`animation: chain-travel 1.2s linear infinite`,
+`stroke-dasharray` overlay, `pathLength="100"` normalized). The `prefers-reduced-motion`
+block collapses it to a static highlight automatically.
 
 ## Policy
 
@@ -322,3 +325,12 @@ surface panel with pure white ink and no color-mix tinting anywhere.
 Deliberate non-fixes: `NODE_PALETTE` hexes and the light-export literals stay
 as data (see [Token sources](#token-sources)); radii and density beyond
 `--radius` keep their pre-redesign values (a later pass may tighten them).
+
+### 2026-08 Chain Highlight — traveling light is the first loop (ADR-0029)
+
+User request: hover-triggered **Chain Highlight** reveals the weakly-connected component.
+Amended Motion contract to allow the overlay's loop (`1.2s linear infinite` via
+`chain-travel` keyframes, `pathLength="100"` normalized dash). Added token
+`--dn-dim-opacity: 0.25` for non-chain dimming. `prefers-reduced-motion` already
+collapses the loop to static (glow + dim remain). No new colors, no new z-token —
+lit Nodes reuse `--dn-z-selected` (Groups excluded per ADR-0008).

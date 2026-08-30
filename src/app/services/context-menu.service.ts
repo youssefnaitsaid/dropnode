@@ -79,6 +79,11 @@ export class ContextMenuService {
   // Drives the Paste item's disabled state — the menu shape stays stable
   readonly canPaste = this.clipboardService.canPaste;
 
+  /** Clear the menu target — called when the overlay closes (dismiss or action). */
+  clear(): void {
+    this.target.set(null);
+  }
+
   /**
    * Prime the menu for a right-click. A target that is already part of a
    * multi-Selection keeps the whole Selection (the menu acts on the set);
