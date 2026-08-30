@@ -17,8 +17,8 @@ export const DN_TOKENS = {
   paper: '#f0f0f5',
   /** Node Text (--dn-ink) — near-black */
   ink: '#1a1a2e',
-  /** The Dropnode blurple (--dn-accent) */
-  accent: '#5865F2',
+  /** The Dropnode grey (--dn-accent) */
+  accent: '#6B7280',
   /** Ink on accent fills (--dn-accent-ink) */
   accentInk: '#ffffff',
   /** Snap highlight / Alignment Guide (--dn-danger) */

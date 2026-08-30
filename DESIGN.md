@@ -6,16 +6,16 @@ light-theme CSS variable block in `src/styles.scss` is inert spartan/shadcn
 default config — never style against it. (The *Export Theme* "light" value is
 a different concept: a PNG-only appearance, see [Export themes](#export-themes).)
 
-> **2026-08 redesign — "blurple-dark" with luminous Nodes.** The previous
+> **2026-08 redesign — "grey-dark" with luminous Nodes (updated from blurple-dark).** The previous
 > refined-dark identity was replaced on explicit user direction with a
-> Discord-derived world: layered slate surfaces, one **blurple** accent —
+> Discord-derived world, now with a neutral **grey** accent — layered slate surfaces, one **grey** accent —
 > while the Nodes kept their **off-white paper with near-black ink**
 > (user-mandated). This file is the contract for that world. See the flag
 > log at the bottom for what changed and what was deliberately kept.
 
 ## Identity
 
-Dropnode's look is the **blurple-dark layered canvas**: Discord's surface
+Dropnode's look is the **grey-dark layered canvas**: Discord's surface
 hierarchy, tuned for a graph editor —
 
 - **Surfaces layer like Discord.** The Canvas is the "chat" surface
@@ -26,7 +26,7 @@ hierarchy, tuned for a graph editor —
   `#1a1a2e` text — user-mandated), so the graph glows bright on the slate
   canvas. Groups render beneath Connections and regular Nodes (ADR-0008)
   so children stay visible without needing translucent fills.
-- **One blurple** (`#5865F2`) is the accent for everything interactive:
+- **One grey** (`#6B7280`) is the accent for everything interactive:
   default Connection stroke, Handles, Resize Grips, the text caret, chrome
   buttons, focus rings. Chrome (`--primary`) and canvas (`--dn-accent`) are
   the same literal value by design.
@@ -68,9 +68,9 @@ both files, and a row here.
 | `--dn-group-edge` | `rgba(255, 255, 255, 0.1)` | Dashed Group border |
 | `--dn-group-strip` | `rgba(0, 0, 0, 0.25)` | Group Label strip fill |
 | `--dn-chip` | `#2b2d31` | Floating chips: Connection Text cards, Pin popover, Formatting Toolbar |
-| `--dn-chip-ink` | `#dbdee1` | Ink on chips and canvas overlays (Step counter, Minimap strokes, default selection glow) |
+| `--dn-chip-ink` | `#ffffff` | Ink on chips and canvas overlays (Step counter, Minimap strokes, default selection glow) |
 | `--dn-chip-input` | `#1e1f22` | Input field inside a chip (link input) |
-| `--dn-accent` | `#5865F2` | The blurple — default Connection stroke, Handles, Grips, caret, chrome `--primary` |
+| `--dn-accent` | `#6B7280` | The grey — default Connection stroke, Handles, Grips, caret, chrome `--primary` |
 | `--dn-accent-ink` | `#ffffff` | Ink on accent fills |
 | `--dn-danger` | `#ffffff` | Handle snap highlight, Alignment Guide |
 | `--dn-highlight` | `#f0b232` | Text highlight mark (`mark` / `.tv-highlight`) |
@@ -94,7 +94,7 @@ exception is `--background` `#313338` (the canvas slate): it only shows on
 input wells and the rename fields, so fields read as lighter wells against
 the darker surfaces. Hairline `--border`/`--input` stay white 6%.
 `--primary`/`--ring`/`--sidebar-primary`/`--sidebar-ring` are literal
-`#5865F2` so chrome and canvas can never drift apart (asserted by the sync
+`#6B7280` so chrome and canvas can never drift apart (asserted by the sync
 spec). Floating canvas chips (`--dn-chip` `#2b2d31`) take the same pure
 white ink (`--dn-chip-ink` `#ffffff`). Semantic Tailwind colors in chrome:
 success = `text-emerald-400`, error = `text-destructive`, info =
@@ -162,7 +162,7 @@ clips same-element shadows — see the node component comments).
 | --- | --- | --- |
 | `--dn-shadow-color` | `rgba(0, 0, 0, 0.45)` | Shadow black — the tone the elevation shadows and the diamond `drop-shadow` tint from |
 | `--dn-shadow-node` | `0 2px 10px rgba(0, 0, 0, 0.45)` | Node resting |
-| `--dn-shadow-node-hover` | `0 6px 20px rgba(88, 101, 242, 0.3)` | Node hover |
+| `--dn-shadow-node-hover` | `0 6px 20px rgba(107, 114, 128, 0.3)` | Node hover |
 | `--dn-shadow-chip` | `0 6px 24px rgba(0, 0, 0, 0.45)` | Formatting Toolbar |
 | `--dn-shadow-pop` | `0 8px 24px rgba(0, 0, 0, 0.5)` | Pin popover |
 | `--dn-shadow-pin` | `0 2px 8px rgba(0, 0, 0, 0.45)` | Pin bubble |
@@ -294,8 +294,8 @@ from Discord's multi-layer stack to one surface + one ink:
   world with off-white Nodes.
 
 Deliberate non-fixes: `NODE_PALETTE` hexes, the light-export literals, and
-the semantic colors (`--dn-accent`, `--dn-danger`, `--dn-highlight`) stay as
-data; the blurple accent is untouched everywhere.
+the semantic colors (`--dn-danger`, `--dn-highlight`) stay as
+data; the accent (`--dn-accent`) was blurple and is now grey (see grey update below).
 
 ### 2026-08 polish — segmented pills in the Import/Export dialogs
 
@@ -306,16 +306,15 @@ pill was invisible. User direction: **give the active buttons a background
 and replace the gray hover mix
 (`color-mix(in oklch, var(--secondary), var(--foreground) 5%)`) with a
 polish color.** The pills now use a shared `.export-seg` style in both
-dialogs: the active pill is a solid blurple fill (`var(--primary)`,
-white ink), any pill's hover tints 15% toward the blurple, and the active
-pill's hover stays solid blurple.
+dialogs: the active pill is a solid grey fill (`var(--primary)`,
+white ink), any pill's hover tints 15% toward the grey, and the active
+pill's hover stays solid grey.
 
 ### 2026-08 de-slop — Command Palette joins the Sidebar system
 
 User direction: "apply the same design system in the sidebar for the
 hlm-dialog-content commands palette. remove any additional UI style slop."
-The palette dropped every decorative layer: the blurple-tinted shell
-(`color-mix(card 96%, primary 4%)`) is now flat `var(--card)`, the tinted
+The palette dropped every decorative layer: the grey-tinted shell (previously blurple-tinted, `color-mix(card 96%, primary 4%)`) is now flat `var(--card)`, the tinted
 header and content borders are plain `--border` hairlines, the decorative
 command-mark chip is gone, the active item lost its tinted border and 3px
 inset accent bar (now a flat `--muted` highlight, matching Sidebar rows),
@@ -334,3 +333,17 @@ Amended Motion contract to allow the overlay's loop (`1.2s linear infinite` via
 `--dn-dim-opacity: 0.25` for non-chain dimming. `prefers-reduced-motion` already
 collapses the loop to static (glow + dim remain). No new colors, no new z-token —
 lit Nodes reuse `--dn-z-selected` (Groups excluded per ADR-0008).
+
+### 2026-08 grey accent — blurple → neutral grey (user-mandated)
+
+User direction: "Change the primary color #5865F2 with grey color for the whole application."
+The single accent was swapped from Discord blurple `#5865F2` to neutral grey `#6B7280` (Tailwind gray-500, 4.83:1 vs white, WCAG AA):
+
+- Canvas `--dn-accent` `#5865F2` → `#6B7280` (default Connection stroke, Handles, Grips, caret)
+- Chrome `--primary`, `--ring`, `--sidebar-primary`, `--sidebar-ring` → `#6B7280` (unified, asserted by `design-tokens.spec.ts`)
+- TS mirror `DN_TOKENS.accent` → `#6B7280`
+- Elevation `--dn-shadow-node-hover` `rgba(88, 101, 242, 0.3)` → `rgba(107, 114, 128, 0.3)` (grey tint)
+- Docs updated: Identity, Color tokens table, Elevation table, chrome unification paragraph.
+- Previous polish pills now grey fills/tints (were blurple).
+- All derived translucency (`color-mix(... var(--dn-accent) ...)`) automatically follows; no other literals.
+- To revert or tweak grey, edit the 5 variables + `DN_TOKENS.accent` + shadow tint together.

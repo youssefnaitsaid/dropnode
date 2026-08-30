@@ -60,9 +60,9 @@ body {
 :root.dark {
   color-scheme: dark;
 
-  /* Chrome accent unified with the canvas accent (DESIGN.md): one blurple,
-     #5865F2, everywhere — the Discord-derived identity (2026-08 redesign).
-     All chrome shares the Sidebar's design system (user-mandated): every
+  /* Chrome accent unified with the canvas accent (DESIGN.md): one grey,
+      #6B7280, everywhere — neutral grey identity (2026-08 redesign, updated).
+      All chrome shares the Sidebar's design system (user-mandated): every
      surface — cards, menus, popovers, hover chips — is the Sidebar slate
      #2b2d31 with #35373c hovers, and all ink is pure white. --background
      stays the canvas slate #313338 so input wells and the rename fields
@@ -74,7 +74,7 @@ body {
   --card-foreground: #ffffff;
   --popover: #2b2d31;
   --popover-foreground: #ffffff;
-  --primary: #5865F2;
+  --primary: #6B7280;
   --primary-foreground: #ffffff;
   --secondary: #35373c;
   --secondary-foreground: #ffffff;
@@ -85,15 +85,15 @@ body {
   --destructive: #f23f43;
   --border: rgba(255, 255, 255, 0.06);
   --input: rgba(255, 255, 255, 0.06);
-  --ring: #5865F2;
+  --ring: #6B7280;
   --sidebar: #2b2d31;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #5865F2;
+  --sidebar-primary: #6B7280;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #35373c;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(0, 0, 0, 0.2);
-  --sidebar-ring: #5865F2;
+  --sidebar-ring: #6B7280;
 }
 
 /* ── Dropnode design tokens ──────────────────────────────────────────
@@ -105,7 +105,7 @@ body {
    export pipeline inlines these rules into its snapshot, so var()
    references are export-safe. */
 :root {
-  /* Surfaces & ink (2026-08 redesign: Discord-derived blurple-dark world) */
+  /* Surfaces & ink (2026-08 redesign: grey-dark world, updated from blurple) */
   --dn-canvas: #313338;                            /* Canvas backdrop — Discord chat surface */
   --dn-canvas-dot: rgba(255, 255, 255, 0.04);      /* Canvas grid dots */
   --dn-paper: #f0f0f5;                             /* default Node surface — off-white (user-mandated) */
@@ -119,7 +119,7 @@ body {
   --dn-chip-input: #1e1f22;                        /* input field inside a chip */
 
   /* Accent & semantic */
-  --dn-accent: #5865F2;                            /* the Dropnode blurple: default Connection stroke, Handles, Grips, caret */
+  --dn-accent: #6B7280;                            /* the Dropnode grey: default Connection stroke, Handles, Grips, caret */
   --dn-accent-ink: #ffffff;                        /* ink on accent fills */
   --dn-danger: #ffffff;                            /* Handle snap highlight, Alignment Guide */
   --dn-highlight: #f0b232;                         /* Text highlight mark */
@@ -129,7 +129,7 @@ body {
   /* Elevation (canvas elements) */
   --dn-shadow-color: rgba(0, 0, 0, 0.45);          /* shadow black — the tone every elevation shadow and the diamond drop-shadow tint from */
   --dn-shadow-node: 0 2px 10px rgba(0, 0, 0, 0.45);
-  --dn-shadow-node-hover: 0 6px 20px rgba(88, 101, 242, 0.3);
+  --dn-shadow-node-hover: 0 6px 20px rgba(107, 114, 128, 0.3);
   --dn-shadow-chip: 0 6px 24px rgba(0, 0, 0, 0.45);
   --dn-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
   --dn-shadow-pin: 0 2px 8px rgba(0, 0, 0, 0.45);
