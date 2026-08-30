@@ -81,7 +81,7 @@ interface DragState {
         />
 
         @if (isChainLit(conn.id)) {
-          @for (dir of chainOverlayDirections(conn); track dir + conn.id) {
+          @for (dir of chainOverlayDirections(conn); track $index) {
             <path
               [attr.d]="getConnectionPath(conn)"
               class="connection-chain-light"
@@ -89,6 +89,7 @@ interface DragState {
               [attr.data-connection-id]="conn.id"
               [attr.data-chain-dir]="dir"
               [style.stroke]="strokeColor(conn)"
+              [style.filter]="chainGlowFilter(conn)"
               pathLength="100"
             />
           }
@@ -283,14 +284,17 @@ interface DragState {
     .connection-text-card.chain-dimmed {
       opacity: var(--dn-dim-opacity);
     }
-    /* Traveling light overlay — one path per direction, pathLength="100" normalizes length */
+    /* Traveling light overlay — one path per direction, pathLength="100" normalizes length
+       Bolder than the lit base (+2.5px) and larger dash (22%) so thick Connections stay clearly visible */
     .connection-chain-light {
       fill: none;
-      stroke-width: calc((var(--sw, 2.5) + 1) * 1px);
+      stroke-width: calc((var(--sw, 2.5) + 2.8) * 1px);
       stroke-linecap: round;
-      stroke-dasharray: 12 88;
+      stroke-linejoin: round;
+      stroke-dasharray: 24 76;
       stroke-dashoffset: 0;
       pointer-events: none;
+      opacity: 1;
       animation: chain-travel 1.2s linear infinite;
     }
     .connection-chain-light.chain-reverse {
@@ -350,6 +354,10 @@ export class ConnectionLayerComponent {
   // A colored Connection keeps its own color when selected; the glow matches it
   glowFilter(conn: Connection): string {
     return `drop-shadow(0 0 4px ${this.strokeColor(conn)})`;
+  }
+
+  chainGlowFilter(conn: Connection): string {
+    return `drop-shadow(0 0 7px ${this.strokeColor(conn)}) drop-shadow(0 0 2px ${this.strokeColor(conn)})`;
   }
 
   markerStart(conn: Connection): string | null {
