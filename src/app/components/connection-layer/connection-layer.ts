@@ -10,6 +10,8 @@ import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { MoveConnectionReroutePointCommand } from '../../services/commands';
+import { ChainHighlightService } from '../../services/chain-highlight.service';
+import { chainConnectionDirection } from '../../models/chain';
 import { textToPlainString } from '../../models/text';
 import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
@@ -55,6 +57,7 @@ interface DragState {
           [attr.d]="getConnectionPath(conn)"
           [attr.data-connection-id]="conn.id"
           class="connection-hit"
+          [class.chain-dimmed]="isChainDimmed(conn.id)"
           [attr.tabindex]="presentationService.active() ? null : 0"
           role="button"
           [attr.aria-label]="connectionAriaLabel(conn)"
@@ -68,17 +71,35 @@ interface DragState {
           [attr.marker-end]="markerEnd(conn)"
           class="connection-path"
           [class.selected]="isSelected(conn.id)"
+          [class.chain-lit]="isChainLit(conn.id)"
+          [class.chain-dimmed]="isChainDimmed(conn.id)"
           [style.stroke]="strokeColor(conn)"
           [style.--sw]="strokeBaseWidth(conn)"
           [attr.stroke-dasharray]="strokeDash(conn)"
           [attr.stroke-linecap]="strokeDash(conn) ? 'round' : null"
-          [style.filter]="isSelected(conn.id) ? glowFilter(conn) : null"
+          [style.filter]="(isSelected(conn.id) || isChainLit(conn.id)) ? glowFilter(conn) : null"
         />
+
+        @if (isChainLit(conn.id)) {
+          @for (dir of chainOverlayDirections(conn); track dir + conn.id) {
+            <path
+              [attr.d]="getConnectionPath(conn)"
+              class="connection-chain-light"
+              [class.chain-reverse]="dir === 'reverse'"
+              [attr.data-connection-id]="conn.id"
+              [attr.data-chain-dir]="dir"
+              [style.stroke]="strokeColor(conn)"
+              pathLength="100"
+            />
+          }
+        }
 
         @if (!presentationService.active() && (isSelected(conn.id) || reroutePointDraggingConnectionId() === conn.id)) {
           @for (point of conn.reroutePoints ?? []; track $index) {
             <circle
               class="reroute-point"
+              [class.chain-lit]="isChainLit(conn.id)"
+              [class.chain-dimmed]="isChainDimmed(conn.id)"
               [attr.r]="6"
               [attr.cx]="point.x"
               [attr.cy]="point.y"
@@ -129,6 +150,8 @@ interface DragState {
             class="connection-text-card"
             [attr.data-connection-id]="conn.id"
             [class.selected]="isSelected(conn.id)"
+            [class.chain-lit]="isChainLit(conn.id)"
+            [class.chain-dimmed]="isChainDimmed(conn.id)"
             [style.left.px]="getTextCardPosition(conn).x"
             [style.top.px]="getTextCardPosition(conn).y"
             (mousedown)="onTextCardMouseDown(conn, $event)"
@@ -246,6 +269,41 @@ interface DragState {
       cursor: text;
       user-select: text;
     }
+    /* Chain Highlight — lit borrows selected styling verbatim */
+    .connection-path.chain-lit {
+      stroke-width: calc((var(--sw, 2.5) + 1.5) * 1px);
+    }
+    .connection-text-card.chain-lit {
+      border-color: var(--dn-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--dn-accent) 40%, transparent);
+    }
+    /* Chain Highlight — dimming */
+    .connection-path.chain-dimmed,
+    .reroute-point.chain-dimmed,
+    .connection-text-card.chain-dimmed {
+      opacity: var(--dn-dim-opacity);
+    }
+    /* Traveling light overlay — one path per direction, pathLength="100" normalizes length */
+    .connection-chain-light {
+      fill: none;
+      stroke-width: calc((var(--sw, 2.5) + 1) * 1px);
+      stroke-linecap: round;
+      stroke-dasharray: 12 88;
+      stroke-dashoffset: 0;
+      pointer-events: none;
+      animation: chain-travel 1.2s linear infinite;
+    }
+    .connection-chain-light.chain-reverse {
+      animation-direction: reverse;
+    }
+    /* Phase-shift second light when both directions are present (bidirectional) */
+    .connection-chain-light + .connection-chain-light {
+      animation-delay: -0.6s;
+    }
+    @keyframes chain-travel {
+      from { stroke-dashoffset: 100; }
+      to { stroke-dashoffset: 0; }
+    }
   `],
 })
 export class ConnectionLayerComponent {
@@ -253,6 +311,7 @@ export class ConnectionLayerComponent {
   private historyService = inject(HistoryService);
   protected presentationService = inject(PresentationService);
   private keyboardConnection = inject(KeyboardConnectionService);
+  protected chainHighlightService = inject(ChainHighlightService);
 
   keyboardPending = this.keyboardConnection.pending;
 
@@ -339,6 +398,12 @@ export class ConnectionLayerComponent {
         this.contextMenuService.clearConnectionTextRequest();
       }
     });
+
+    // Chain Highlight suppression while Connection Text editing
+    effect(() => {
+      const editing = this.editingConnectionId();
+      this.chainHighlightService.setConnectionEditingSuppressed(editing !== null);
+    });
   }
 
   connectionSelect = output<{ connectionId: string; additive: boolean }>();
@@ -398,6 +463,21 @@ export class ConnectionLayerComponent {
 
   isSelected(connectionId: string): boolean {
     return this.graphService.isConnectionSelected(connectionId);
+  }
+
+  isChainLit(connectionId: string): boolean {
+    return this.chainHighlightService.isConnectionLit(connectionId);
+  }
+
+  isChainDimmed(connectionId: string): boolean {
+    return this.chainHighlightService.isConnectionDimmed(connectionId);
+  }
+
+  chainOverlayDirections(conn: Connection): ('forward' | 'reverse')[] {
+    const dir = chainConnectionDirection(conn);
+    if (dir === 'forward') return ['forward'];
+    if (dir === 'reverse') return ['reverse'];
+    return ['forward', 'reverse'];
   }
 
   getGhostPath(): string {

@@ -17,6 +17,7 @@ import { TextEditorComponent } from '../text-editor/text-editor';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
+import { ChainHighlightService } from '../../services/chain-highlight.service';
 
 export type GripCorner = 'nw' | 'ne' | 'sw' | 'se';
 export interface NodeSizeChangedEvent {
@@ -37,6 +38,8 @@ export interface NodeSizeChangedEvent {
       class="node-card"
       [class.group-card]="isGroup()"
       [class.selected]="isSelected()"
+      [class.chain-lit]="chainHighlightService.isNodeLit(node().id)"
+      [class.chain-dimmed]="chainHighlightService.isNodeDimmed(node().id)"
       [class.editing]="isEditing()"
       [class.presenting]="presentationService.active()"
       [attr.data-node-id]="node().id"
@@ -50,6 +53,8 @@ export interface NodeSizeChangedEvent {
       role="button"
       [attr.aria-label]="cardAriaLabel()"
       [attr.aria-pressed]="isSelected()"
+      (mouseenter)="onMouseEnter()"
+      (mouseleave)="onMouseLeave()"
       (mousedown)="onMouseDown($event)"
       (dblclick)="onDoubleClick($event)"
       (keydown)="onCardKeydown($event)"
@@ -203,23 +208,31 @@ export interface NodeSizeChangedEvent {
     .node-card.presenting app-handle {
       display: none;
     }
-    .node-card.selected .node-surface {
+    .node-card.selected .node-surface,
+    .node-card.chain-lit .node-surface {
       box-shadow: 0 0 0px 1px var(--dn-sel-edge), 0 0 6px 2px var(--selection-glow, var(--dn-paper));
     }
-    .node-card.selected .node-surface.shape-ellipse {
+    .node-card.selected .node-surface.shape-ellipse,
+    .node-card.chain-lit .node-surface.shape-ellipse {
       box-shadow: none;
       filter: drop-shadow(0 0 1px var(--dn-sel-edge)) drop-shadow(0 0 6px var(--selection-glow, var(--dn-paper)));
     }
     /* after the diamond hover rule on purpose: a selected diamond keeps its
        selection glow while hovered, like the rectangle/pill cards */
-    .node-card.selected:has(.node-surface.shape-diamond) {
+    .node-card.selected:has(.node-surface.shape-diamond),
+    .node-card.chain-lit:has(.node-surface.shape-diamond) {
       filter: drop-shadow(0 0 1px var(--dn-sel-edge)) drop-shadow(0 0 6px var(--selection-glow, var(--dn-paper)));
     }
-    /* Lift a selected node (and its glow) above neighbouring cards,
+    /* Lift a selected/lit node (and its glow) above neighbouring cards,
        but NOT groups — they render below children by ADR-0008 stacking
        and a z-index lift would cover the children with the solid fill. */
-    :host:has(.node-card.selected):not(:has(.group-card)) {
+    :host:has(.node-card.selected):not(:has(.group-card)),
+    :host:has(.node-card.chain-lit):not(:has(.group-card)) {
       z-index: var(--dn-z-selected);
+    }
+    /* Chain Highlight dimming — opacity only, preserves interactivity */
+    .node-card.chain-dimmed {
+      opacity: var(--dn-dim-opacity);
     }
     /* While editing, the card hosts a text editor — not a drag target */
     .node-card.editing {
@@ -345,6 +358,8 @@ export class NodeComponent implements AfterViewInit {
   handleDragStart = output<{ nodeId: string; handle: HandleSide; event: MouseEvent }>();
   startResize = output<{ nodeId: string; corner: GripCorner; minWidth: number; minHeight: number; event: MouseEvent }>();
   createChild = output<{ parentId: string; clientX: number; clientY: number }>();
+  hoverEnter = output<string>();
+  hoverLeave = output<void>();
   private textWrap = viewChild<ElementRef<HTMLDivElement>>('textWrap');
   sizeChanged = output<NodeSizeChangedEvent>();
 
@@ -352,10 +367,20 @@ export class NodeComponent implements AfterViewInit {
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
   private resizeMode = inject(ResizeModeService);
+  protected chainHighlightService = inject(ChainHighlightService);
   private viewReady = false;
   private measuredShape: NodeShape | null = null;
 
   constructor() {
+    // Chain Highlight suppression while inline editing (Node Text or Group Label)
+    effect(() => {
+      if (this.isEditing()) {
+        this.chainHighlightService.setNodeEditingSuppressed(true);
+      } else {
+        this.chainHighlightService.setNodeEditingSuppressed(false);
+      }
+    });
+
     // autofocus doesn't fire for dynamically inserted inputs; focus and
     // select the Group Label text once the editor renders
     effect(() => {
@@ -426,6 +451,15 @@ export class NodeComponent implements AfterViewInit {
   isHandleSnapped(side: HandleSide): boolean {
     const target = this.snapTarget();
     return target !== null && target.nodeId === this.node().id && target.handle === side;
+  }
+
+  onMouseEnter(): void {
+    if (this.presentationService.active()) return;
+    this.hoverEnter.emit(this.node().id);
+  }
+
+  onMouseLeave(): void {
+    this.hoverLeave.emit();
   }
 
   onMouseDown(event: MouseEvent): void {

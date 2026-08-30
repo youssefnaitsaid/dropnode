@@ -23,6 +23,7 @@ import { ContextMenuService } from '../../services/context-menu.service';
 import { ClipboardService } from '../../services/clipboard.service';
 import { PresentationService } from '../../services/presentation.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
+import { ChainHighlightService } from '../../services/chain-highlight.service';
 import {
   CreateNodeCommand,
   MoveNodeCommand,
@@ -110,6 +111,8 @@ import { Text } from '../../models/text';
                 (sizeChanged)="onNodeSizeChanged($event)"
                 (startResize)="onNodeStartResize($event)"
                 (createChild)="onCreateChild($event)"
+                (hoverEnter)="onNodeHoverEnter($event)"
+                (hoverLeave)="onNodeHoverLeave()"
               />
             }
           </div>
@@ -141,6 +144,8 @@ import { Text } from '../../models/text';
                 (sizeChanged)="onNodeSizeChanged($event)"
                 (startResize)="onNodeStartResize($event)"
                 (createChild)="onCreateChild($event)"
+                (hoverEnter)="onNodeHoverEnter($event)"
+                (hoverLeave)="onNodeHoverLeave()"
               />
             }
           </div>
@@ -421,6 +426,7 @@ export class CanvasComponent {
   protected resizeMode = inject(ResizeModeService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
+  private chainHighlightService = inject(ChainHighlightService);
 
   constructor() {
     // Ctrl+V converts the raw cursor point to canvas coordinates lazily at
@@ -504,6 +510,11 @@ export class CanvasComponent {
   // Guide lines render a constant 1px on screen regardless of zoom (ADR-0017)
   protected guideThickness = computed(() => 1 / this.graphService.viewportState().zoom);
 
+  // Chain Highlight — hover-triggered weakly-connected component (ADR-0029)
+  // Deferred clear: leaving schedules RAF, entering cancels pending clear to avoid
+  // leave-then-enter flicker when crossing overlapping elements (Groups beneath Nodes).
+  private chainClearFrame: number | null = null;
+
   // Connection drag state — track source info for CreateConnectionCommand on drop;
   // the moved flag is the standard 2px (canvas-unit) guard that keeps a stray
   // Handle click from Quick-adding a Node
@@ -540,6 +551,47 @@ export class CanvasComponent {
 
   get currentSnapTarget() {
     return this.connectionLayer()?.snapTarget() ?? null;
+  }
+
+  // Chain Highlight hover — Canvas mediates, Node emits
+  onNodeHoverEnter(nodeId: string): void {
+    if (this.chainClearFrame !== null) {
+      cancelAnimationFrame(this.chainClearFrame);
+      this.chainClearFrame = null;
+    }
+    this.chainHighlightService.setHovered(nodeId);
+  }
+
+  onNodeHoverLeave(): void {
+    if (this.chainClearFrame !== null) {
+      cancelAnimationFrame(this.chainClearFrame);
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      this.chainClearFrame = requestAnimationFrame(() => {
+        this.chainHighlightService.clearHovered();
+        this.chainClearFrame = null;
+      });
+    } else {
+      this.chainHighlightService.clearHovered();
+      this.chainClearFrame = null;
+    }
+  }
+
+  private syncChainDragSuppression(): void {
+    const dragging =
+      this.isDraggingNode ||
+      this.isResizingNode ||
+      this.isPanning ||
+      this.marqueeActive ||
+      this.isDraggingConnection ||
+      this.isDraggingConnectionText ||
+      this.isDraggingReroutePoint ||
+      this.touchPanPointerId !== null;
+    this.chainHighlightService.setDragSuppressed(dragging);
+    if (dragging && this.chainClearFrame !== null) {
+      cancelAnimationFrame(this.chainClearFrame);
+      this.chainClearFrame = null;
+    }
   }
 
   private screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
@@ -665,6 +717,7 @@ export class CanvasComponent {
     const vp = this.graphService.viewportState();
     this.panStartPanX = vp.panX;
     this.panStartPanY = vp.panY;
+    this.syncChainDragSuppression();
   }
 
   onCanvasPointerDown(event: PointerEvent): void {
@@ -691,12 +744,14 @@ export class CanvasComponent {
       const points = [...this.touchPointers.values()];
       this.pinchStartDist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
       this.pinchStartZoom = this.graphService.viewportState().zoom;
+      this.syncChainDragSuppression();
       return;
     }
     if (this.touchPointers.size > 2) return;
 
     this.touchPanPointerId = event.pointerId;
     this.startPan(event);
+    this.syncChainDragSuppression();
   }
 
   onCanvasPointerMove(event: PointerEvent): void {
@@ -731,6 +786,7 @@ export class CanvasComponent {
     if (wasPanPointer && this.touchPointers.size === 0) {
       this.isPanning = false;
     }
+    this.syncChainDragSuppression();
   }
 
   // Space tracking for the pan gesture; ignored while typing so the editors
@@ -955,6 +1011,7 @@ export class CanvasComponent {
       .filter((n): n is GraphNode => n !== undefined)
       .map(n => ({ id: n.id, startX: n.x, startY: n.y, isGroup: n.kind === 'group' }));
     this.hasMoved = false;
+    this.syncChainDragSuppression();
   }
 
   // Keyboard select (Enter on a focused card): mirror a plain click.
@@ -1032,6 +1089,7 @@ export class CanvasComponent {
     // The opposite corner stays anchored during the drag
     this.resizeAnchorX = event.corner === 'nw' || event.corner === 'sw' ? node.x + node.width : node.x;
     this.resizeAnchorY = event.corner === 'nw' || event.corner === 'ne' ? node.y + node.height : node.y;
+    this.syncChainDragSuppression();
   }
 
   // Handle drag start (connection creation)
@@ -1049,6 +1107,7 @@ export class CanvasComponent {
     if (layer) {
       layer.startConnectionDrag(event.nodeId, event.handle, event.event);
     }
+    this.syncChainDragSuppression();
   }
 
   // Text card drag start — armed on mousedown; becomes a drag past 2px
@@ -1062,6 +1121,7 @@ export class CanvasComponent {
     this.textDragStartClientY = event.event.clientY;
     this.textDragOriginalPosition = conn.textPosition ?? null;
     this.textDragMoved = false;
+    this.syncChainDragSuppression();
   }
 
   onReroutePointAdd(event: { connectionId: string; clientX: number; clientY: number }): void {
@@ -1101,6 +1161,7 @@ export class CanvasComponent {
     this.reroutePointOriginalPoints = structuredClone(conn.reroutePoints);
     this.reroutePointMoved = false;
     this.connectionLayer()?.setReroutePointDragging(event.connectionId);
+    this.syncChainDragSuppression();
   }
 
   onReroutePointRemove(event: { connectionId: string; pointIndex: number }): void {
@@ -1162,6 +1223,7 @@ export class CanvasComponent {
       const dy = event.clientY - this.marqueeStartClientY;
       if (!this.marqueeActive && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
         this.marqueeActive = true;
+        this.syncChainDragSuppression();
       }
       if (this.marqueeActive) {
         const start = this.clientPointToCanvas(this.marqueeStartClientX, this.marqueeStartClientY);
@@ -1558,6 +1620,7 @@ export class CanvasComponent {
       this.reroutePointOriginalPoints = [];
       this.reroutePointMoved = false;
     }
+    this.syncChainDragSuppression();
   }
 
   // Group Label rename (Groups only)
