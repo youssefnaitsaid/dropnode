@@ -73,7 +73,7 @@ import { Text } from '../../models/text';
     }),
   ],
   template: `
-    <div class="canvas-viewport" role="region" aria-label="Canvas" [cdkContextMenuTriggerFor]="contextMenu">
+    <div class="canvas-viewport" role="region" aria-label="Canvas" [cdkContextMenuTriggerFor]="contextMenu" (cdkContextMenuClosed)="onContextMenuClosed()">
       <div
         class="canvas-container"
         [class.panning]="isPanning"
@@ -946,6 +946,10 @@ export class CanvasComponent {
     }
 
     this.contextMenuService.openFor({ kind: 'canvas' }, canvasPos.x, canvasPos.y);
+  }
+
+  onContextMenuClosed(): void {
+    this.contextMenuService.clear();
   }
 
   onWheel(event: WheelEvent): void {
