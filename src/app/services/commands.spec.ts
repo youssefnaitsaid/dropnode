@@ -27,6 +27,7 @@ import {
   SetConnectionArrowheadCommand,
   SetConnectionStrokePatternCommand,
   SetConnectionStrokeWeightCommand,
+  SetConnectionRouteStyleCommand,
   InsertElementsCommand,
   QuickAddNodeCommand,
   CreatePinCommand,
@@ -41,6 +42,7 @@ import {
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
+  buildSetConnectionsRouteStyleCommand,
   buildAlignSelectionCommand,
   buildDistributeSelectionCommand,
   buildTidyUpCommand,
@@ -659,6 +661,36 @@ describe('Commands', () => {
 
       cmd.undo();
       expect(graphService.connections()[0].strokeWeight).toBe('thin');
+    });
+  });
+
+  describe('SetConnectionRouteStyleCommand', () => {
+    function makeConn() {
+      const n1 = graphService.createNode('N1', 0, 0);
+      const n2 = graphService.createNode('N2', 100, 0);
+      return graphService.createConnection(n1.id, 'right', n2.id, 'left')!;
+    }
+
+    it('execute sets orthogonal, undo removes the field back to the curve default', () => {
+      const conn = makeConn();
+
+      const cmd = new SetConnectionRouteStyleCommand(graphService, conn.id, 'orthogonal');
+      cmd.execute();
+      expect(graphService.connections()[0].routeStyle).toBe('orthogonal');
+
+      cmd.undo();
+      expect('routeStyle' in graphService.connections()[0]).toBe(false);
+    });
+
+    it('redo (execute after undo) re-applies the style', () => {
+      const conn = makeConn();
+
+      const cmd = new SetConnectionRouteStyleCommand(graphService, conn.id, 'orthogonal');
+      cmd.execute();
+      cmd.undo();
+      cmd.execute();
+
+      expect(graphService.connections()[0].routeStyle).toBe('orthogonal');
     });
   });
 
@@ -1431,6 +1463,34 @@ describe('Commands', () => {
       const c1 = graphService.createConnection(a.id, 'right', b.id, 'left')!;
 
       expect(buildSetConnectionsStrokeWeightCommand(graphService, [c1.id], 'normal')).toBeNull();
+    });
+  });
+
+  describe('buildSetConnectionsRouteStyleCommand', () => {
+    it('restyles all given Connections as one undo step, skipping no-ops', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const c1 = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      const c2 = graphService.createConnection(a.id, 'top', b.id, 'top')!;
+      graphService.setConnectionRouteStyle(c2.id, 'orthogonal');
+
+      const cmd = buildSetConnectionsRouteStyleCommand(graphService, [c1.id, c2.id], 'orthogonal')!;
+      cmd.execute();
+      expect(graphService.connections().map(cn => cn.routeStyle)).toEqual(['orthogonal', 'orthogonal']);
+
+      cmd.undo();
+      // c1 reverts to its curve default (absent field); c2 keeps orthogonal
+      expect(graphService.connections().find(cn => cn.id === c1.id)?.routeStyle).toBeUndefined();
+      expect(graphService.connections().find(cn => cn.id === c2.id)?.routeStyle).toBe('orthogonal');
+    });
+
+    it('returns null when every Connection already shows the style', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const c1 = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+
+      // 'curve' is the effective default — already showing
+      expect(buildSetConnectionsRouteStyleCommand(graphService, [c1.id], 'curve')).toBeNull();
     });
   });
 

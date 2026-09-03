@@ -162,6 +162,38 @@ describe('ToolbarComponent', () => {
     expect(historyService.canUndo()).toBe(false);
   });
 
+  it('shows a Route Style section and applies orthogonal to selected Connections, undoing as one command', async () => {
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 300, 0);
+    const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    graphService.selectConnection(conn.id);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Connection styling',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const orthogonal = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Orthogonal',
+    ) as HTMLButtonElement;
+    expect(orthogonal).toBeTruthy();
+    orthogonal.click();
+    fixture.detectChanges();
+
+    expect(graphService.connections()[0].routeStyle).toBe('orthogonal');
+    expect(fixture.componentInstance.sharedRouteStyle()).toBe('orthogonal');
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect('routeStyle' in graphService.connections()[0]).toBe(false);
+  });
+
   it('zooms in and out anchored on the visible Canvas center', () => {
     // No .canvas-container in the test DOM, so the anchor falls back to the
     // window size — half of innerWidth/innerHeight.

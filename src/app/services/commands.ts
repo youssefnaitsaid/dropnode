@@ -2,7 +2,7 @@ import { Command } from '../models/command';
 import { GraphNode, HandleSide, oppositeHandle } from '../models/node';
 import { NodeRect, NodeShape, effectiveNodeShape } from '../models/node-shape';
 export type { NodeRect } from '../models/node-shape';
-import { Connection, ReroutePoint, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT } from '../models/connection';
+import { Connection, ReroutePoint, ArrowheadType, ArrowheadEnd, effectiveArrowhead, defaultArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, RouteStyle, effectiveRouteStyle, DEFAULT_ROUTE_STYLE } from '../models/connection';
 import { Text } from '../models/text';
 import { Pin, PinAnchor } from '../models/pin';
 import { AlignKind, DistributeAxis, RootRect, TargetPosition, alignRects, distributeRects } from '../models/align-distribute';
@@ -553,6 +553,28 @@ export class SetConnectionStrokeWeightCommand implements Command {
   }
 }
 
+export class SetConnectionRouteStyleCommand implements Command {
+  description = 'Set Connection Route Style';
+  private originalStyle: RouteStyle;
+
+  constructor(
+    private graphService: GraphService,
+    private connectionId: string,
+    private newStyle: RouteStyle,
+  ) {
+    const conn = this.graphService.connections().find(c => c.id === connectionId);
+    this.originalStyle = conn ? effectiveRouteStyle(conn) : DEFAULT_ROUTE_STYLE;
+  }
+
+  execute(): void {
+    this.graphService.setConnectionRouteStyle(this.connectionId, this.newStyle);
+  }
+
+  undo(): void {
+    this.graphService.setConnectionRouteStyle(this.connectionId, this.originalStyle);
+  }
+}
+
 // Compound command for deleting a node and its connections as a single undoable action
 export class DeleteNodeCompoundCommand implements Command {
   description = 'Delete Node';
@@ -1077,6 +1099,22 @@ export function buildSetConnectionsStrokeWeightCommand(
     })
     .map(id => new SetConnectionStrokeWeightCommand(graphService, id, weight));
   return parts.length > 0 ? new CompoundCommand('Set Connection Stroke Weight', parts) : null;
+}
+
+/** Restyle the Route Style of every given Connection as one undo step, skipping no-ops. */
+export function buildSetConnectionsRouteStyleCommand(
+  graphService: GraphService,
+  connectionIds: readonly string[],
+  style: RouteStyle,
+): Command | null {
+  const conns = graphService.connections();
+  const parts = connectionIds
+    .filter(id => {
+      const conn = conns.find(c => c.id === id);
+      return conn !== undefined && effectiveRouteStyle(conn) !== style;
+    })
+    .map(id => new SetConnectionRouteStyleCommand(graphService, id, style));
+  return parts.length > 0 ? new CompoundCommand('Set Connection Route Style', parts) : null;
 }
 
 // Align/Distribute participants (spec #25, ADR-0018): the Selection's roots

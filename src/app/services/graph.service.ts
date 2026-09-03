@@ -2,7 +2,7 @@ import { Injectable, signal, computed } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
 import { NodeShape, isNodeShape, storedNodeShape } from '../models/node-shape';
 import { isNodeEmoji } from '../models/node-emoji';
-import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
+import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, RouteStyle, ROUTE_STYLES, DEFAULT_ROUTE_STYLE, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
 import { GraphState } from '../models/graph-state';
 import { ViewportState, ZOOM_MIN, ZOOM_MAX } from '../models/viewport-state';
 import { Bounds, unionBounds, contentBounds, connectionBounds, frameViewport } from '../models/bounds';
@@ -532,6 +532,21 @@ export class GraphService {
     );
   }
 
+  // Route Style (ADR-0031): same deviation-only discipline — absent means the
+  // curve default, so only orthogonal deviations are stored.
+  setConnectionRouteStyle(id: string, style: RouteStyle): void {
+    this.connections.update(conns =>
+      conns.map(c => {
+        if (c.id !== id) return c;
+        if (style === DEFAULT_ROUTE_STYLE) {
+          const { routeStyle: _removed, ...rest } = c;
+          return rest;
+        }
+        return { ...c, routeStyle: style };
+      })
+    );
+  }
+
   // Selection (ADR-0015): one set freely mixing Nodes and Connections. The
   // set is normalized so a Group and its own children are never both members
   // (group-as-unit — children ride along implicitly).
@@ -753,6 +768,8 @@ export class GraphService {
     // Same canonical form for stroke styling (ADR-0020)
     if (rest.strokePattern === DEFAULT_STROKE_PATTERN) delete rest.strokePattern;
     if (rest.strokeWeight === DEFAULT_STROKE_WEIGHT) delete rest.strokeWeight;
+    // Same canonical form for Route Style (ADR-0031)
+    if (rest.routeStyle === DEFAULT_ROUTE_STYLE) delete rest.routeStyle;
     // Same canonical form for textPosition: an explicit midpoint is absent
     if (rest.textPosition === TEXT_POSITION_DEFAULT) delete rest.textPosition;
     // Empty Reroute Point arrays are the canonical absent form. Import has
@@ -939,6 +956,9 @@ export class GraphService {
       }
       if (conn['strokeWeight'] !== undefined && !STROKE_WEIGHTS.includes(conn['strokeWeight'] as StrokeWeight)) {
         return { valid: false, error: `Invalid connection ${connId}: strokeWeight must be thin, normal, or thick` };
+      }
+      if (conn['routeStyle'] !== undefined && !ROUTE_STYLES.includes(conn['routeStyle'] as RouteStyle)) {
+        return { valid: false, error: `Invalid connection ${connId}: routeStyle must be curve or orthogonal` };
       }
       if (conn['reroutePoints'] !== undefined) {
         const points = conn['reroutePoints'];

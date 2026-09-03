@@ -469,6 +469,19 @@ describe('ClipboardService', () => {
       const pasted = graphService.connections().find(c => c.id !== connection.id)!;
       expect(pasted.reroutePoints).toEqual([{ x: 950, y: 1096 }]);
     });
+
+    it('carries the Route Style through copy/paste', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 300, 0);
+      const connection = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      graphService.setConnectionRouteStyle(connection.id, 'orthogonal');
+      service.copy([a.id, b.id]);
+
+      service.pasteAt(1000, 1000);
+
+      const pasted = graphService.connections().find(c => c.id !== connection.id)!;
+      expect(pasted.routeStyle).toBe('orthogonal');
+    });
   });
 
   // Multi-Selection Clipboard (ADR-0015): the entry generalizes to a set;

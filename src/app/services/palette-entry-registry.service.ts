@@ -5,6 +5,8 @@ import {
   ArrowheadEnd,
   ArrowheadType,
   MAX_REROUTE_POINTS,
+  ROUTE_STYLES,
+  RouteStyle,
   STROKE_PATTERNS,
   STROKE_WEIGHTS,
   StrokePattern,
@@ -31,6 +33,7 @@ import {
   buildSetConnectionsColorCommand,
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
+  buildSetConnectionsRouteStyleCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
   buildSetNodesEmojiCommand,
@@ -124,12 +127,23 @@ const WEIGHT_PREVIEWS: Record<StrokeWeight, { dash?: string; width?: number }> =
 };
 
 // Connections category display order: Reset (0), colors (1), patterns (2),
-// weights (3–5), then Arrowheads (start group before end). Patterns and
-// colors share one step; the label tiebreak orders them alphabetically.
+// weights (3–5), then Arrowheads (start group before end), then Route Styles
+// (12–13). Patterns and colors share one step; the label tiebreak orders them
+// alphabetically.
 const CONNECTION_WEIGHT_ORDER: Record<StrokeWeight, number> = {
   thin: 3,
   normal: 4,
   thick: 5,
+};
+
+const ROUTE_STYLE_ICONS: Record<RouteStyle, string> = {
+  curve: 'lucideSpline',
+  orthogonal: 'lucideRoute',
+};
+
+const ROUTE_STYLE_ORDER: Record<RouteStyle, number> = {
+  curve: 12,
+  orthogonal: 13,
 };
 
 type EntryOptions = {
@@ -311,6 +325,7 @@ export class PaletteEntryRegistry {
       ...this.connectionColorEntries(selectedConnectionIds),
       ...this.connectionArrowheadEntries(selectedConnectionIds),
       ...this.connectionStrokeEntries(selectedConnectionIds),
+      ...this.connectionRouteStyleEntries(selectedConnectionIds),
 
       this.action('zoom-in', 'Zoom In', 'Viewport', () => this.canvasViewport.zoomByCentered(0.1), {
         aliases: ['magnify', 'increase zoom'], icon: 'lucideZoomIn',
@@ -686,6 +701,31 @@ export class PaletteEntryRegistry {
         },
       )),
     ];
+  }
+
+  private connectionRouteStyleEntries(connectionIds: readonly string[]): PaletteEntry[] {
+    const available = connectionIds.length > 0;
+    const unavailableReason = 'Select a Connection first';
+    return ROUTE_STYLES.map(style => this.action(
+      `connection-route-${style}`,
+      `Set selected Connections' Route Style to ${this.titleCase(style)}`,
+      'Connections',
+      () => {
+        const command = buildSetConnectionsRouteStyleCommand(
+          this.graphService,
+          this.graphService.selectedConnectionIds(),
+          style,
+        );
+        if (command) this.historyService.execute(command);
+      },
+      {
+        aliases: [`${style} connections`, `${style} route style`],
+        icon: ROUTE_STYLE_ICONS[style],
+        sortOrder: ROUTE_STYLE_ORDER[style],
+        available,
+        unavailableReason,
+      },
+    ));
   }
 
   private addNode(): void {

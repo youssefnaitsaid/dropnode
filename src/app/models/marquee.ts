@@ -135,6 +135,7 @@ export function marqueeSelection(
         conn.sourceHandle,
         conn.targetHandle,
         conn.reroutePoints,
+        conn.routeStyle,
       );
       if (routeTouchesRect(route, rect)) return true;
       if (!conn.text) return false;

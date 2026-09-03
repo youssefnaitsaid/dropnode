@@ -139,4 +139,15 @@ describe('marqueeSelection', () => {
     const result = marqueeSelection([a, b], [c], { x: 300, y: 200, width: 20, height: 20 });
     expect(result.connectionIds).toEqual([]);
   });
+
+  it('selects an orthogonal Connection by its mid-split vertical leg', () => {
+    // Handles (160,100) → (460,200): orthogonal mid-splits at x = 310, so a
+    // probe over the vertical leg hits while the free curve passes below it.
+    const a = node('a', 0, 76);
+    const b = node('b', 460, 176);
+    const probe: Rect = { x: 300, y: 160, width: 20, height: 30 };
+    expect(marqueeSelection([a, b], [conn('c1', 'a', 'b', { routeStyle: 'orthogonal' })], probe).connectionIds)
+      .toEqual(['c1']);
+    expect(marqueeSelection([a, b], [conn('c2', 'a', 'b')], probe).connectionIds).toEqual([]);
+  });
 });

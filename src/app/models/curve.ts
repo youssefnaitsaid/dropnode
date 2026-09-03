@@ -1,5 +1,5 @@
 import { HandleSide, GraphNode } from './node';
-import { TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from './connection';
+import { TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT, RouteStyle, DEFAULT_ROUTE_STYLE } from './connection';
 
 // Pure Connection curve geometry (ADR-0013). The single source of truth for
 // the cubic bezier a Connection renders as, the point-at-t evaluation the
@@ -165,6 +165,8 @@ function measuredRoute(segments: Curve[], hasReroutePoints: boolean): Connection
 /** Build the complete Connection route. Without Reroute Points this returns
  * the existing single cubic unchanged. With points, each segment interpolates
  * its two consecutive route vertices using bounded Catmull-Rom-like tangents.
+ * With the orthogonal Route Style, every leg becomes sharp axis-aligned steps
+ * through the same vertices (ADR-0031) — see `orthogonalRoute` below.
  */
 export function connectionRoute(
   start: Point,
@@ -172,7 +174,11 @@ export function connectionRoute(
   startHandle: HandleSide,
   endHandle: HandleSide,
   reroutePoints: readonly Point[] = [],
+  routeStyle: RouteStyle = DEFAULT_ROUTE_STYLE,
 ): ConnectionRoute {
+  if (routeStyle === 'orthogonal') {
+    return orthogonalRoute(start, end, startHandle, endHandle, reroutePoints);
+  }
   if (reroutePoints.length === 0) {
     return measuredRoute([connectionCurve(start, end, startHandle, endHandle)], false);
   }
@@ -223,6 +229,119 @@ export function connectionRoute(
     };
   });
 
+  return measuredRoute(segments, true);
+}
+
+// --- Orthogonal routing (ADR-0031) ------------------------------------------
+// Handle-constrained Manhattan geometry: the route departs along the source
+// Handle and arrives along the target Handle, hitting every vertex (source,
+// ordered Reroute Points, target) exactly with sharp 90° corners. Each leg is
+// emitted as uniform straight cubic segments (collinear third-spaced control
+// points), so every existing consumer — sampling, projection, Text anchoring,
+// bounds, hit-testing, SVG and Minimap stroking — works unchanged. The route
+// always uses arc-length progress (flagged via hasReroutePoints, which is
+// exact on uniform legs), keeping the legacy cubic-t meaning for plain curves.
+
+type Axis = 'h' | 'v';
+
+function axisOf(direction: Point): Axis {
+  return direction.x !== 0 ? 'h' : 'v';
+}
+
+/** A uniform straight segment: the cubic evaluates to exact linear interpolation. */
+function straightLeg(start: Point, end: Point): Curve {
+  return {
+    start,
+    end,
+    cp1: { x: start.x + (end.x - start.x) / 3, y: start.y + (end.y - start.y) / 3 },
+    cp2: { x: start.x + 2 * (end.x - start.x) / 3, y: start.y + 2 * (end.y - start.y) / 3 },
+  };
+}
+
+/** Full point chain [from, ...bends, to] for one vertex pair. A null
+ * constraint means that end is free. Handle axes always win over travel
+ * direction; travel direction wins over the H-first default; step signs are
+ * best-effort so degenerate placements stay deterministic. */
+function orthogonalChain(
+  from: Point,
+  to: Point,
+  startDir: Point | null,
+  endDir: Point | null,
+  incoming: Point | null,
+): Point[] {
+  if (from.x === to.x && from.y === to.y) return [from];
+  const hFirst: Point[] = [from, { x: to.x, y: from.y }, to];
+  const vFirst: Point[] = [from, { x: from.x, y: to.y }, to];
+  if (from.x === to.x || from.y === to.y) return [from, to];
+  if (startDir && endDir) {
+    if (axisOf(startDir) === axisOf(endDir)) {
+      // Same-axis Handles need an H-V-H (or V-H-V) mid-split to honor both.
+      if (axisOf(startDir) === 'h') {
+        const midX = (from.x + to.x) / 2;
+        return [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+      }
+      const midY = (from.y + to.y) / 2;
+      return [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
+    }
+    // Differing axes: the single L starting along the departure axis.
+    return axisOf(startDir) === 'h' ? hFirst : vFirst;
+  }
+  if (startDir) return axisOf(startDir) === 'h' ? hFirst : vFirst;
+  if (endDir) return axisOf(endDir) === 'h' ? vFirst : hFirst;
+  // Interior leg: keep the incoming travel direction when it makes progress
+  // toward the next vertex, else turn at the vertex. No incoming direction
+  // (a zero-length leg preceded us) falls back to H-first.
+  if (incoming) {
+    if (incoming.x !== 0) {
+      return Math.sign(to.x - from.x) === Math.sign(incoming.x) ? hFirst : vFirst;
+    }
+    if (incoming.y !== 0) {
+      return Math.sign(to.y - from.y) === Math.sign(incoming.y) ? vFirst : hFirst;
+    }
+  }
+  return hFirst;
+}
+
+function orthogonalRoute(
+  start: Point,
+  end: Point,
+  startHandle: HandleSide,
+  endHandle: HandleSide,
+  reroutePoints: readonly Point[],
+): ConnectionRoute {
+  const vertices = [start, ...reroutePoints, end];
+  // The departure step leaves along the source Handle's outward direction;
+  // the arrival step enters against the target Handle's outward direction.
+  const departDir = handleDirection(startHandle);
+  const arriveDir = scale(handleDirection(endHandle), -1);
+
+  const joints: Point[] = [start];
+  let incoming: Point | null = null;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const from = vertices[i];
+    const to = vertices[i + 1];
+    const first = i === 0;
+    const last = i === vertices.length - 2;
+    // A lone pair carries both Handle constraints; otherwise the first leg
+    // owns the departure and the last leg owns the arrival.
+    const chain = orthogonalChain(
+      from,
+      to,
+      first ? departDir : null,
+      last ? arriveDir : null,
+      first ? null : incoming,
+    );
+    for (let j = 1; j < chain.length; j++) {
+      const prev = joints[joints.length - 1];
+      const next = chain[j];
+      if (next.x === prev.x && next.y === prev.y) continue;
+      incoming = { x: Math.sign(next.x - prev.x), y: Math.sign(next.y - prev.y) };
+      joints.push(next);
+    }
+  }
+
+  const segments = joints.slice(1).map((joint, index) => straightLeg(joints[index], joint));
+  if (segments.length === 0) segments.push(straightLeg(start, start));
   return measuredRoute(segments, true);
 }
 

@@ -120,7 +120,7 @@
 - while dragging Connection Text, a projected point within 15 canvas units of the curve midpoint snaps to it; a drag ending snapped stores no textPosition @implemented
 - clearing Connection Text discards its textPosition; undoing the clear restores both text and position in one step; newly added Text always starts at the midpoint @implemented
 - Import rejects a payload wholesale when textPosition is not a number, is outside [0.1, 0.9], or is present on a Connection without text; Export emits textPosition only when present @implemented
-- Connections without Reroute Points render as the existing cubic Bézier @implemented
+- Connections without Reroute Points render as the existing cubic Bézier unless their Route Style is orthogonal @implemented
 - a Connection with Reroute Points renders as a bounded piecewise cubic Bézier through its source Handle, every ordered Reroute Point, and its target Handle @implemented
 - routed Connection endpoint tangents follow their Handles @implemented
 - routed Connection endpoint tangent magnitudes use the plain curve's span-based offset (clamp(0.4 × span, 40, 150)), capped so the departure/arrival control point never passes the first/last Reroute Point along the Handle direction @implemented
@@ -153,6 +153,9 @@
 - rendering, hit-testing, and Marquee selection use the complete routed curve @implemented
 - Zoom to Fit, Zoom to Selection, Connection Text projection, and PNG bounds use the complete routed curve @implemented
 - creating a Connection and Quick-add never invent Reroute Points @implemented
+- a Connection carries an optional Route Style — curve by default, orthogonal for handle-constrained right-angle segments bending through Reroute Points as sharp corners; absent means curve and creating a Connection or Quick-add never sets it @implemented
+- an orthogonal Connection departs along its source Handle and arrives along its target Handle with minimal bends, hitting every Reroute Point exactly as a sharp corner @implemented
+- Route Style is restyled from the Connection styling trigger and per-value Command Palette Entries as one bulk undo step following the Stroke Pattern rules; Import rejects unknown styles wholesale and canonicalizes explicit curve to absent @implemented
 
 ## alignment
 

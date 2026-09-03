@@ -289,7 +289,7 @@ export class ContextMenuService {
     const start = this.graphService.getHandlePosition(conn.sourceNodeId, conn.sourceHandle);
     const end = this.graphService.getHandlePosition(conn.targetNodeId, conn.targetHandle);
     if (!start || !end) return;
-    const route = connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints);
+    const route = connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints, conn.routeStyle);
     const midpoint = routePointAt(route, 0.5);
     this.historyService.execute(new AddConnectionReroutePointCommand(
       this.graphService,

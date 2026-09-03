@@ -73,6 +73,8 @@ describe('PaletteEntryRegistry', () => {
     expect(find('connection-color-default').icon).toBe('lucideEraser');
     expect(find('connection-pattern-dashed').linePreview).toEqual({ dash: '6 4' });
     expect(find('connection-weight-thick').linePreview).toEqual({ width: 3.5 });
+    expect(find('connection-route-curve').icon).toBe('lucideSpline');
+    expect(find('connection-route-orthogonal').icon).toBe('lucideRoute');
   });
 
   it('orders Connection entries Add Reroute Point first, then Reset → colors → patterns → weights → arrowheads', () => {
@@ -88,9 +90,9 @@ describe('PaletteEntryRegistry', () => {
       'connection-color-lavender',
       'connection-color-lightgray',
       'connection-color-lightorange',
-      'connection-color-pink',
-      'connection-color-pastelred',
       'connection-color-pastelblue',
+      'connection-color-pastelred',
+      'connection-color-pink',
       'connection-pattern-dashed',
       'connection-pattern-dotted',
       'connection-pattern-solid',
@@ -103,6 +105,8 @@ describe('PaletteEntryRegistry', () => {
       'connection-arrowhead-end-none',
       'connection-arrowhead-end-arrow',
       'connection-arrowhead-end-triangle',
+      'connection-route-curve',
+      'connection-route-orthogonal',
     ]);
   });
 
@@ -152,6 +156,26 @@ describe('PaletteEntryRegistry', () => {
     expect(registry.execute('node-color-pastelblue')).toBe(true);
     expect(graphService.nodes()[0].color).toBe('#B3EBF2');
     expect(historyService.canUndo()).toBe(true);
+  });
+
+  it('executes Route Style entries through the bulk Route Style Command', () => {
+    const orthogonal = find('connection-route-orthogonal');
+    expect(orthogonal.label).toBe("Set selected Connections' Route Style to Orthogonal");
+    expect(orthogonal.category).toBe('Connections');
+    expect(orthogonal.aliases).toContain('orthogonal route style');
+    expect(orthogonal.available).toBe(false);
+
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 300, 0);
+    const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    graphService.selectConnection(conn.id);
+
+    expect(find('connection-route-orthogonal').available).toBe(true);
+    expect(registry.execute('connection-route-orthogonal')).toBe(true);
+    expect(graphService.connections()[0].routeStyle).toBe('orthogonal');
+    expect(historyService.canUndo()).toBe(true);
+    historyService.undo();
+    expect('routeStyle' in graphService.connections()[0]).toBe(false);
   });
 
   it('executes a Shape entry through the bulk Shape Command', () => {
