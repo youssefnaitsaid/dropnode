@@ -46,6 +46,19 @@ describe('ClipboardService', () => {
       expect(copies.every(item => item.shape === 'pill')).toBe(true);
     });
 
+    it('carries a regular Node Emoji through Paste and Duplicate', () => {
+      const node = graphService.createNode('Idea', 10, 20);
+      graphService.setNodeEmoji(node.id, '💡');
+
+      service.copy(node.id);
+      service.pasteAt(400, 300);
+      service.duplicate(node.id);
+
+      const copies = graphService.nodes().filter(item => item.id !== node.id);
+      expect(copies).toHaveLength(2);
+      expect(copies.every(item => item.emoji === '💡')).toBe(true);
+    });
+
     it('copying a Group captures the Group, its children, and only internal Connections', () => {
       const group = graphService.createGroup('G', 0, 0, 400, 300);
       const childA = graphService.createNode('A', 20, 20);
@@ -128,6 +141,17 @@ describe('ClipboardService', () => {
       service.cut('nonexistent');
       expect(service.canPaste()).toBe(false);
       expect(historyService.canUndo()).toBe(false);
+    });
+
+    it('cut carries the Emoji to the Clipboard and back on paste', () => {
+      const node = graphService.createNode('Idea', 0, 0);
+      graphService.setNodeEmoji(node.id, '💡');
+
+      service.cut(node.id);
+      service.pasteAt(400, 300);
+
+      const pasted = graphService.nodes().find(item => item.id !== node.id)!;
+      expect(pasted.emoji).toBe('💡');
     });
   });
 

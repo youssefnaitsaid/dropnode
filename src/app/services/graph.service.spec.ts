@@ -1833,6 +1833,32 @@ describe('GraphService', () => {
     });
   });
 
+  describe('setNodeEmoji', () => {
+    it('stores a curated Emoji and removes the field with null', () => {
+      const node = service.createNode('N', 0, 0);
+
+      service.setNodeEmoji(node.id, '💡');
+      expect(service.nodes().find(n => n.id === node.id)?.emoji).toBe('💡');
+
+      service.setNodeEmoji(node.id, null);
+      expect(service.nodes().find(n => n.id === node.id)?.emoji).toBeUndefined();
+    });
+
+    it('does not give a Group an Emoji', () => {
+      const group = service.createGroup('G', 0, 0);
+
+      service.setNodeEmoji(group.id, '💡');
+
+      expect(service.nodes().find(n => n.id === group.id)?.emoji).toBeUndefined();
+    });
+
+    it('new Nodes start without an Emoji', () => {
+      const node = service.createNode('N', 0, 0);
+
+      expect(node.emoji).toBeUndefined();
+    });
+  });
+
   describe('import validation for Groups and colors', () => {
     const baseNode = (over: Record<string, unknown>) => ({
       id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, ...over,
@@ -1967,6 +1993,61 @@ describe('GraphService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Invalid node g1: a Group cannot carry shape');
+      expect(service.nodes().map(n => n.id)).toEqual([keep.id]);
+    });
+  });
+
+  describe('import validation for Node Emoji', () => {
+    const node = (over: Record<string, unknown> = {}) => ({
+      id: 'n1', label: 'Node', x: 0, y: 0, width: 160, height: 48, ...over,
+    });
+    const group = (over: Record<string, unknown> = {}) => ({
+      id: 'g1', label: 'Group', x: 0, y: 0, width: 320, height: 200, kind: 'group', ...over,
+    });
+
+    it('accepts a curated Emoji and imports a payload without one unchanged', () => {
+      const result = service.importGraph({
+        nodes: [node({ emoji: '💡' }), node({ id: 'n2' })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(true);
+      expect(service.nodes().find(n => n.id === 'n1')?.emoji).toBe('💡');
+      expect(service.nodes().find(n => n.id === 'n2')?.emoji).toBeUndefined();
+    });
+
+    it('carries the Emoji through an export/import round trip', () => {
+      const created = service.createNode('Idea', 0, 0);
+      service.setNodeEmoji(created.id, '💡');
+
+      const exported = service.exportGraph();
+      service.clearGraph();
+      const result = service.importGraph(exported);
+
+      expect(result.success).toBe(true);
+      expect(service.nodes()[0].emoji).toBe('💡');
+    });
+
+    it.each([null, '', '🎉', '🔴', 42])('rejects a non-string or off-set Emoji %j', emoji => {
+      const result = service.importGraph({
+        nodes: [node({ emoji })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid node n1: emoji must be a curated emoji');
+    });
+
+    it('rejects an Emoji on a Group and keeps existing Graph State untouched', () => {
+      const keep = service.createNode('Keep', 0, 0);
+
+      const result = service.importGraph({
+        nodes: [group({ emoji: '💡' })],
+        connections: [],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid node g1: a Group cannot carry emoji');
       expect(service.nodes().map(n => n.id)).toEqual([keep.id]);
     });
   });

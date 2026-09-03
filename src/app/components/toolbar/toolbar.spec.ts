@@ -91,6 +91,77 @@ describe('ToolbarComponent', () => {
     expect(historyService.canUndo()).toBe(false);
   });
 
+  it('shows an Emoji section and applies the pick to regular Nodes only, undoing as one command', async () => {
+    const node = graphService.createNode('Node', 0, 0);
+    const group = graphService.createGroup('Group', 400, 0);
+    graphService.setSelection([node.id, group.id], []);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const cells = Array.from(document.body.querySelectorAll('.emoji-cell')) as HTMLButtonElement[];
+    expect(cells).toHaveLength(48);
+    const idea = cells.find(button => button.getAttribute('aria-label') === 'Idea')!;
+    expect(idea.getAttribute('title')).toBe('Idea');
+    idea.click();
+    fixture.detectChanges();
+
+    expect(graphService.nodes().find(item => item.id === node.id)?.emoji).toBe('💡');
+    expect(graphService.nodes().find(item => item.id === group.id)?.emoji).toBeUndefined();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect(graphService.nodes().find(item => item.id === node.id)?.emoji).toBeUndefined();
+  });
+
+  it('shows no Emoji check for a mixed regular selection and disables Emoji items for a Group-only selection', async () => {
+    const first = graphService.createNode('First', 0, 0);
+    const second = graphService.createNode('Second', 300, 0);
+    graphService.setNodeEmoji(second.id, '💡');
+    graphService.setSelection([first.id, second.id], []);
+    fixture.detectChanges();
+
+    // Mixed regular selection: no shared Emoji, so no item can read active
+    expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
+
+    // Group-only selection: the trigger stays (Groups take color), but the
+    // Emoji section is disabled with a hint and clicking does nothing
+    graphService.selectNode(graphService.createGroup('Only Group', 600, 0).id);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const label = Array.from(document.body.querySelectorAll('*')).find(
+      el => el.textContent?.trim() === 'Emoji — select a regular Node first',
+    );
+    expect(label).toBeTruthy();
+    const idea = Array.from(document.body.querySelectorAll('.emoji-cell')).find(
+      button => button.getAttribute('aria-label') === 'Idea',
+    ) as HTMLButtonElement;
+    expect(idea.hasAttribute('disabled')).toBe(true);
+
+    idea.click();
+    fixture.detectChanges();
+    expect(historyService.canUndo()).toBe(false);
+  });
+
   it('zooms in and out anchored on the visible Canvas center', () => {
     // No .canvas-container in the test DOM, so the anchor falls back to the
     // window size — half of innerWidth/innerHeight.

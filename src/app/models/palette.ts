@@ -29,6 +29,8 @@ export interface PaletteEntry {
   readonly icon?: string;
   /** Line-style preview (stroke patterns and weights) drawn instead of an icon. */
   readonly linePreview?: { readonly dash?: string; readonly width?: number };
+  /** Emoji glyph drawn as the leading visual for per-value Emoji entries. */
+  readonly emoji?: string;
   /** Optional ordering group within a category; equal groups use the label. */
   readonly sortOrder?: number;
   readonly available: boolean;

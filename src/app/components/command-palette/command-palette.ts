@@ -266,6 +266,8 @@ interface PaletteGroup {
                       >
                         @if (entry.swatch) {
                           <span class="palette-swatch" [style.background]="entry.swatch" aria-hidden="true"></span>
+                        } @else if (entry.emoji) {
+                          <span class="palette-emoji" aria-hidden="true">{{ entry.emoji }}</span>
                         } @else if (entry.linePreview) {
                           <span class="palette-line-preview" aria-hidden="true">
                             <svg viewBox="0 0 20 20" width="16" height="16">
@@ -430,6 +432,17 @@ interface PaletteGroup {
       align-items: center;
       justify-content: center;
       color: var(--muted-foreground);
+    }
+
+    .palette-emoji {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
     }
 
     .palette-item-icon {

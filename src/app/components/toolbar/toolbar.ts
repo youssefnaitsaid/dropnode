@@ -51,6 +51,7 @@ import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
+  buildSetNodesEmojiCommand,
   buildSetConnectionsColorCommand,
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
@@ -61,6 +62,7 @@ import {
 } from '../../services/commands';
 import { AlignKind, DistributeAxis } from '../../models/align-distribute';
 import { NODE_PALETTE, NODE_PALETTE_NAMES } from '../../models/node';
+import { NODE_EMOJIS } from '../../models/node-emoji';
 import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
 import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight } from '../../models/connection';
 
@@ -141,7 +143,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
             variant="ghost"
             size="icon"
             [hlmDropdownMenuTrigger]="nodeMenu"
-            title="Node — color and shape"
+            title="Node — color, shape, and emoji"
             aria-label="Node styling"
           >
             <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
@@ -260,6 +262,41 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               }
             </button>
           }
+          <hlm-dropdown-menu-separator />
+          <!-- Regular Nodes only, like Shape (ADR-0030); the section stays
+               visible but disabled so the state is explained (ADR-0028) -->
+          <div hlmDropdownMenuLabel>
+            {{ selectedRegularNodes().length === 0 ? 'Emoji — select a regular Node first' : 'Emoji' }}
+          </div>
+          <button
+            hlmDropdownMenuItem
+            [disabled]="selectedRegularNodes().length === 0"
+            (triggered)="setEmoji(null)"
+          >
+            <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+            <span>None</span>
+            @if (sharedNodeEmoji() === null) {
+              <ng-icon name="lucideCheck" class="ml-auto" />
+            }
+          </button>
+          <div class="emoji-grid" role="group" aria-label="Emoji choices">
+            @for (entry of emojiEntries; track entry.emoji) {
+              <button
+                hlmDropdownMenuItem
+                class="emoji-cell"
+                [disabled]="selectedRegularNodes().length === 0"
+                (triggered)="setEmoji(entry.emoji)"
+                [title]="entry.name"
+                [attr.aria-label]="entry.name"
+                [attr.aria-pressed]="sharedNodeEmoji() === entry.emoji"
+              >
+                <span class="emoji-glyph" aria-hidden="true">{{ entry.emoji }}</span>
+                @if (sharedNodeEmoji() === entry.emoji) {
+                  <ng-icon name="lucideCheck" class="emoji-check" />
+                }
+              </button>
+            }
+          </div>
         </div>
       </ng-template>
 
@@ -486,6 +523,30 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       border-radius: 50%;
       border: 1px dashed var(--muted-foreground);
     }
+    /* Emoji picker (ADR-0030): the 48 curated glyphs as a compact grid with
+       name tooltips, inside the Node styling trigger beside Color/Shape */
+    .emoji-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 2px;
+      padding: 4px 8px 8px;
+    }
+    .emoji-cell {
+      position: relative;
+      justify-content: center;
+      padding: 4px 0;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .emoji-glyph {
+      line-height: 1;
+    }
+    .emoji-check {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      font-size: 10px;
+    }
     .flip-x {
       transform: scaleX(-1);
     }
@@ -525,6 +586,9 @@ export class ToolbarComponent {
     { shape: 'diamond', label: 'Diamond' },
     { shape: 'ellipse', label: 'Ellipse' },
   ];
+  // The curated Emoji set in picker order (ADR-0030): tooltips and aria
+  // labels use the stable names, never the raw glyph.
+  readonly emojiEntries = NODE_EMOJIS;
 
   // Start icons are the same glyphs flipped horizontally (see .flip-x) so they
   // point backward along the curve, teaching the source→target direction.
@@ -566,6 +630,15 @@ export class ToolbarComponent {
     if (nodes.length === 0) return undefined;
     const first = effectiveNodeShape(nodes[0].shape);
     return nodes.every(n => effectiveNodeShape(n.shape) === first) ? first : undefined;
+  };
+
+  // Null means every selected regular Node lacks an Emoji; undefined means a
+  // mixed set (or no regular Node) — nothing highlights.
+  sharedNodeEmoji = (): string | null | undefined => {
+    const nodes = this.selectedRegularNodes();
+    if (nodes.length === 0) return undefined;
+    const first = nodes[0].emoji ?? null;
+    return nodes.every(n => (n.emoji ?? null) === first) ? first : undefined;
   };
 
   sharedConnectionColor = (): string | null | undefined => {
@@ -646,6 +719,13 @@ export class ToolbarComponent {
   setShape(shape: NodeShape): void {
     const cmd = buildSetNodesShapeCommand(
       this.graphService, this.graphService.selectedNodeIds(), shape,
+    );
+    if (cmd) this.historyService.execute(cmd);
+  }
+
+  setEmoji(emoji: string | null): void {
+    const cmd = buildSetNodesEmojiCommand(
+      this.graphService, this.graphService.selectedNodeIds(), emoji,
     );
     if (cmd) this.historyService.execute(cmd);
   }

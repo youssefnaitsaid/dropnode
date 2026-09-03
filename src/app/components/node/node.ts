@@ -10,6 +10,7 @@ import {
   NodeShape,
   shapeMinimumSize,
 } from '../../models/node-shape';
+import { nodeEmojiName } from '../../models/node-emoji';
 import { Text, isTextEmpty, textToPlainString } from '../../models/text';
 import { HandleComponent } from '../handle/handle';
 import { TextViewComponent } from '../text-view/text-view';
@@ -91,7 +92,10 @@ export interface NodeSizeChangedEvent {
           </div>
         } @else {
           @if (isEditing()) {
-            <div class="node-text">
+            <div class="node-text" [class.has-emoji]="nodeEmoji() !== undefined">
+              @if (nodeEmoji() !== undefined) {
+                <span class="node-emoji" aria-hidden="true">{{ nodeEmoji() }}</span>
+              }
               @defer (when isEditing()) {
                 <app-text-editor
                   [text]="nodeText()"
@@ -101,7 +105,10 @@ export interface NodeSizeChangedEvent {
               }
             </div>
           } @else {
-            <div #textWrap class="node-text">
+            <div #textWrap class="node-text" [class.has-emoji]="nodeEmoji() !== undefined">
+              @if (nodeEmoji() !== undefined) {
+                <span class="node-emoji" aria-hidden="true">{{ nodeEmoji() }}</span>
+              }
               <app-text-view [text]="nodeText()" />
             </div>
           }
@@ -274,6 +281,27 @@ export interface NodeSizeChangedEvent {
       --tv-size-s: 11px;
       --tv-size-l: 18px;
     }
+    /* Emoji (ADR-0030): the glyph leads the Text inside the centered content
+       block, so it inherits every Shape safe-area rule for free. A flex row
+       keeps the glyph baseline-aligned with the Text's first line; long Text
+       wraps inside its own box beside the glyph. The glyph never enters the
+       edited document. Fixed size, independent of the S/M/L Text formatting. */
+    .node-text.has-emoji {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+    }
+    .node-text.has-emoji app-text-view,
+    .node-text.has-emoji app-text-editor {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .node-emoji {
+      flex: 0 0 auto;
+      font-size: var(--dn-emoji-size);
+      line-height: 1;
+      margin-right: var(--dn-emoji-gap);
+    }
     .node-label-input {
       background: transparent;
       border: none;
@@ -370,6 +398,7 @@ export class NodeComponent implements AfterViewInit {
   protected chainHighlightService = inject(ChainHighlightService);
   private viewReady = false;
   private measuredShape: NodeShape | null = null;
+  private measuredEmoji: string | null | undefined = null;
 
   constructor() {
     // Chain Highlight suppression while inline editing (Node Text or Group Label)
@@ -407,14 +436,18 @@ export class NodeComponent implements AfterViewInit {
       }
     });
 
-    // A shape change can require a larger safe bounding box. Wait for the
-    // shaped surface to render, then grow around the existing center.
+    // A shape change can require a larger safe bounding box. An added Emoji
+    // grows the measured content the same way (grow-only, center kept).
+    // Wait for the shaped surface to render, then grow around the existing
+    // center.
     effect(() => {
       const shape = this.nodeShape();
-      if (!this.viewReady || !this.textWrap() || this.measuredShape === shape) return;
+      const emoji = this.nodeEmoji();
+      if (!this.viewReady || !this.textWrap() || (this.measuredShape === shape && this.measuredEmoji === (emoji ?? null))) return;
       this.measuredShape = shape;
+      this.measuredEmoji = emoji ?? null;
       requestAnimationFrame(() => {
-        if (this.nodeShape() === shape) this.measureAndEmitSize(true);
+        if (this.nodeShape() === shape && this.nodeEmoji() === emoji) this.measureAndEmitSize(true);
       });
     });
   }
@@ -431,15 +464,26 @@ export class NodeComponent implements AfterViewInit {
 
   nodeText = computed<Text>(() => this.node().text ?? []);
 
+  // The Emoji beside the Text (ADR-0030): regular Nodes only, mirroring the
+  // Shape boundary — Groups never carry one. Never separately focusable;
+  // the card's accessible name carries the curated meaning instead.
+  nodeEmoji = computed<string | undefined>(() =>
+    this.isGroup() ? undefined : this.node().emoji,
+  );
+
   // Screen-reader name for the card: a Group's label, or a regular Node's
-  // Text flattened to plain text (falling back to "Node" when empty).
+  // Text flattened to plain text (falling back to "Node" when empty),
+  // prefixed with the curated Emoji name when one is present.
   cardAriaLabel = computed(() => {
     if (this.isGroup()) {
       const label = this.node().label?.trim();
       return label ? `Group, ${label}` : 'Group';
     }
     const plain = textToPlainString(this.nodeText()).trim();
-    return plain ? plain : 'Node';
+    const base = plain ? plain : 'Node';
+    const emoji = this.nodeEmoji();
+    const name = emoji !== undefined ? nodeEmojiName(emoji) : undefined;
+    return name ? `${name}. ${base}` : base;
   });
 
   cardBackground = computed(() => this.node().color ?? DEFAULT_NODE_BACKGROUND);

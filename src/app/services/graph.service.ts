@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
 import { NodeShape, isNodeShape, storedNodeShape } from '../models/node-shape';
+import { isNodeEmoji } from '../models/node-emoji';
 import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
 import { GraphState } from '../models/graph-state';
 import { ViewportState, ZOOM_MIN, ZOOM_MAX } from '../models/viewport-state';
@@ -241,6 +242,20 @@ export class GraphService {
     );
   }
 
+  // Emoji is a regular-Node-only mark like Shape (ADR-0030): absent means
+  // none, and there is no default to canonicalize. Null removes the field.
+  setNodeEmoji(id: string, emoji: string | null): void {
+    this.nodes.update(nodes =>
+      nodes.map(n => {
+        if (n.id !== id || n.kind === 'group') return n;
+        if (emoji === null) {
+          const { emoji: _removed, ...rest } = n;
+          return rest;
+        }
+        return { ...n, emoji };
+      })
+    );
+  }
   // Group Label only — regular nodes carry Text, set via setNodeText
   updateNodeLabel(id: string, label: string): void {
     this.nodes.update(nodes =>
@@ -844,6 +859,14 @@ export class GraphService {
       }
       if (node['color'] !== undefined && !NODE_PALETTE.includes(node['color'] as string)) {
         return { valid: false, error: `Invalid node ${nodeId}: color must be a palette color` };
+      }
+      if (node['emoji'] !== undefined) {
+        if (node['kind'] === 'group') {
+          return { valid: false, error: `Invalid node ${nodeId}: a Group cannot carry emoji` };
+        }
+        if (!isNodeEmoji(node['emoji'])) {
+          return { valid: false, error: `Invalid node ${nodeId}: emoji must be a curated emoji` };
+        }
       }
       nodeIds.add(nodeId);
     }

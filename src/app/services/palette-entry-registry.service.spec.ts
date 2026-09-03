@@ -55,15 +55,17 @@ describe('PaletteEntryRegistry', () => {
       .toEqual(['node-shape-rectangle', 'node-shape-pill', 'node-shape-diamond', 'node-shape-ellipse']);
 
     const styleIds = registry.search('').filter(entry =>
-      entry.id.startsWith('node-color-') || entry.id.startsWith('node-shape-'),
+      entry.id.startsWith('node-color-') || entry.id.startsWith('node-shape-') || entry.id.startsWith('node-emoji-'),
     ).map(entry => entry.id);
     expect(styleIds.slice(0, 9).every(id => id.startsWith('node-color-'))).toBe(true);
-    expect(styleIds.slice(9).every(id => id.startsWith('node-shape-'))).toBe(true);
+    expect(styleIds.slice(9, 13).every(id => id.startsWith('node-shape-'))).toBe(true);
+    expect(styleIds.slice(13).every(id => id.startsWith('node-emoji-'))).toBe(true);
+    expect(styleIds.filter(id => id.startsWith('node-emoji-'))).toHaveLength(49);
   });
 
-  it('gives every entry exactly one leading visual (swatch, icon, or line preview)', () => {
+  it('gives every entry exactly one leading visual (swatch, emoji, icon, or line preview)', () => {
     const offenders = registry.entries()
-      .filter(entry => [entry.swatch, entry.icon, entry.linePreview].filter(Boolean).length !== 1)
+      .filter(entry => [entry.swatch, entry.emoji, entry.icon, entry.linePreview].filter(Boolean).length !== 1)
       .map(entry => entry.id);
     expect(offenders).toEqual([]);
 
@@ -165,6 +167,64 @@ describe('PaletteEntryRegistry', () => {
 
     historyService.undo();
     expect(graphService.nodes().find(item => item.id === node.id)?.shape).toBeUndefined();
+  });
+
+  it('exposes one Emoji entry per curated value plus Remove Emoji', () => {
+    const idea = find('node-emoji-idea');
+    const blocked = find('node-emoji-blocked');
+    const remove = find('node-emoji-remove');
+
+    expect(idea.label).toBe("Set selected Nodes' Emoji to Idea");
+    expect(idea.category).toBe('Nodes & Groups');
+    expect(idea.emoji).toBe('💡');
+    expect(idea.aliases).toContain('idea');
+    expect(blocked.label).toBe("Set selected Nodes' Emoji to Blocked");
+    expect(blocked.aliases).toContain('blocked');
+    expect(remove.label).toBe('Remove Emoji');
+    expect(remove.aliases).toContain('remove emoji');
+  });
+
+  it('keeps Emoji entries unavailable until a regular Node is selected', () => {
+    const group = graphService.createGroup('G', 0, 0, 240, 160);
+    const idea = find('node-emoji-idea');
+
+    expect(idea.available).toBe(false);
+    expect(idea.disabledReason).toBe('Select a regular Node first');
+
+    graphService.selectNode(group.id);
+    expect(find('node-emoji-idea').available).toBe(false);
+    expect(registry.execute('node-emoji-idea')).toBe(false);
+
+    const node = graphService.createNode('A', 0, 0);
+    graphService.toggleNodeSelection(node.id);
+    expect(find('node-emoji-idea').available).toBe(true);
+  });
+
+  it('executes Emoji entries through the bulk Emoji Command, skipping Groups', () => {
+    const group = graphService.createGroup('G', 0, 0, 240, 160);
+    const node = graphService.createNode('A', 0, 0);
+    graphService.selectNode(group.id);
+    graphService.toggleNodeSelection(node.id);
+
+    expect(registry.execute('node-emoji-idea')).toBe(true);
+    expect(graphService.nodes().find(item => item.id === node.id)?.emoji).toBe('💡');
+    expect(graphService.nodes().find(item => item.id === group.id)?.emoji).toBeUndefined();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect(graphService.nodes().find(item => item.id === node.id)?.emoji).toBeUndefined();
+
+    registry.execute('node-emoji-idea');
+    expect(registry.execute('node-emoji-remove')).toBe(true);
+    expect(graphService.nodes().find(item => item.id === node.id)?.emoji).toBeUndefined();
+  });
+
+  it('finds Emoji entries by their curated names', () => {
+    const node = graphService.createNode('A', 0, 0);
+    graphService.selectNode(node.id);
+
+    expect(registry.search('idea').map(entry => entry.id)).toContain('node-emoji-idea');
+    expect(registry.search('blocked').map(entry => entry.id)).toContain('node-emoji-blocked');
   });
 
   it('re-checks live selection at execution time', () => {
