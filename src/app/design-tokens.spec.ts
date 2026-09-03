@@ -39,4 +39,11 @@ describe('design tokens stay in sync with styles.scss', () => {
     const darkBlock = STYLES.slice(STYLES.indexOf(':root.dark'));
     expect(darkBlock).toContain(`--primary: ${DN_TOKENS.accent};`);
   });
+
+  it('pins the Node Emoji size and gap tokens (ADR-0030)', () => {
+    // The Emoji renders at a fixed size regardless of Text S/M/L
+    // formatting, with a small trailing gap before the Text.
+    expect(cssVar('dn-emoji-size')).toBe('16px');
+    expect(cssVar('dn-emoji-gap')).toBe('6px');
+  });
 });

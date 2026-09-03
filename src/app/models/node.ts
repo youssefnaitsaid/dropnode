@@ -52,4 +52,7 @@ export interface GraphNode {
   color?: string;
   // Shape of a regular Node; absent means the existing rectangle. Groups never carry Shape.
   shape?: StoredNodeShape;
+  // Emoji of a regular Node — the exact glyph from the curated set; absent means none.
+  // Groups never carry Emoji. Beside Text, never inside it (ADR-0030).
+  emoji?: string;
 }

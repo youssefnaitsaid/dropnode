@@ -126,6 +126,11 @@ body {
   --dn-sel-edge: #949ba4;                          /* 1px edge ring under the selection glow */
   --dn-dim-opacity: 0.25;                          /* Chain Highlight dim for non-chain elements (ADR-0029) */
 
+  /* Node Emoji (ADR-0030): fixed glyph size independent of Text S/M/L, with
+     a small trailing gap before the Text's first line */
+  --dn-emoji-size: 16px;                           /* Emoji glyph size on a Node card */
+  --dn-emoji-gap: 6px;                             /* trailing gap between the Emoji and Text */
+
   /* Elevation (canvas elements) */
   --dn-shadow-color: rgba(0, 0, 0, 0.45);          /* shadow black — the tone every elevation shadow and the diamond drop-shadow tint from */
   --dn-shadow-node: 0 2px 10px rgba(0, 0, 0, 0.45);

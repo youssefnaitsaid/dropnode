@@ -952,6 +952,68 @@ export function buildSetNodesShapeCommand(
   return parts.length > 0 ? new CompoundCommand('Set Node Shape', parts) : null;
 }
 
+export class SetNodeEmojiCommand implements Command {
+  description = 'Set Node Emoji';
+  private originalEmoji: string | null;
+  private originalRect: NodeRect;
+  private appliedRect: NodeRect | null = null;
+
+  constructor(
+    private graphService: GraphService,
+    private nodeId: string,
+    private newEmoji: string | null,
+  ) {
+    const node = this.graphService.nodes().find(n => n.id === nodeId);
+    this.originalEmoji = node?.emoji ?? null;
+    this.originalRect = {
+      x: node?.x ?? 0,
+      y: node?.y ?? 0,
+      width: node?.width ?? 0,
+      height: node?.height ?? 0,
+    };
+  }
+
+  execute(): void {
+    this.graphService.setNodeEmoji(this.nodeId, this.newEmoji);
+    if (this.appliedRect) {
+      this.graphService.resizeNode(this.nodeId, this.appliedRect);
+    }
+  }
+
+  recordAutoResize(nodeId: string, rect: NodeRect): void {
+    if (nodeId !== this.nodeId) return;
+    const node = this.graphService.nodes().find(item => item.id === nodeId);
+    if (node && (node.emoji ?? null) === this.newEmoji) {
+      this.appliedRect = { ...rect };
+    }
+  }
+
+  undo(): void {
+    this.graphService.setNodeEmoji(this.nodeId, this.originalEmoji);
+    this.graphService.resizeNode(this.nodeId, this.originalRect);
+  }
+}
+
+/**
+ * Set every given regular Node's Emoji as one undo step, skipping Groups
+ * and Nodes already carrying the value. Null removes the Emoji. Returns
+ * null when nothing would change, so a no-op pick touches no History.
+ */
+export function buildSetNodesEmojiCommand(
+  graphService: GraphService,
+  nodeIds: readonly string[],
+  emoji: string | null,
+): Command | null {
+  const nodes = graphService.nodes();
+  const parts = nodeIds
+    .filter(id => {
+      const node = nodes.find(n => n.id === id);
+      return node !== undefined && node.kind !== 'group' && (node.emoji ?? null) !== emoji;
+    })
+    .map(id => new SetNodeEmojiCommand(graphService, id, emoji));
+  return parts.length > 0 ? new CompoundCommand('Set Node Emoji', parts) : null;
+}
+
 /** Recolor every given Connection as one undo step, skipping no-ops. */
 export function buildSetConnectionsColorCommand(
   graphService: GraphService,

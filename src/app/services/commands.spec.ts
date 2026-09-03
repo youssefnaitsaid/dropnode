@@ -15,6 +15,7 @@ import {
   ResizeNodeCommand,
   SetNodeColorCommand,
   SetNodeShapeCommand,
+  SetNodeEmojiCommand,
   CompoundCommand,
   SetNodeTextCommand,
   SetConnectionTextCommand,
@@ -35,6 +36,7 @@ import {
   buildDeleteSelectionCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
+  buildSetNodesEmojiCommand,
   buildSetConnectionsColorCommand,
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
@@ -1255,6 +1257,79 @@ describe('Commands', () => {
     });
   });
 
+  describe('SetNodeEmojiCommand', () => {
+    it('execute applies the Emoji and undo restores the exact previous value and rect', () => {
+      const node = graphService.createNode('N', 100, 80);
+      const original = { x: node.x, y: node.y, width: node.width, height: node.height };
+      const cmd = new SetNodeEmojiCommand(graphService, node.id, '💡');
+
+      cmd.execute();
+      const grown = { x: 90, y: 80, width: 180, height: 48 };
+      graphService.resizeNode(node.id, grown);
+      cmd.recordAutoResize(node.id, grown);
+      expect(graphService.nodes()[0].emoji).toBe('💡');
+
+      cmd.undo();
+
+      expect(graphService.nodes()[0]).toMatchObject(original);
+      expect(graphService.nodes()[0].emoji).toBeUndefined();
+
+      cmd.execute();
+      expect(graphService.nodes()[0]).toMatchObject({ emoji: '💡', ...grown });
+    });
+  });
+
+  describe('buildSetNodesEmojiCommand', () => {
+    it('applies an Emoji to regular Nodes, skips Groups and restores mixed values', () => {
+      const regular = graphService.createNode('A', 0, 0);
+      const already = graphService.createNode('B', 300, 0);
+      const group = graphService.createGroup('G', 600, 0);
+      graphService.setNodeEmoji(already.id, '⭐');
+
+      const cmd = buildSetNodesEmojiCommand(
+        graphService,
+        [regular.id, already.id, group.id],
+        '💡',
+      )!;
+      cmd.execute();
+
+      expect(graphService.nodes().find(n => n.id === regular.id)?.emoji).toBe('💡');
+      expect(graphService.nodes().find(n => n.id === already.id)?.emoji).toBe('💡');
+      expect(graphService.nodes().find(n => n.id === group.id)?.emoji).toBeUndefined();
+
+      cmd.undo();
+
+      expect(graphService.nodes().find(n => n.id === regular.id)?.emoji).toBeUndefined();
+      expect(graphService.nodes().find(n => n.id === already.id)?.emoji).toBe('⭐');
+    });
+
+    it('removes the Emoji when null is picked and restores it on undo', () => {
+      const node = graphService.createNode('A', 0, 0);
+      graphService.setNodeEmoji(node.id, '💡');
+
+      const cmd = buildSetNodesEmojiCommand(graphService, [node.id], null)!;
+      cmd.execute();
+      expect(graphService.nodes().find(n => n.id === node.id)?.emoji).toBeUndefined();
+
+      cmd.undo();
+      expect(graphService.nodes().find(n => n.id === node.id)?.emoji).toBe('💡');
+    });
+
+    it('returns null when every regular Node already carries the Emoji', () => {
+      const regular = graphService.createNode('A', 0, 0);
+      const group = graphService.createGroup('G', 300, 0);
+      graphService.setNodeEmoji(regular.id, '💡');
+
+      expect(buildSetNodesEmojiCommand(graphService, [regular.id, group.id], '💡')).toBeNull();
+    });
+
+    it('returns null when removing from Nodes that already lack one', () => {
+      const regular = graphService.createNode('A', 0, 0);
+
+      expect(buildSetNodesEmojiCommand(graphService, [regular.id], null)).toBeNull();
+    });
+  });
+
   describe('buildSetConnectionsColorCommand', () => {
     it('recolors all given Connections as one undo step', () => {
       const a = graphService.createNode('A', 0, 0);
@@ -1586,6 +1661,19 @@ describe('Commands', () => {
         color: NODE_PALETTE[2],
         text: textFromString('label'),
       });
+    });
+
+    it('leaves Node Emojis untouched', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const b = graphService.createNode('B', 10, 300);
+      graphService.setNodeEmoji(a.id, '💡');
+      graphService.setNodeEmoji(b.id, '⭐');
+      graphService.createConnection(a.id, 'top', b.id, 'top');
+
+      buildTidyUpCommand(graphService)!.execute();
+
+      expect(graphService.nodes().find(n => n.id === a.id)?.emoji).toBe('💡');
+      expect(graphService.nodes().find(n => n.id === b.id)?.emoji).toBe('⭐');
     });
 
     it('neither execute nor undo touches the Selection', () => {

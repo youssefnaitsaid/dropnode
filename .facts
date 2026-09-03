@@ -49,6 +49,11 @@
 - Shape is visual-only: the Node's rectangular bounding box remains authoritative for Handles, hit testing, Marquee, alignment, containment, bounds, and Export, while Text stays centered in the shape's safe area @implemented
 - choosing a Shape from the toolbar's Node trigger or the Command Palette applies it only to regular Nodes in the Selection as one undoable bulk Command; selected Groups are ignored, the Shape section is disabled while no regular Node is selected, mixed Shapes show no active item, and an all-no-op choice creates no History entry @implemented
 - a Shape change grows an undersized regular Node around its existing center using a shape-specific Text-safe minimum and never shrinks an existing rect; Resize Grips remain free width/height resizing subject to that minimum @implemented
+- label: the curated Emoji set holds exactly 48 glyphs with stable human-readable names (NODE_EMOJIS); an absent emoji field means none and Groups never carry Emoji
+  command: grep -q 'NODE_EMOJIS' src/app/models/node-emoji.ts
+- choosing an Emoji from the toolbar's Node trigger (None plus a 48-glyph grid with name tooltips) or the Command Palette ("Set selected Nodes' Emoji to <Name>" per value plus "Remove Emoji") applies it only to regular Nodes in the Selection as one undoable bulk Command; selected Groups are ignored, the Emoji section is disabled while no regular Node is selected, mixed Emojis show no active item, and an all-no-op choice creates no History entry @implemented
+- an Emoji renders inline before the Node's Text at a fixed 16px with a 6px trailing gap, stays visible while the Text editor is open, dims and lights with Chain Highlight, and prefixes the card's accessible name with its curated name; it is never separately focusable @implemented
+- an added Emoji grows an undersized regular Node around its existing center via the same grow-only Text/Shape minimum path and never shrinks an existing rect; Copy, Paste, Duplicate, Alt+drag, project persistence, Graph State Export, share links, and PNG rendering preserve it while the Minimap omits it @implemented
 - four Resize Grips show at the corners of a node only while it is the entire Selection (exactly one Node, nothing else); dragging one resizes with the opposite corner anchored
 - a grip drag clamps width and height to the Text-derived minimums (floors 120 and 48)
 - an entire grip drag is one undo step: per-mousemove size updates bypass History, and a single ResizeNodeCommand is pushed on mouseup only if the rect changed more than 2px
@@ -239,6 +244,7 @@
 - Import validation rejects duplicate Node ids, Connections referencing Nodes absent from the same payload, and handle values outside top/right/bottom/left; an empty graph is valid
 - Import validation also rejects kind values other than 'group', off-palette colors, parentId values that reference a missing node or a non-Group, Groups carrying a parentId, and Connections linking a Group to its own child
 - Import accepts only rectangle, pill, diamond, or ellipse Shape values on regular Nodes, rejects Shape on Groups, and canonicalizes explicit rectangle to an absent field @implemented
+- Import accepts only curated Emoji values on regular Nodes, rejects Emoji on Groups, and imports payloads without the field unchanged @implemented
 - payloads without kind, parentId, or color import unchanged as plain nodes — pre-Group exports and links stay valid
 - Import validation does NOT reject duplicate Connection ids or self-connections — only createConnection guards those
 - Import whitelists Text wholesale: unknown block kinds or run keys, non-true format flags, sizes outside S/L, and non-http(s) links are rejected with "Invalid node {id}: {reason}" or "Invalid connection {id}: {reason}"; a Group carrying text is rejected, and a Group without a string label is rejected

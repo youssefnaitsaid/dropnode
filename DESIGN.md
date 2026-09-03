@@ -183,6 +183,9 @@ a 1px `--dn-sel-edge` ring — the glow uses the element's own color identity
 - Repeating one-off metrics (28px Group Label strip, 12px Handle, 10px Grip,
   200×150 Minimap) are intentional sizes documented in their components, not
   tokens — they don't scale as a system.
+- Node Emoji is fixed **16px** (`--dn-emoji-size`) with a **6px** trailing gap
+  (`--dn-emoji-gap`) before the Text, independent of the Text S/M/L sizes
+  (ADR-0030). The size scales with the Viewport like all card content.
 
 ## Motion
 
@@ -347,3 +350,13 @@ The single accent was swapped from Discord blurple `#5865F2` to neutral grey `#6
 - Previous polish pills now grey fills/tints (were blurple).
 - All derived translucency (`color-mix(... var(--dn-accent) ...)`) automatically follows; no other literals.
 - To revert or tweak grey, edit the 5 variables + `DN_TOKENS.accent` + shadow tint together.
+
+### 2026-09 Node Emoji tokens (ADR-0030)
+
+Spec #50 implementation: a Node Emoji renders at a fixed size regardless of
+Text S/M/L formatting, with a small trailing gap before the Text:
+
+- `--dn-emoji-size: 16px` (glyph size), `--dn-emoji-gap: 6px` (trailing gap).
+- CSS-only tokens (no `DN_TOKENS` mirror — sizes are consumed in stylesheets,
+  like the other one-off metrics); `design-tokens.spec.ts` pins both values.
+- Documented in [Radius, spacing, sizing](#radius-spacing-sizing).

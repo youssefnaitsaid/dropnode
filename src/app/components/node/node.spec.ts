@@ -62,6 +62,84 @@ describe('NodeComponent shapes', () => {
   });
 });
 
+describe('NodeComponent emoji', () => {
+  let fixture: ComponentFixture<NodeComponent>;
+  let component: NodeComponent;
+
+  function render(node: GraphNode): void {
+    fixture = TestBed.createComponent(NodeComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('node', node);
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [NodeComponent] });
+  });
+
+  it('renders the Emoji glyph before the Text inside the content block', () => {
+    render({
+      id: 'n1', text: textFromString('Checkout redesign'),
+      x: 0, y: 0, width: 160, height: 48, emoji: '💡',
+    });
+
+    const textWrap = fixture.nativeElement.querySelector('.node-text') as HTMLElement;
+    const glyph = textWrap.querySelector('.node-emoji') as HTMLElement;
+    const text = textWrap.querySelector('app-text-view') as HTMLElement;
+
+    expect(glyph).toBeTruthy();
+    expect(glyph.textContent).toBe('💡');
+    expect(glyph.getAttribute('aria-hidden')).toBe('true');
+    // The glyph leads the Text within the same centered content block
+    expect(glyph.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders no glyph without an Emoji and never on a Group', () => {
+    render({ id: 'n1', text: textFromString('Plain'), x: 0, y: 0, width: 160, height: 48 });
+    expect(fixture.nativeElement.querySelector('.node-emoji')).toBeNull();
+
+    render({
+      id: 'g1', kind: 'group', label: 'System',
+      x: 0, y: 0, width: 320, height: 200, emoji: '💡',
+    } as GraphNode);
+    expect(fixture.nativeElement.querySelector('.node-emoji')).toBeNull();
+  });
+
+  it('prefixes the accessible name with the curated Emoji name', () => {
+    render({
+      id: 'n1', text: textFromString('Checkout redesign'),
+      x: 0, y: 0, width: 160, height: 48, emoji: '✨',
+    });
+    const card = fixture.nativeElement.querySelector('.node-card') as HTMLElement;
+
+    expect(card.getAttribute('aria-label')).toBe('New. Checkout redesign');
+  });
+
+  it('keeps the Emoji visible while the Text editor is open', () => {
+    render({
+      id: 'n1', text: textFromString('Idea'),
+      x: 0, y: 0, width: 160, height: 48, emoji: '💡',
+    });
+    component.isEditing.set(true);
+    fixture.detectChanges();
+
+    const glyph = fixture.nativeElement.querySelector('.node-emoji') as HTMLElement;
+    expect(glyph).toBeTruthy();
+    expect(glyph.textContent).toBe('💡');
+  });
+
+  it('never exposes the Emoji as a separate focus stop', () => {
+    render({
+      id: 'n1', text: textFromString('Idea'),
+      x: 0, y: 0, width: 160, height: 48, emoji: '💡',
+    });
+
+    expect(fixture.nativeElement.querySelector('.node-emoji')?.getAttribute('tabindex')).toBeNull();
+    const card = fixture.nativeElement.querySelector('.node-card') as HTMLElement;
+    expect(card.getAttribute('tabindex')).toBe('0');
+  });
+});
+
 describe('NodeComponent keyboard operation', () => {
   let fixture: ComponentFixture<NodeComponent>;
   let component: NodeComponent;

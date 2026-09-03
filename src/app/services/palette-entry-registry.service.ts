@@ -13,6 +13,7 @@ import {
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
 import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES } from '../models/node';
 import { NODE_SHAPES, NodeShape } from '../models/node-shape';
+import { NODE_EMOJIS } from '../models/node-emoji';
 import {
   PaletteCategory,
   PaletteEntry,
@@ -32,6 +33,7 @@ import {
   buildSetConnectionsStrokeWeightCommand,
   buildSetNodesColorCommand,
   buildSetNodesShapeCommand,
+  buildSetNodesEmojiCommand,
   buildTidyUpCommand,
 } from './commands';
 import { ClipboardService } from './clipboard.service';
@@ -135,6 +137,7 @@ type EntryOptions = {
   shortcut?: string;
   swatch?: string;
   icon?: string;
+  emoji?: string;
   linePreview?: { dash?: string; width?: number };
   sortOrder?: number;
 };
@@ -290,6 +293,7 @@ export class PaletteEntryRegistry {
       }),
       ...this.nodeColorEntries(selectedNodeIds),
       ...this.nodeShapeEntries(selectedRegularNodeIds),
+      ...this.nodeEmojiEntries(selectedRegularNodeIds),
 
       this.action('add-reroute-point', 'Add Reroute Point', 'Connections', () => {
         const connectionId = this.graphService.selectedConnectionId();
@@ -446,6 +450,7 @@ export class PaletteEntryRegistry {
       shortcut: options.shortcut,
       swatch: options.swatch,
       icon: options.icon,
+      emoji: options.emoji,
       linePreview: options.linePreview,
       sortOrder: options.sortOrder,
       available,
@@ -520,6 +525,55 @@ export class PaletteEntryRegistry {
         },
       );
     });
+  }
+
+  private nodeEmojiEntries(nodeIds: readonly string[]): PaletteEntry[] {
+    const available = nodeIds.length > 0;
+    const unavailableReason = 'Select a regular Node first';
+    const entries = NODE_EMOJIS.map(entry => {
+      const lowered = entry.name.toLocaleLowerCase();
+      return this.action(
+        `node-emoji-${lowered.replace(/\s+/g, '-')}`,
+        `Set selected Nodes' Emoji to ${entry.name}`,
+        'Nodes & Groups',
+        () => {
+          const command = buildSetNodesEmojiCommand(
+            this.graphService,
+            this.graphService.selectedNodeIds(),
+            entry.emoji,
+          );
+          if (command) this.historyService.execute(command);
+        },
+        {
+          aliases: [lowered, `emoji ${lowered}`],
+          emoji: entry.emoji,
+          sortOrder: 2,
+          available,
+          unavailableReason,
+        },
+      );
+    });
+    entries.push(this.action(
+      'node-emoji-remove',
+      'Remove Emoji',
+      'Nodes & Groups',
+      () => {
+        const command = buildSetNodesEmojiCommand(
+          this.graphService,
+          this.graphService.selectedNodeIds(),
+          null,
+        );
+        if (command) this.historyService.execute(command);
+      },
+      {
+        aliases: ['remove emoji', 'clear emoji', 'emoji none'],
+        icon: 'lucideEraser',
+        sortOrder: 2,
+        available,
+        unavailableReason,
+      },
+    ));
+    return entries;
   }
 
   private connectionColorEntries(connectionIds: readonly string[]): PaletteEntry[] {
