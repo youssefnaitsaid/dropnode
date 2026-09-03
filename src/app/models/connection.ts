@@ -23,6 +23,13 @@ export type StrokeWeight = 'thin' | 'normal' | 'thick';
 export const STROKE_WEIGHTS: readonly StrokeWeight[] = ['thin', 'normal', 'thick'];
 export const DEFAULT_STROKE_WEIGHT: StrokeWeight = 'normal';
 
+// Route Style (ADR-0031): how a Connection's curve routes — the legacy cubic
+// ('curve') or handle-constrained right-angle segments ('orthogonal') bending
+// through Reroute Points as sharp corners. Absent means the default.
+export type RouteStyle = 'curve' | 'orthogonal';
+export const ROUTE_STYLES: readonly RouteStyle[] = ['curve', 'orthogonal'];
+export const DEFAULT_ROUTE_STYLE: RouteStyle = 'curve';
+
 // Text position along the curve (ADR-0013): a bezier parameter clamped away
 // from the endpoints so the Text card never buries an Arrowhead or a node.
 // Absent means the midpoint; only deviations are stored.
@@ -63,6 +70,8 @@ export interface Connection {
   strokePattern?: StrokePattern;
   // Stroke Weight of the curve (ADR-0020); absent means DEFAULT_STROKE_WEIGHT
   strokeWeight?: StrokeWeight;
+  // Route Style of the curve (ADR-0031); absent means DEFAULT_ROUTE_STYLE
+  routeStyle?: RouteStyle;
 }
 
 /** The position a Connection's Text actually occupies (stored value, or the midpoint). */
@@ -89,6 +98,11 @@ export function effectiveStrokePattern(conn: Connection): StrokePattern {
 /** The Stroke Weight a Connection actually shows (stored value, or normal). */
 export function effectiveStrokeWeight(conn: Connection): StrokeWeight {
   return conn.strokeWeight ?? DEFAULT_STROKE_WEIGHT;
+}
+
+/** The Route Style a Connection actually shows (stored value, or curve). */
+export function effectiveRouteStyle(conn: Connection): RouteStyle {
+  return conn.routeStyle ?? DEFAULT_ROUTE_STYLE;
 }
 
 // Interaction state a Connection's curve renders in: at rest, hovered, or selected.

@@ -212,6 +212,135 @@ describe('connectionRoute', () => {
   });
 });
 
+describe('connectionRoute orthogonal', () => {
+  it('renders an aligned Handle pair as one straight leg', () => {
+    const route = connectionRoute({ x: 0, y: 0 }, { x: 100, y: 0 }, 'right', 'left', [], 'orthogonal');
+
+    expect(route.segments).toHaveLength(1);
+    expect(route.totalLength).toBeCloseTo(100, 6);
+    const quarter = routePointAt(route, 0.25);
+    expect(quarter.x).toBeCloseTo(25, 3);
+    expect(quarter.y).toBeCloseTo(0, 6);
+    const half = routePointAt(route, 0.5);
+    expect(half.x).toBeCloseTo(50, 3);
+    expect(half.y).toBeCloseTo(0, 6);
+  });
+
+  it('mid-splits an offset same-axis Handle pair (H-V-H)', () => {
+    // Source departs +x, target arrives +x: minimal satisfaction is
+    // (0,0) → (150,0) → (150,100) → (300,100).
+    const route = connectionRoute({ x: 0, y: 0 }, { x: 300, y: 100 }, 'right', 'left', [], 'orthogonal');
+
+    expect(route.segments).toHaveLength(3);
+    expect(route.totalLength).toBeCloseTo(400, 6);
+    expect(routePointAt(route, 0)).toEqual({ x: 0, y: 0 });
+    expect(routePointAt(route, 150 / 400)).toEqual({ x: 150, y: 0 });
+    expect(routePointAt(route, 250 / 400)).toEqual({ x: 150, y: 100 });
+    expect(routePointAt(route, 1)).toEqual({ x: 300, y: 100 });
+  });
+
+  it('joins differing-axis Handles with a single L-bend', () => {
+    // Source departs +x, target Handle bottom arrives -y:
+    // (0,0) → (100,0) → (100,-100).
+    const route = connectionRoute({ x: 0, y: 0 }, { x: 100, y: -100 }, 'right', 'bottom', [], 'orthogonal');
+
+    expect(route.segments).toHaveLength(2);
+    expect(route.totalLength).toBeCloseTo(200, 6);
+    expect(routePointAt(route, 0.5)).toEqual({ x: 100, y: 0 });
+  });
+
+  it('hits every Reroute Point exactly with sharp axis-aligned legs', () => {
+    const start = { x: 0, y: 0 };
+    const first = { x: 200, y: 50 };
+    const end = { x: 400, y: 50 };
+    const route = connectionRoute(start, end, 'right', 'left', [first], 'orthogonal');
+
+    // First leg starts along the source Handle: (0,0) → (200,0) → first;
+    // last leg is aligned straight: first → end.
+    expect(route.segments).toHaveLength(3);
+    expect(route.totalLength).toBeCloseTo(450, 6);
+    const joints = [route.segments[0].start, ...route.segments.map(s => s.end)];
+    expect(joints).toEqual([
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 50 },
+      { x: 400, y: 50 },
+    ]);
+  });
+
+  it('continues straight through a vertex when it makes progress, else turns at it', () => {
+    const route = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 50 },
+      'right',
+      'left',
+      [{ x: 100, y: 0 }, { x: 200, y: 50 }],
+    );
+    // Without a style the curve default applies even with points present.
+    expect(route.hasReroutePoints).toBe(true);
+
+    const ortho = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 50 },
+      'right',
+      'left',
+      [{ x: 100, y: 0 }, { x: 200, y: 50 }],
+      'orthogonal',
+    );
+    // S → P1 straight; P1 → P2 continues +x (H-first): bend (200,0);
+    // P2 → T arrives +x (H-last): arrives from (200,50) straight.
+    const joints = [ortho.segments[0].start, ...ortho.segments.map(s => s.end)];
+    expect(joints).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 50 },
+      { x: 300, y: 50 },
+    ]);
+    expect(ortho.totalLength).toBeCloseTo(100 + 100 + 50 + 100, 6);
+  });
+
+  it('turns immediately at a vertex when continuing would backtrack', () => {
+    const ortho = connectionRoute(
+      { x: 0, y: 0 },
+      { x: 300, y: 80 },
+      'right',
+      'left',
+      [{ x: 100, y: 0 }, { x: 50, y: 80 }],
+      'orthogonal',
+    );
+    // P1 → P2 heads -x against the +x arrival: V-first via (100,80).
+    const joints = [ortho.segments[0].start, ...ortho.segments.map(s => s.end)];
+    expect(joints).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 50, y: 80 },
+      { x: 300, y: 80 },
+    ]);
+  });
+
+  it('projects onto the nearest orthogonal leg with earliest-wins ties', () => {
+    const route = connectionRoute({ x: 0, y: 0 }, { x: 300, y: 100 }, 'right', 'left', [], 'orthogonal');
+
+    const onVertical = routeProjection(route, { x: 160, y: 50 });
+    expect(onVertical.point.x).toBeCloseTo(150, 6);
+    expect(onVertical.point.y).toBeCloseTo(50, 6);
+    expect(onVertical.segmentIndex).toBe(1);
+
+    const position = textPositionFromRoute(route, { x: 160, y: 50 });
+    expect(routePointAt(route, position).x).toBeCloseTo(150, 0);
+    expect(routePointAt(route, position).y).toBeCloseTo(50, 0);
+  });
+
+  it('keeps a degenerate same-point route measurable', () => {
+    const route = connectionRoute({ x: 50, y: 50 }, { x: 50, y: 50 }, 'right', 'left', [], 'orthogonal');
+
+    expect(route.totalLength).toBeCloseTo(0, 9);
+    expect(routePointAt(route, 0.5)).toEqual({ x: 50, y: 50 });
+  });
+});
+
 describe('pointAt', () => {
   it('returns the start point at t = 0 and the end point at t = 1', () => {
     const curve = flatCurve();

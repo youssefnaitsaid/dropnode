@@ -522,6 +522,32 @@ describe('GraphService', () => {
     });
   });
 
+  describe('setConnectionRouteStyle', () => {
+    function makeConn(): Connection {
+      const n1 = service.createNode('N1', 0, 0);
+      const n2 = service.createNode('N2', 300, 0);
+      return service.createConnection(n1.id, 'right', n2.id, 'left')!;
+    }
+
+    it('stores the orthogonal style', () => {
+      const conn = makeConn();
+      service.setConnectionRouteStyle(conn.id, 'orthogonal');
+      expect(service.connections()[0].routeStyle).toBe('orthogonal');
+    });
+
+    it('removes the style field when set back to its default (curve)', () => {
+      const conn = makeConn();
+      service.setConnectionRouteStyle(conn.id, 'orthogonal');
+      service.setConnectionRouteStyle(conn.id, 'curve');
+      expect('routeStyle' in service.connections()[0]).toBe(false);
+    });
+
+    it('createConnection sets no routeStyle field', () => {
+      const conn = makeConn();
+      expect('routeStyle' in conn).toBe(false);
+    });
+  });
+
   describe('selectNode / clearSelection', () => {
     it('sets selectedNodeId', () => {
       const node = service.createNode('Test', 0, 0);
@@ -1199,6 +1225,46 @@ describe('GraphService', () => {
       expect(result.success).toBe(true);
       expect(service.connections()[0].strokePattern).toBe('dotted');
       expect(service.connections()[0].strokeWeight).toBe('thick');
+    });
+
+    it('out-of-range routeStyle rejected wholesale', () => {
+      const result = service.importGraph({
+        nodes: [
+          { id: 'n1', label: 'Node 1', x: 0, y: 0, width: 160, height: 48 },
+          { id: 'n2', label: 'Node 2', x: 200, y: 0, width: 160, height: 48 },
+        ],
+        connections: [
+          { id: 'c1', sourceNodeId: 'n1', sourceHandle: 'right', targetNodeId: 'n2', targetHandle: 'left', routeStyle: 'diagonal' },
+        ],
+      } as any);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid connection c1: routeStyle must be curve or orthogonal');
+    });
+
+    it('valid routeStyle imports and an explicit default normalizes to absent', () => {
+      const styled = service.importGraph({
+        nodes: [
+          { id: 'n1', label: 'Node 1', x: 0, y: 0, width: 160, height: 48 },
+          { id: 'n2', label: 'Node 2', x: 200, y: 0, width: 160, height: 48 },
+        ],
+        connections: [
+          { id: 'c1', sourceNodeId: 'n1', sourceHandle: 'right', targetNodeId: 'n2', targetHandle: 'left', routeStyle: 'orthogonal' },
+        ],
+      } as any);
+      expect(styled.success).toBe(true);
+      expect(service.connections()[0].routeStyle).toBe('orthogonal');
+
+      const defaulted = service.importGraph({
+        nodes: [
+          { id: 'n1', label: 'Node 1', x: 0, y: 0, width: 160, height: 48 },
+          { id: 'n2', label: 'Node 2', x: 200, y: 0, width: 160, height: 48 },
+        ],
+        connections: [
+          { id: 'c1', sourceNodeId: 'n1', sourceHandle: 'right', targetNodeId: 'n2', targetHandle: 'left', routeStyle: 'curve' },
+        ],
+      } as any);
+      expect(defaulted.success).toBe(true);
+      expect('routeStyle' in service.connections()[0]).toBe(false);
     });
 
     it('normalizes explicitly-default stroke values to absent on import (ADR-0020 canonical form)', () => {

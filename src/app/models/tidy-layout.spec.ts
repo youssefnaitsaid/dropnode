@@ -328,8 +328,7 @@ describe('tidyLayout', () => {
     expect(applied.connections[0].reroutePoints).toEqual([{ x: 208, y: 101 }, { x: 232, y: 101 }]);
   });
 
-  it('re-anchored Reroute Points render with the plain curve endpoint sweeps', () => {
-    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+  it('re-anchored Reroute Points render with the plain curve endpoint sweeps', () => {    const nodes = [node('a', 0, 100), node('b', 500, 100)];
     const connections: Connection[] = [{
       ...conn('c1', 'a', 'right', 'b', 'left'),
       reroutePoints: [{ x: 200, y: 60 }, { x: 350, y: 60 }],
@@ -399,5 +398,19 @@ describe('tidyLayout', () => {
       handleAssignments: [],
       rerouteAdjustments: [],
     });
+  });
+
+  it('never flips the Route Style while re-anchoring (ADR-0031)', () => {
+    const nodes = [node('a', 0, 100), node('b', 500, 100)];
+    const connections: Connection[] = [{
+      ...conn('c1', 'a', 'right', 'b', 'left'),
+      routeStyle: 'orthogonal',
+      reroutePoints: [{ x: 300, y: -300 }],
+    }];
+
+    const result = tidyLayout(nodes, connections);
+    const applied = applyTidyToState(nodes, connections, result);
+
+    expect(applied.connections[0].routeStyle).toBe('orthogonal');
   });
 });

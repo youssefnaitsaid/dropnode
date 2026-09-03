@@ -190,6 +190,7 @@ export class MinimapComponent implements AfterViewInit, OnDestroy {
         conn.sourceHandle,
         conn.targetHandle,
         conn.reroutePoints,
+        conn.routeStyle,
       );
       ctx.strokeStyle = selectedConnections.has(conn.id) ? ACCENT : CONNECTION_STROKE;
       ctx.beginPath();

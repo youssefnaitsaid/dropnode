@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   Connection,
+  DEFAULT_ROUTE_STYLE,
   DEFAULT_STROKE_PATTERN,
   DEFAULT_STROKE_WEIGHT,
+  effectiveRouteStyle,
   effectiveStrokePattern,
   effectiveStrokeWeight,
   strokeWidthPx,
@@ -42,6 +44,18 @@ describe('effectiveStrokeWeight', () => {
   it('returns the stored weight', () => {
     expect(effectiveStrokeWeight(makeConn({ strokeWeight: 'thin' }))).toBe('thin');
     expect(effectiveStrokeWeight(makeConn({ strokeWeight: 'thick' }))).toBe('thick');
+  });
+});
+
+describe('effectiveRouteStyle', () => {
+  it('falls back to curve when no style is stored', () => {
+    expect(DEFAULT_ROUTE_STYLE).toBe('curve');
+    expect(effectiveRouteStyle(makeConn())).toBe('curve');
+  });
+
+  it('returns the stored style', () => {
+    expect(effectiveRouteStyle(makeConn({ routeStyle: 'orthogonal' }))).toBe('orthogonal');
+    expect(effectiveRouteStyle(makeConn({ routeStyle: 'curve' }))).toBe('curve');
   });
 });
 

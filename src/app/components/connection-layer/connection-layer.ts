@@ -466,7 +466,7 @@ export class ConnectionLayerComponent {
   private getRoute(conn: Connection): ConnectionRoute {
     const start = this.getHandlePos(conn.sourceNodeId, conn.sourceHandle);
     const end = this.getHandlePos(conn.targetNodeId, conn.targetHandle);
-    return connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints);
+    return connectionRoute(start, end, conn.sourceHandle, conn.targetHandle, conn.reroutePoints, conn.routeStyle);
   }
 
   isSelected(connectionId: string): boolean {

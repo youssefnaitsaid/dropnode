@@ -56,6 +56,7 @@ import {
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
+  buildSetConnectionsRouteStyleCommand,
   buildAlignSelectionCommand,
   buildDistributeSelectionCommand,
   buildTidyUpCommand,
@@ -64,7 +65,7 @@ import { AlignKind, DistributeAxis } from '../../models/align-distribute';
 import { NODE_PALETTE, NODE_PALETTE_NAMES } from '../../models/node';
 import { NODE_EMOJIS } from '../../models/node-emoji';
 import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
-import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight } from '../../models/connection';
+import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, RouteStyle, effectiveRouteStyle } from '../../models/connection';
 
 @Component({
   selector: 'app-toolbar',
@@ -391,6 +392,19 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               }
             </button>
           }
+          <hlm-dropdown-menu-separator />
+          <div hlmDropdownMenuLabel>Route Style</div>
+          @for (opt of routeStyleOptions; track opt.style) {
+            <button hlmDropdownMenuItem (triggered)="setRouteStyle(opt.style)">
+              <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                <path [attr.d]="opt.path" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>{{ opt.label }}</span>
+              @if (sharedRouteStyle() === opt.style) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+          }
         </div>
       </ng-template>
 
@@ -614,6 +628,13 @@ export class ToolbarComponent {
     { weight: 'thick', previewWidth: 3.5, label: 'Thick' },
   ];
 
+  // Route Style options with inline previews drawn as the route itself: a
+  // free curve beside a right-angle orthogonal route (ADR-0031)
+  routeStyleOptions: { style: RouteStyle; path: string; label: string }[] = [
+    { style: 'curve', path: 'M2 14 C 7 14, 13 6, 18 6', label: 'Curve' },
+    { style: 'orthogonal', path: 'M2 14 H11 V6 H18', label: 'Orthogonal' },
+  ];
+
   zoomPercent = () => Math.round(this.graphService.viewportState().zoom * 100);
 
   // A styling control reads as active only when ALL its targets share the
@@ -667,6 +688,13 @@ export class ToolbarComponent {
     if (conns.length === 0) return undefined;
     const first = effectiveStrokeWeight(conns[0]);
     return conns.every(c => effectiveStrokeWeight(c) === first) ? first : undefined;
+  };
+
+  sharedRouteStyle = (): RouteStyle | undefined => {
+    const conns = this.graphService.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = effectiveRouteStyle(conns[0]);
+    return conns.every(c => effectiveRouteStyle(c) === first) ? first : undefined;
   };
 
   // Live preview on the Connection trigger: the shared pattern's dash and the
@@ -754,6 +782,13 @@ export class ToolbarComponent {
   setStrokeWeight(weight: StrokeWeight): void {
     const cmd = buildSetConnectionsStrokeWeightCommand(
       this.graphService, this.graphService.selectedConnectionIds(), weight,
+    );
+    if (cmd) this.historyService.execute(cmd);
+  }
+
+  setRouteStyle(style: RouteStyle): void {
+    const cmd = buildSetConnectionsRouteStyleCommand(
+      this.graphService, this.graphService.selectedConnectionIds(), style,
     );
     if (cmd) this.historyService.execute(cmd);
   }

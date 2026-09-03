@@ -90,6 +90,7 @@ export function connectionBounds(
     conn.sourceHandle,
     conn.targetHandle,
     conn.reroutePoints,
+    conn.routeStyle,
   );
   return routeBounds(route);
 }
