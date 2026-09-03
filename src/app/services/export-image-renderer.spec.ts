@@ -99,6 +99,29 @@ describe('ExportImageRenderer', () => {
     expect(clone.querySelector('.pin-popover')).toBeNull();
   });
 
+  it('keeps Connection Jump masks so the PNG follows the on-screen toggle', () => {
+    const clone = document.createElement('div');
+    clone.innerHTML = `
+      <svg>
+        <defs>
+          <mask id="connection-jump-c1">
+            <path d="M 0 0 C 10 10, 20 20, 30 30" stroke="white"></path>
+            <circle cx="15" cy="15" r="5" fill="black"></circle>
+          </mask>
+        </defs>
+        <path class="connection-path selected" mask="url(#connection-jump-c1)"></path>
+      </svg>
+    `;
+
+    (renderer as unknown as { stripEditorChrome(element: HTMLElement): void }).stripEditorChrome(clone);
+
+    expect(clone.querySelector('mask')).not.toBeNull();
+    expect(clone.querySelector('mask circle')).not.toBeNull();
+    expect(clone.querySelector('.connection-path')?.getAttribute('mask')).toBe(
+      'url(#connection-jump-c1)',
+    );
+  });
+
   it('a scoped snapshot with Pins included drops Pins anchored outside the Scope and all Canvas Pins', () => {
     const clone = document.createElement('div');
     clone.innerHTML = `

@@ -7,6 +7,7 @@ import { HistoryService } from './history.service';
 import { ContextMenuService } from './context-menu.service';
 import { ExportDialogService } from './export-dialog.service';
 import { PinVisibilityService } from './pin-visibility.service';
+import { ConnectionJumpsService } from './connection-jumps.service';
 
 @Component({ standalone: true, template: '' })
 class TestRoute {}
@@ -138,6 +139,23 @@ describe('PaletteEntryRegistry', () => {
     const node = graphService.createNode('A', 0, 0);
     graphService.toggleNodeSelection(node.id);
     expect(find('node-shape-pill').available).toBe(true);
+  });
+
+  it('toggles Connection Jumps without touching History', () => {
+    const entry = find('toggle-connection-jumps');
+    const jumps = TestBed.inject(ConnectionJumpsService);
+
+    expect(entry.label).toBe('Toggle Connection Jumps');
+    expect(entry.category).toBe('Application');
+    expect(entry.aliases).toContain('show connection jumps');
+    expect(entry.aliases).toContain('hide connection jumps');
+    expect(entry.icon).toBe('lucideWaypoints');
+    expect(entry.available).toBe(true);
+
+    expect(jumps.enabled()).toBe(false);
+    expect(registry.execute('toggle-connection-jumps')).toBe(true);
+    expect(jumps.enabled()).toBe(true);
+    expect(historyService.canUndo()).toBe(false);
   });
 
   it('executes Add Node through History and requests the existing Text editor', () => {

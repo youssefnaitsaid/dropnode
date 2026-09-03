@@ -132,6 +132,9 @@ export class ExportImageRenderer {
     });
 
     const connectionIds = new Set(scope.connections.map(connection => connection.id));
+    // Jump masks ride their Connection: an in-scope curve keeps the gaps its
+    // full-graph crossings earned, even where the crosser fell out of Scope —
+    // a scoped PNG is an artifact of its Scope, never a re-laid-out graph.
     clone.querySelectorAll<SVGElement>('.connection-hit').forEach(hit => {
       if (connectionIds.has(hit.getAttribute('data-connection-id') ?? '')) return;
       const path = hit.nextElementSibling;

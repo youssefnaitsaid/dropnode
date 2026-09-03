@@ -49,6 +49,7 @@ import { ExportService } from './export.service';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { MinimapService } from './minimap.service';
+import { ConnectionJumpsService } from './connection-jumps.service';
 import { PinVisibilityService } from './pin-visibility.service';
 import { ImportDialogService } from './import-dialog.service';
 import { ConnectDialogService } from './connect-dialog.service';
@@ -175,6 +176,7 @@ export class PaletteEntryRegistry {
   private readonly presentationService = inject(PresentationService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
+  private readonly connectionJumpsService = inject(ConnectionJumpsService);
   private readonly pinVisibilityService = inject(PinVisibilityService);
   private readonly resizeMode = inject(ResizeModeService);
   private readonly paletteService = inject(CommandPaletteService);
@@ -421,6 +423,9 @@ export class PaletteEntryRegistry {
       }),
       this.action('toggle-minimap', 'Toggle Minimap', 'Application', () => this.minimapService.toggle(), {
         aliases: ['show minimap', 'hide minimap'], icon: 'lucideMap',
+      }),
+      this.action('toggle-connection-jumps', 'Toggle Connection Jumps', 'Application', () => this.connectionJumpsService.toggle(), {
+        aliases: ['show connection jumps', 'hide connection jumps'], icon: 'lucideWaypoints',
       }),
       this.action('toggle-pins', 'Toggle Pins', 'Application', () => this.pinVisibilityService.toggle(), {
         aliases: ['show pins', 'hide pins', 'toggle comments'], icon: 'lucideMessageCircle',
