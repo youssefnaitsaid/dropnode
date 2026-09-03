@@ -59,6 +59,7 @@ import {
   lucideTrash2,
   lucideUndo2,
   lucideUpload,
+  lucideWaypoints,
   lucideZoomIn,
   lucideZoomOut,
 } from '@ng-icons/lucide';
@@ -131,6 +132,7 @@ interface PaletteGroup {
     lucideTrash2,
     lucideUndo2,
     lucideUpload,
+    lucideWaypoints,
     lucideZoomIn,
     lucideZoomOut,
   })],

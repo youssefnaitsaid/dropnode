@@ -156,6 +156,10 @@
 - a Connection carries an optional Route Style — curve by default, orthogonal for handle-constrained right-angle segments bending through Reroute Points as sharp corners; absent means curve and creating a Connection or Quick-add never sets it @implemented
 - an orthogonal Connection departs along its source Handle and arrives along its target Handle with minimal bends, hitting every Reroute Point exactly as a sharp corner @implemented
 - Route Style is restyled from the Connection styling trigger and per-value Command Palette Entries as one bulk undo step following the Stroke Pattern rules; Import rejects unknown styles wholesale and canonicalizes explicit curve to absent @implemented
+- a Connection Jump is a purely visual gap where one Connection crosses another so crossings never read as junctions; it is never Graph State, History, Import, JSON Export, or share-link payload @implemented
+- Connection Jumps render behind one Canvas-wide toggle that defaults to off, persists in localStorage, and is exposed as a single "Toggle Connection Jumps" Palette Entry that creates no History entry @implemented
+- a jump breaks the lower-painted Connection at each proper mid-curve crossing between distinct Connections; shared-endpoint touches, self-intersections, and Connection-under-Node overlaps never jump, and coincident pairs gap nothing @implemented
+- jump gaps are true transparent breaks whose width scales with Stroke Weight; dash rhythms survive, Arrowheads never jump, and PNG Export follows the toggle while the Minimap omits jumps @implemented
 
 ## alignment
 

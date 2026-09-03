@@ -3,6 +3,8 @@ import { ConnectionLayerComponent } from './connection-layer';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { PresentationService } from '../../services/presentation.service';
+import { ConnectionJumpsService } from '../../services/connection-jumps.service';
+import { PresentationService } from '../../services/presentation.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { textFromString } from '../../models/text';
 
@@ -208,5 +210,99 @@ describe('ConnectionLayerComponent keyboard Connection flow', () => {
 
     history.undo();
     expect(graphService.connections()[0].reroutePoints![0].x).toBe(160);
+  });
+});
+
+describe('ConnectionLayerComponent Connection Jumps', () => {
+  let fixture: ComponentFixture<ConnectionLayerComponent>;
+  let graphService: GraphService;
+  let jumpsService: ConnectionJumpsService;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ imports: [ConnectionLayerComponent] });
+    fixture = TestBed.createComponent(ConnectionLayerComponent);
+    graphService = TestBed.inject(GraphService);
+    jumpsService = TestBed.inject(ConnectionJumpsService);
+    fixture.detectChanges();
+  });
+
+  function makeCrossing() {
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 320, 0);
+    const c = graphService.createNode('C', 160, -160);
+    const d = graphService.createNode('D', 160, 160);
+    const lower = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    const upper = graphService.createConnection(c.id, 'bottom', d.id, 'top')!;
+    fixture.detectChanges();
+    return { lower, upper };
+  }
+
+  function visiblePaths(): SVGPathElement[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('.connection-path'));
+  }
+
+  it('renders no jump masks while the toggle is off', () => {
+    makeCrossing();
+    expect(jumpsService.enabled()).toBe(false);
+    expect(fixture.nativeElement.querySelectorAll('mask').length).toBe(0);
+    expect(visiblePaths().every(path => !path.getAttribute('mask'))).toBe(true);
+  });
+
+  it('masks only the lower-painted Connection at a crossing when on', () => {
+    const { lower, upper } = makeCrossing();
+    jumpsService.toggle();
+    fixture.detectChanges();
+
+    const masks = fixture.nativeElement.querySelectorAll('mask');
+    expect(masks.length).toBe(1);
+    expect(masks[0].querySelectorAll('circle').length).toBe(1);
+
+    const byId = new Map(visiblePaths().map(path => [
+      path.previousElementSibling?.getAttribute('data-connection-id'),
+      path,
+    ]));
+    expect(byId.get(lower.id)?.getAttribute('mask')).toContain('url(#');
+    expect(byId.get(upper.id)?.getAttribute('mask')).toBeNull();
+  });
+
+  it('renders no masks when on but nothing crosses', () => {
+    const source = graphService.createNode('Source', 0, 0);
+    const target = graphService.createNode('Target', 320, 0);
+    graphService.createConnection(source.id, 'right', target.id, 'left')!;
+    jumpsService.toggle();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('mask').length).toBe(0);
+  });
+
+  it('leaves hit paths, ghosts, and Chain lights unmasked', () => {
+    makeCrossing();
+    jumpsService.toggle();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.connection-hit[mask]').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('.connection-chain-light[mask]').length).toBe(0);
+  });
+
+  it('keeps the gap when the lower Connection is selected', () => {
+    const { lower } = makeCrossing();
+    jumpsService.toggle();
+    graphService.selectConnection(lower.id);
+    fixture.detectChanges();
+
+    const masks = fixture.nativeElement.querySelectorAll('mask');
+    expect(masks.length).toBe(1);
+    const selected = fixture.nativeElement.querySelector('.connection-path.selected') as SVGPathElement;
+    expect(selected.getAttribute('mask')).toContain('url(#');
+  });
+
+  it('keeps jumps in Present Mode', () => {
+    makeCrossing();
+    jumpsService.toggle();
+    TestBed.inject(PresentationService).active.set(true);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('mask').length).toBe(1);
   });
 });

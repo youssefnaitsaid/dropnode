@@ -2,7 +2,7 @@ import { Component, computed, effect, input, output, signal, ChangeDetectionStra
 import { GraphNode, HandleSide, NODE_PALETTE, oppositeHandle } from '../../models/node';
 import { DN_TOKENS } from '../../design-tokens';
 import { Connection, ArrowheadType, effectiveArrowhead, effectiveTextPosition, effectiveStrokePattern, effectiveStrokeWeight, strokeWidthPx, strokeDasharray } from '../../models/connection';
-import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, textPositionFromRoute } from '../../models/curve';
+import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, sampleRoute, textPositionFromRoute } from '../../models/curve';
 import { Text, isTextEmpty } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -11,6 +11,8 @@ import { PresentationService } from '../../services/presentation.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { MoveConnectionReroutePointCommand } from '../../services/commands';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
+import { ConnectionJumpsService } from '../../services/connection-jumps.service';
+import { findConnectionJumps, jumpGapRadius } from '../../models/connection-jumps';
 import { chainConnectionDirection } from '../../models/chain';
 import { textToPlainString } from '../../models/text';
 import { TextViewComponent } from '../text-view/text-view';
@@ -23,6 +25,16 @@ interface DragState {
   currentY: number;
   targetNodeId: string | null;
   targetHandle: HandleSide | null;
+}
+
+// One SVG mask's worth of Connection Jump rendering: the gapped Connection,
+// its full curve, and the gap disks punched along it.
+interface JumpMaskEntry {
+  id: string;
+  path: string;
+  whiteWidth: number;
+  radius: number;
+  points: readonly { x: number; y: number }[];
 }
 
 @Component({
@@ -49,6 +61,33 @@ interface DragState {
             <path d="M1,1 L9,5 L1,9 Z" [attr.fill]="color" />
           </marker>
         }
+        <!-- Connection Jumps (ADR-0032): one mask per gapped Connection — a
+             white copy of the full curve punched with black disks at each
+             crossing. True transparency (never a canvas-colored cover), so the
+             dot grid and Export Themes show through; the drag ghost, hit
+             paths, and Chain lights stay unmasked by construction. -->
+        @for (entry of jumpMaskEntries(); track entry.id) {
+          <mask
+            [attr.id]="jumpMaskId(entry.id)"
+            maskUnits="userSpaceOnUse"
+            x="-10000" y="-10000" width="30000" height="30000"
+          >
+            <path
+              [attr.d]="entry.path"
+              fill="none"
+              stroke="white"
+              [attr.stroke-width]="entry.whiteWidth"
+            />
+            @for (point of entry.points; track $index) {
+              <circle
+                [attr.cx]="point.x"
+                [attr.cy]="point.y"
+                [attr.r]="entry.radius"
+                fill="black"
+              />
+            }
+          </mask>
+        }
       </defs>
       @for (conn of connections(); track conn.id) {
         <!-- Invisible solid companion path (ADR-0020): the sole pointer target,
@@ -69,6 +108,7 @@ interface DragState {
           [attr.d]="getConnectionPath(conn)"
           [attr.marker-start]="markerStart(conn)"
           [attr.marker-end]="markerEnd(conn)"
+          [attr.mask]="jumpMaskRef(conn)"
           class="connection-path"
           [class.selected]="isSelected(conn.id)"
           [class.chain-lit]="isChainLit(conn.id)"
@@ -313,6 +353,7 @@ interface DragState {
 export class ConnectionLayerComponent {
   private graphService = inject(GraphService);
   private historyService = inject(HistoryService);
+  private jumpsService = inject(ConnectionJumpsService);
   protected presentationService = inject(PresentationService);
   private keyboardConnection = inject(KeyboardConnectionService);
   protected chainHighlightService = inject(ChainHighlightService);
@@ -349,6 +390,57 @@ export class ConnectionLayerComponent {
   // Dash rhythm scales with the base width (ADR-0020); null keeps solid
   strokeDash(conn: Connection): string | null {
     return strokeDasharray(effectiveStrokePattern(conn), this.strokeBaseWidth(conn));
+  }
+
+  // Connection Jumps (ADR-0032): gap disks per lower-painted Connection,
+  // recomputed only while the toggle is on — off costs nothing. Sampling is
+  // coarse (16 per segment) to stay inside the ADR-0003 frame budget; the
+  // pure crossing math lives in the tested connection-jumps module.
+  private static readonly JUMP_SAMPLES_PER_SEGMENT = 16;
+
+  readonly jumpMaskEntries = computed<JumpMaskEntry[]>(() => {
+    if (!this.jumpsService.enabled()) return [];
+    const conns = this.connections();
+    if (conns.length < 2) return [];
+    const routes = conns.map(conn => ({
+      id: conn.id,
+      points: sampleRoute(
+        this.getRoute(conn),
+        ConnectionLayerComponent.JUMP_SAMPLES_PER_SEGMENT,
+      ),
+      width: this.strokeBaseWidth(conn),
+    }));
+    const { gaps, capped } = findConnectionJumps(routes);
+    if (capped) return [];
+    const byId = new Map(conns.map(conn => [conn.id, conn]));
+    const entries: JumpMaskEntry[] = [];
+    for (const [id, points] of gaps) {
+      const conn = byId.get(id);
+      if (!conn || points.length === 0) continue;
+      const width = this.strokeBaseWidth(conn);
+      entries.push({
+        id,
+        path: this.getConnectionPath(conn),
+        // The white base must cover the widest the curve ever renders
+        // (selected/hover/focus growth), or grown strokes would peek out
+        // around the punched disks.
+        whiteWidth: width + 3,
+        radius: jumpGapRadius(width) + 1.5,
+        points,
+      });
+    }
+    return entries;
+  });
+
+  jumpMaskId(connectionId: string): string {
+    return `connection-jump-${connectionId}`;
+  }
+
+  // The mask reference for a visible curve, or null for unbroken curves —
+  // hit paths, the drag ghost, and Chain lights never take one.
+  jumpMaskRef(conn: Connection): string | null {
+    const points = this.jumpMaskEntries().find(entry => entry.id === conn.id)?.points;
+    return points?.length ? `url(#${this.jumpMaskId(conn.id)})` : null;
   }
 
   // A colored Connection keeps its own color when selected; the glow matches it
