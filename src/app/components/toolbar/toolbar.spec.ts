@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
+import { CreateNodeCommand } from '../../services/commands';
 import { ToolbarComponent } from './toolbar';
 
 describe('ToolbarComponent', () => {
@@ -224,5 +226,81 @@ describe('ToolbarComponent', () => {
     expect(restored.zoom).toBe(1);
     expect(restored.panX).toBeCloseTo(0, 10);
     expect(restored.panY).toBeCloseTo(0, 10);
+  });
+});
+
+describe('ToolbarComponent Canvas Lock', () => {
+  let fixture: ComponentFixture<ToolbarComponent>;
+  let graphService: GraphService;
+  let historyService: HistoryService;
+  let canvasLock: CanvasLockService;
+
+  const button = (label: string) =>
+    Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      (item: unknown) => (item as HTMLButtonElement).getAttribute('aria-label') === label,
+    ) as HTMLButtonElement;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [ToolbarComponent],
+      providers: [provideRouter([])],
+    });
+    fixture = TestBed.createComponent(ToolbarComponent);
+    fixture.componentRef.setInput('scratchMode', true);
+    graphService = TestBed.inject(GraphService);
+    historyService = TestBed.inject(HistoryService);
+    canvasLock = TestBed.inject(CanvasLockService);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    canvasLock.unlock({ silent: true });
+    document.body.innerHTML = '';
+  });
+
+  it('toggles Canvas Lock from the right-cluster button with pressed state', () => {
+    const toggle = button('Lock canvas');
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(canvasLock.locked()).toBe(true);
+
+    const unlock = button('Unlock canvas');
+    expect(unlock.getAttribute('aria-pressed')).toBe('true');
+    unlock.click();
+    fixture.detectChanges();
+    expect(canvasLock.locked()).toBe(false);
+  });
+
+  it('disables Tidy up, Undo, and Import while locked', () => {
+    historyService.execute(new CreateNodeCommand(graphService, 'N', 0, 0));
+    fixture.detectChanges();
+    expect(button('Undo').disabled).toBe(false);
+
+    canvasLock.lock();
+    fixture.detectChanges();
+
+    expect(button('Tidy up').disabled).toBe(true);
+    expect(button('Tidy up').title).toContain('Unlock');
+    expect(button('Undo').disabled).toBe(true);
+    expect(button('Redo').disabled).toBe(true);
+    expect(button('Import').disabled).toBe(true);
+
+    canvasLock.unlock();
+    fixture.detectChanges();
+    expect(button('Tidy up').disabled).toBe(false);
+    expect(button('Import').disabled).toBe(false);
+  });
+
+  it('keeps zoom controls and Present live while locked', () => {
+    graphService.createGroup('Tour', 0, 0);
+    canvasLock.lock();
+    fixture.detectChanges();
+
+    expect(button('Zoom in').disabled).toBe(false);
+    expect(button('Zoom to fit').disabled).toBe(false);
+    expect(button('Present').disabled).toBe(false);
   });
 });

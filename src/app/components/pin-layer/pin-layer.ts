@@ -8,6 +8,7 @@ import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { PinVisibilityService } from '../../services/pin-visibility.service';
 import {
   CreatePinCommand, EditPinCommand, MovePinCommand, DeletePinCommand,
@@ -48,7 +49,7 @@ type PopoverState =
           [style.left.px]="item.x"
           [style.top.px]="item.y"
           [class.dragging]="dragPinId() === item.pin.id"
-          [attr.tabindex]="presentationService.active() ? null : 0"
+          [attr.tabindex]="presentationService.active() || canvasLock.locked() ? null : 0"
           role="button"
           [attr.aria-label]="'Pin: ' + item.pin.message"
           (mousedown)="onPinMouseDown($event, item.pin)"
@@ -159,6 +160,7 @@ export class PinLayerComponent {
   private historyService = inject(HistoryService);
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
+  protected canvasLock = inject(CanvasLockService);
   private pinVisibility = inject(PinVisibilityService);
 
   readonly draft = signal('');
@@ -231,7 +233,7 @@ export class PinLayerComponent {
   // Shift) as one undoable MovePinCommand per step within its own anchor kind
   // (no re-anchoring, matching the drag); Enter opens the edit popover.
   onPinKeydown(pin: Pin, event: KeyboardEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if (event.key === 'Enter') {
       event.preventDefault();
       event.stopPropagation();
@@ -264,7 +266,7 @@ export class PinLayerComponent {
   }
 
   onPinMouseDown(event: MouseEvent, pin: Pin): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if (event.button !== 0) return;
     event.stopPropagation();
     const point = this.graphService.pinPoint(pin.id);

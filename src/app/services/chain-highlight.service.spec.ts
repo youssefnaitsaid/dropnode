@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { GraphService } from './graph.service';
 import { ContextMenuService } from './context-menu.service';
 import { ChainHighlightService } from './chain-highlight.service';
+import { CanvasLockService } from './canvas-lock.service';
 
 describe('ChainHighlightService', () => {
   let graphService: GraphService;
@@ -111,6 +112,20 @@ describe('ChainHighlightService', () => {
       expect(chainService.hasHighlight()).toBe(false);
       contextMenuService.clear();
       expect(chainService.hasHighlight()).toBe(true);
+    }
+  });
+
+  it('stays live while Canvas Lock is active', () => {
+    const { aId } = setupChain();
+    const canvasLock = TestBed.inject(CanvasLockService);
+    canvasLock.lock();
+    try {
+      chainService.setHovered(aId);
+      expect(chainService.isSuppressed()).toBe(false);
+      expect(chainService.hasHighlight()).toBe(true);
+      expect(chainService.litNodeIds().size).toBe(3);
+    } finally {
+      canvasLock.unlock({ silent: true });
     }
   });
 });

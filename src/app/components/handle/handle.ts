@@ -3,6 +3,7 @@ import { HandleSide } from '../../models/node';
 import { textToPlainString } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 
 @Component({
@@ -18,7 +19,7 @@ import { KeyboardConnectionService } from '../../services/keyboard-connection.se
       [class.side-bottom]="side() === 'bottom'"
       [class.side-left]="side() === 'left'"
       [attr.data-handle]="nodeId() + ':' + side()"
-      [attr.tabindex]="presentationService.active() ? null : 0"
+      [attr.tabindex]="presentationService.active() || canvasLock.locked() ? null : 0"
       role="button"
       [attr.aria-label]="handleLabel()"
       (mousedown)="$event.stopPropagation(); onStartDrag($event)"
@@ -72,6 +73,7 @@ export class HandleComponent {
 
   private graphService = inject(GraphService);
   protected presentationService = inject(PresentationService);
+  protected canvasLock = inject(CanvasLockService);
   private keyboardConnection = inject(KeyboardConnectionService);
 
   // Screen-reader name: "Connect from <node name>" — the Handle's only job is
@@ -107,7 +109,7 @@ export class HandleComponent {
   }
 
   onKeydown(event: KeyboardEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if (event.key === 'Enter') {
       // The Node card's Enter-select must not fire: a Handle's Enter belongs
       // to the Connection flow, not the card

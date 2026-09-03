@@ -4,9 +4,12 @@ import { provideRouter } from '@angular/router';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { CommandPaletteService } from '../services/command-palette.service';
 import { GraphService } from '../services/graph.service';
+import { HistoryService } from '../services/history.service';
 import { PresentationService } from '../services/presentation.service';
+import { CanvasLockService } from '../services/canvas-lock.service';
 import { KeyboardConnectionService } from '../services/keyboard-connection.service';
 import { ResizeModeService } from '../services/resize-mode.service';
+import { CreateNodeCommand } from '../services/commands';
 
 @Component({
   standalone: true,
@@ -311,5 +314,105 @@ describe('KeyboardShortcuts Resize mode and Reroute Point flow', () => {
 
     expect(graphService.viewportState().panX).toBe(0);
     card.remove();
+  });
+});
+
+describe('KeyboardShortcuts Canvas Lock scope', () => {
+  let fixture: ComponentFixture<KeyboardHost>;
+  let graphService: GraphService;
+  let historyService: HistoryService;
+  let lock: CanvasLockService;
+  let palette: CommandPaletteService;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    TestBed.configureTestingModule({
+      imports: [KeyboardHost],
+      providers: [provideRouter([])],
+    });
+    fixture = TestBed.createComponent(KeyboardHost);
+    graphService = TestBed.inject(GraphService);
+    historyService = TestBed.inject(HistoryService);
+    lock = TestBed.inject(CanvasLockService);
+    palette = TestBed.inject(CommandPaletteService);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    lock.unlock({ silent: true });
+    palette.close(false);
+    document.body.innerHTML = '';
+  });
+
+  function key(keyName: string, init: KeyboardEventInit = {}): void {
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: keyName,
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    }));
+  }
+
+  it('opens the Palette with Ctrl+K while locked', () => {
+    lock.lock();
+    key('k', { ctrlKey: true });
+    expect(palette.isOpen()).toBe(true);
+  });
+
+  it('leaves History untouched on Ctrl+Z while locked, resuming after unlock', () => {
+    historyService.execute(new CreateNodeCommand(graphService, 'N', 0, 0));
+    expect(graphService.nodes()).toHaveLength(1);
+    lock.lock();
+
+    key('z', { ctrlKey: true });
+    expect(graphService.nodes()).toHaveLength(1);
+    expect(historyService.canUndo()).toBe(true);
+
+    lock.unlock();
+    key('z', { ctrlKey: true });
+    expect(graphService.nodes()).toHaveLength(0);
+  });
+
+  it('does not select all on Ctrl+A while locked', () => {
+    graphService.createNode('A', 0, 0);
+    lock.lock();
+    key('a', { ctrlKey: true });
+    expect(graphService.selectedNodeIds()).toEqual([]);
+  });
+
+  it('does not delete the Selection on Delete while locked', () => {
+    const node = graphService.createNode('A', 0, 0);
+    lock.lock();
+    // Selection built programmatically (gestures cannot build one while
+    // locked) still cannot be deleted from the keyboard
+    graphService.setSelection([node.id], []);
+    key('Delete');
+    expect(graphService.nodes()).toHaveLength(1);
+  });
+
+  it('does not cycle Connections on ] while locked', () => {
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 320, 0);
+    graphService.createConnection(a.id, 'right', b.id, 'left');
+    lock.lock();
+    key(']');
+    expect(graphService.selectedConnectionIds()).toEqual([]);
+  });
+
+  it('keeps Escape from unlocking or clearing while locked', () => {
+    const node = graphService.createNode('A', 0, 0);
+    lock.lock();
+    graphService.setSelection([node.id], []);
+    key('Escape');
+    expect(lock.locked()).toBe(true);
+    expect(graphService.selectedNodeIds()).toEqual([node.id]);
+  });
+
+  it('still pans the Viewport from arrows while locked', () => {
+    graphService.createNode('A', 0, 0);
+    lock.lock();
+    document.body.focus();
+    key('ArrowRight');
+    expect(graphService.viewportState().panX).toBe(40);
   });
 });

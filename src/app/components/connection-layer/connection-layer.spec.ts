@@ -3,8 +3,8 @@ import { ConnectionLayerComponent } from './connection-layer';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { ConnectionJumpsService } from '../../services/connection-jumps.service';
-import { PresentationService } from '../../services/presentation.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { textFromString } from '../../models/text';
 
@@ -13,6 +13,7 @@ describe('ConnectionLayerComponent reroute interactions', () => {
   let component: ConnectionLayerComponent;
   let graphService: GraphService;
   let presentationService: PresentationService;
+  let canvasLock: CanvasLockService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [ConnectionLayerComponent] });
@@ -20,6 +21,7 @@ describe('ConnectionLayerComponent reroute interactions', () => {
     component = fixture.componentInstance;
     graphService = TestBed.inject(GraphService);
     presentationService = TestBed.inject(PresentationService);
+    canvasLock = TestBed.inject(CanvasLockService);
     fixture.detectChanges();
   });
 
@@ -304,5 +306,59 @@ describe('ConnectionLayerComponent Connection Jumps', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelectorAll('mask').length).toBe(1);
+  });
+});
+
+describe('ConnectionLayerComponent Canvas Lock', () => {
+  let fixture: ComponentFixture<ConnectionLayerComponent>;
+  let component: ConnectionLayerComponent;
+  let graphService: GraphService;
+  let canvasLock: CanvasLockService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [ConnectionLayerComponent] });
+    fixture = TestBed.createComponent(ConnectionLayerComponent);
+    component = fixture.componentInstance;
+    graphService = TestBed.inject(GraphService);
+    canvasLock = TestBed.inject(CanvasLockService);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    canvasLock.unlock({ silent: true });
+  });
+
+  function makeConnection() {
+    const source = graphService.createNode('Source', 0, 0);
+    const target = graphService.createNode('Target', 320, 0);
+    return graphService.createConnection(source.id, 'right', target.id, 'left')!;
+  }
+
+  it('does not open the Text editor from a card double-click while locked', () => {
+    const connection = makeConnection();
+    canvasLock.lock();
+    component.onTextCardDoubleClick(connection, new MouseEvent('dblclick'));
+    expect(component.editingConnectionId()).toBeNull();
+  });
+
+  it('emits no select or point move from keys while locked', () => {
+    const connection = makeConnection();
+    graphService.setConnectionReroutePoints(connection.id, [{ x: 160, y: 100 }]);
+    canvasLock.lock();
+    let selected: { connectionId: string; additive: boolean } | null = null;
+    component.connectionSelect.subscribe(e => (selected = e));
+    const after = graphService.connections()[0];
+
+    component.onConnectionKeydown(after, new KeyboardEvent('keydown', { key: 'Enter' }));
+    component.onReroutePointKeydown(after, 0, new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(selected).toBeNull();
+    expect(graphService.connections()[0].reroutePoints).toEqual([{ x: 160, y: 100 }]);
+  });
+
+  it('drops Connections and Reroute Points out of the tab order while locked', () => {
+    makeConnection();
+    canvasLock.lock();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.connection-hit')?.getAttribute('tabindex')).toBeNull();
   });
 });

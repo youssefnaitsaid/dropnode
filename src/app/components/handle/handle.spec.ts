@@ -4,6 +4,7 @@ import { GraphService } from '../../services/graph.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { ToastService } from '../toast/toast';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 
 describe('HandleComponent keyboard Connection flow', () => {
   let fixture: ComponentFixture<HandleComponent>;
@@ -12,6 +13,7 @@ describe('HandleComponent keyboard Connection flow', () => {
   let keyboardConnection: KeyboardConnectionService;
   let toastService: ToastService;
   let presentationService: PresentationService;
+  let canvasLock: CanvasLockService;
 
   const handleEl = () => fixture.nativeElement.querySelector('.handle') as HTMLElement;
 
@@ -27,6 +29,7 @@ describe('HandleComponent keyboard Connection flow', () => {
     keyboardConnection = TestBed.inject(KeyboardConnectionService);
     toastService = TestBed.inject(ToastService);
     presentationService = TestBed.inject(PresentationService);
+    canvasLock = TestBed.inject(CanvasLockService);
     fixture.componentRef.setInput('nodeId', 'n1');
     fixture.componentRef.setInput('side', 'right');
     fixture.detectChanges();
@@ -113,5 +116,23 @@ describe('HandleComponent keyboard Connection flow', () => {
     enter(handleEl());
     expect(keyboardConnection.pending()).toBeNull();
     presentationService.active.set(false);
+  });
+
+  it('does nothing while Canvas Lock is active', () => {
+    const node = graphService.createNode('A', 0, 0);
+    fixture.componentRef.setInput('nodeId', node.id);
+    fixture.detectChanges();
+
+    canvasLock.lock();
+    enter(handleEl());
+    expect(keyboardConnection.pending()).toBeNull();
+    canvasLock.unlock({ silent: true });
+  });
+
+  it('drops out of the tab order while Canvas Lock is active', () => {
+    canvasLock.lock();
+    fixture.detectChanges();
+    expect(handleEl().getAttribute('tabindex')).toBeNull();
+    canvasLock.unlock({ silent: true });
   });
 });

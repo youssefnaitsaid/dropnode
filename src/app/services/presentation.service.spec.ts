@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PresentationService } from './presentation.service';
+import { CanvasLockService } from './canvas-lock.service';
 import { GraphService } from './graph.service';
 import { frameViewport } from '../models/bounds';
 
@@ -150,8 +151,7 @@ describe('PresentationService', () => {
   });
 
   describe('exit', () => {
-    it('restores the exact pre-Present Viewport instantly and deactivates', () => {
-      graphService.createGroup('G', 2000, 2000);
+    it('restores the exact pre-Present Viewport instantly and deactivates', () => {      graphService.createGroup('G', 2000, 2000);
       graphService.setViewport({ panX: -42, panY: 17, zoom: 1.3 });
       service.enter(W, H);
       service.exit();
@@ -174,6 +174,24 @@ describe('PresentationService', () => {
       graphService.setViewport({ panX: 1, panY: 2, zoom: 3 });
       service.exit();
       expect(graphService.viewportState()).toEqual({ panX: 1, panY: 2, zoom: 3 });
+    });
+  });
+
+  describe('Canvas Lock stacking', () => {
+    it('enters while locked and returns to locked on exit', () => {
+      graphService.createGroup('G', 0, 0);
+      const canvasLock = TestBed.inject(CanvasLockService);
+      canvasLock.lock();
+      try {
+        service.enter(W, H);
+        expect(service.active()).toBe(true);
+        expect(canvasLock.locked()).toBe(true);
+        service.exit();
+        expect(service.active()).toBe(false);
+        expect(canvasLock.locked()).toBe(true);
+      } finally {
+        canvasLock.unlock({ silent: true });
+      }
     });
   });
 });

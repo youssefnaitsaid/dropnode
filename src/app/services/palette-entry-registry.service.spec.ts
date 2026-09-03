@@ -8,6 +8,8 @@ import { ContextMenuService } from './context-menu.service';
 import { ExportDialogService } from './export-dialog.service';
 import { PinVisibilityService } from './pin-visibility.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
+import { CanvasLockService } from './canvas-lock.service';
+import { CollectionService } from './collection.service';
 
 @Component({ standalone: true, template: '' })
 class TestRoute {}
@@ -374,5 +376,76 @@ describe('PaletteEntryRegistry', () => {
     expect(pinVisibility.hidden()).toBe(true);
     registry.execute('toggle-pins');
     expect(pinVisibility.hidden()).toBe(false);
+  });
+});
+
+describe('PaletteEntryRegistry Canvas Lock', () => {
+  let registry: PaletteEntryRegistry;
+  let historyService: HistoryService;
+  let canvasLock: CanvasLockService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'p/:projectId', component: TestRoute }])] });
+    registry = TestBed.inject(PaletteEntryRegistry);
+    historyService = TestBed.inject(HistoryService);
+    canvasLock = TestBed.inject(CanvasLockService);
+  });
+
+  afterEach(() => {
+    canvasLock.unlock({ silent: true });
+  });
+
+  function find(id: string) {
+    return registry.entries().find(entry => entry.id === id)!;
+  }
+
+  it('exposes a Lock Canvas entry that toggles the lock', () => {
+    expect(find('lock-canvas').label).toBe('Lock Canvas');
+    expect(find('lock-canvas').category).toBe('Viewport');
+    expect(find('lock-canvas').available).toBe(true);
+
+    registry.execute('lock-canvas');
+    expect(canvasLock.locked()).toBe(true);
+    expect(find('unlock-canvas').label).toBe('Unlock Canvas');
+    expect(find('unlock-canvas').available).toBe(true);
+
+    registry.execute('unlock-canvas');
+    expect(canvasLock.locked()).toBe(false);
+  });
+
+  it('gates mutating entries with a locked reason while locked, keeping view entries live', () => {
+    const graph = TestBed.inject(GraphService);
+    graph.createGroup('Tour', 0, 0);
+    TestBed.inject(CollectionService).createCollection('C');
+    canvasLock.lock();
+
+    for (const id of ['undo', 'add-node', 'add-group', 'add-pin', 'connect-nodes', 'delete',
+      'cut', 'copy', 'paste', 'duplicate', 'select-all', 'tidy-up', 'import-graph',
+      'zoom-to-selection', 'export-selection-png', 'edit-text', 'add-reroute-point']) {
+      const entry = find(id);
+      expect(entry.available).toBe(false);
+      expect(entry.disabledReason).toBe('Unlock the Canvas to edit');
+    }
+
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-to-fit', 'present', 'export-png',
+      'export-json', 'export-as', 'copy-json', 'copy-link', 'toggle-minimap',
+      'toggle-connection-jumps', 'toggle-pins', 'toggle-sidebar', 'save-as-project',
+      'new-collection', 'import-collection', 'unlock-canvas']) {
+      expect(find(id).available).toBe(true);
+    }
+  });
+
+  it('refuses to execute a gated entry while locked', () => {
+    const graph = TestBed.inject(GraphService);
+    const node = graph.createNode('A', 0, 0);
+    graph.selectNode(node.id);
+    expect(registry.execute('delete')).toBe(true);
+
+    const survivor = graph.createNode('B', 0, 0);
+    graph.selectNode(survivor.id);
+    canvasLock.lock();
+    expect(registry.execute('delete')).toBe(false);
+    expect(graph.nodes().some(n => n.id === survivor.id)).toBe(true);
+    expect(historyService.canUndo()).toBe(true);
   });
 });
