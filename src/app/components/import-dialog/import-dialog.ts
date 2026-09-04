@@ -7,6 +7,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
+import { OutlineService } from '../../services/outline.service';
 import { ToastService } from '../toast/toast';
 
 @Component({
@@ -109,6 +110,7 @@ import { ToastService } from '../toast/toast';
 export class ImportDialogComponent {
   private graphService = inject(GraphService);
   private historyService = inject(HistoryService);
+  private outlineService = inject(OutlineService);
   private toastService = inject(ToastService);
 
   private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
@@ -172,6 +174,8 @@ export class ImportDialogComponent {
       const result = this.graphService.importGraph(parsed);
       if (result.success) {
         this.historyService.recordImportSeparator();
+        // Imported ids replace the graph wholesale — land expanded.
+        this.outlineService.clearCollapsed();
         this.toastService.show('Graph imported successfully', 'success');
         this.close();
       } else {

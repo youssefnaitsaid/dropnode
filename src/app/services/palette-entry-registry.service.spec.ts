@@ -8,6 +8,7 @@ import { ContextMenuService } from './context-menu.service';
 import { ExportDialogService } from './export-dialog.service';
 import { PinVisibilityService } from './pin-visibility.service';
 import { HistoryPanelService } from './history-panel.service';
+import { OutlineService } from './outline.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
 import { CanvasLockService } from './canvas-lock.service';
 import { CanvasSearchService } from './canvas-search.service';
@@ -436,6 +437,21 @@ describe('PaletteEntryRegistry', () => {
     expect(historyPanel.hidden()).toBe(true);
   });
 
+  it('exposes Toggle Outline in Application with no shortcut and it flips the panel', () => {
+    const toggleOutline = find('toggle-outline');
+    const outline = TestBed.inject(OutlineService);
+
+    expect(toggleOutline.label).toBe('Toggle Outline');
+    expect(toggleOutline.category).toBe('Application');
+    expect(toggleOutline.aliases).toContain('hide outline');
+    expect(toggleOutline.shortcut).toBeUndefined();
+
+    registry.execute('toggle-outline');
+    expect(outline.hidden()).toBe(true);
+    registry.execute('toggle-outline');
+    expect(outline.hidden()).toBe(false);
+  });
+
   it('exposes Add Text Block beside Add Node and Add Group', () => {
     const entry = find('add-text-block');
     expect(entry.label).toBe('Add Text Block');
@@ -514,7 +530,7 @@ describe('PaletteEntryRegistry Canvas Lock', () => {
     }
 
     for (const id of ['zoom-in', 'zoom-out', 'zoom-to-fit', 'present-reading-order', 'present-following-connections', 'export-png',
-      'export-json', 'export-as', 'copy-json', 'copy-link', 'toggle-minimap',
+      'export-json', 'export-as', 'copy-json', 'copy-link', 'toggle-minimap', 'toggle-outline',
       'toggle-connection-jumps', 'toggle-pins', 'toggle-sidebar', 'save-as-project',
       'new-collection', 'import-collection', 'unlock-canvas']) {
       expect(find(id).available).toBe(true);

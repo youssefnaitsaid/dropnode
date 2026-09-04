@@ -51,6 +51,7 @@ import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { HistoryPanelService } from './history-panel.service';
 import { MinimapService } from './minimap.service';
+import { OutlineService } from './outline.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
 import { PinVisibilityService } from './pin-visibility.service';
 import { ImportDialogService } from './import-dialog.service';
@@ -206,6 +207,7 @@ export class PaletteEntryRegistry {
   private readonly canvasSearch = inject(CanvasSearchService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
+  private readonly outlineService = inject(OutlineService);
   private readonly connectionJumpsService = inject(ConnectionJumpsService);
   private readonly pinVisibilityService = inject(PinVisibilityService);
   private readonly resizeMode = inject(ResizeModeService);
@@ -491,6 +493,9 @@ export class PaletteEntryRegistry {
       }),
       this.action('toggle-minimap', 'Toggle Minimap', 'Application', () => this.minimapService.toggle(), {
         aliases: ['show minimap', 'hide minimap'], icon: 'lucideMap',
+      }),
+      this.action('toggle-outline', 'Toggle Outline', 'Application', () => this.outlineService.toggle(), {
+        aliases: ['show outline', 'hide outline'], icon: 'lucideListTree',
       }),
       this.action('toggle-connection-jumps', 'Toggle Connection Jumps', 'Application', () => this.connectionJumpsService.toggle(), {
         aliases: ['show connection jumps', 'hide connection jumps'], icon: 'lucideWaypoints',
