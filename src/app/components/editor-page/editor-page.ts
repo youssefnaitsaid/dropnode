@@ -176,7 +176,7 @@ export class EditorPageComponent implements OnDestroy {
   protected presentationService = inject(PresentationService);
   protected minimapService = inject(MinimapService);
   protected historyPanelService = inject(HistoryPanelService);
-  private outlineService = inject(OutlineService);
+  protected outlineService = inject(OutlineService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
