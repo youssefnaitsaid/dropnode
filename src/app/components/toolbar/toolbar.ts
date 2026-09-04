@@ -430,7 +430,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
           hlmBtn
           variant="ghost"
           size="icon"
-          (click)="present()"
+          [hlmDropdownMenuTrigger]="presentMenu"
           [disabled]="!presentationService.canPresent()"
           [title]="presentationService.canPresent() ? 'Present' : 'Group nodes to present them'"
           aria-label="Present"
@@ -471,6 +471,19 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         }
       </div>
     </div>
+
+    <ng-template #presentMenu>
+      <div hlmDropdownMenu class="w-64">
+        <button hlmDropdownMenuItem (triggered)="presentReading()">
+          <ng-icon name="lucidePresentation" />
+          <span>Present in reading order</span>
+        </button>
+        <button hlmDropdownMenuItem (triggered)="presentFollowing()">
+          <ng-icon name="lucidePresentation" />
+          <span>Present following Connections</span>
+        </button>
+      </div>
+    </ng-template>
 
     <ng-template #exportMenu>
       <div hlmDropdownMenu class="w-56">
@@ -856,8 +869,12 @@ export class ToolbarComponent {
   // and toolbar), so the canvas is about to fill the window — Steps must
   // frame against that destination region, not the pre-hide canvas rect
   // (which is still shrunk by the chrome at click time).
-  present(): void {
-    this.presentationService.enter(window.innerWidth, window.innerHeight);
+  presentReading(): void {
+    this.presentationService.enter(window.innerWidth, window.innerHeight, 'reading');
+  }
+
+  presentFollowing(): void {
+    this.presentationService.enter(window.innerWidth, window.innerHeight, 'connection-following');
   }
 
   toggleLock(): void {

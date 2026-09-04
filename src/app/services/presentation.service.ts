@@ -2,12 +2,13 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { GraphService } from './graph.service';
 import { ViewportState } from '../models/viewport-state';
 import { Bounds, unionBounds, frameViewport } from '../models/bounds';
-import { presentSteps, interpolateViewport, PRESENT_TRANSITION_MS } from '../models/present';
+import { presentSteps, connectionFollowingSteps, interpolateViewport, PRESENT_TRANSITION_MS, PresentOrder } from '../models/present';
 
 /**
- * Owns Present Mode — the read-only, chrome-free Viewport tour of Groups
- * (ADR-0020). Every Group is a Step, visited in positional reading order;
- * each Step frames its Group unioned with its children under the
+ * Owns Present Mode — the read-only, chrome-free Viewport walk of Groups
+ * (ADR-0020). Every Group is a Step in both orders: reading order (the
+ * default) or Connection-following order (a directed walk from a start
+ * Group); each Step frames its Group unioned with its children under the
  * Zoom-to-selection contract (90% fill, 2x cap, no bezier union). Transient
  * UI state: never Graph State, never History, never serialized. `active`
  * doubles as the gate the editor page uses to suspend Viewport auto-save
@@ -22,8 +23,16 @@ export class PresentationService {
   readonly stepIndex = signal(0);
   /** Destination of the current Step's transition; null while inactive. */
   readonly targetViewport = signal<ViewportState | null>(null);
+  /** Which order the active (or next) walk uses; reading is the default. */
+  readonly order = signal<PresentOrder>('reading');
 
-  readonly steps = computed(() => presentSteps(this.graphService.nodes()));
+  readonly steps = computed(() => {
+    const nodes = this.graphService.nodes();
+    if (this.order() === 'connection-following') {
+      return connectionFollowingSteps(nodes, this.graphService.connections(), this.startGroupId());
+    }
+    return presentSteps(nodes);
+  });
   readonly stepCount = computed(() => this.steps().length);
   readonly canPresent = computed(() => this.stepCount() > 0);
 
@@ -33,13 +42,26 @@ export class PresentationService {
   private viewWidth = 0;
   private viewHeight = 0;
   private animationFrame: number | null = null;
+  /** Start Group of a Connection-following walk; null means reading-first fallback. */
+  private startGroupId = signal<string | null>(null);
 
-  /** Start the tour at Step 1. No Groups or already presenting: silent no-op. */
-  enter(viewWidth: number, viewHeight: number): void {
+  /** Start the walk at Step 1. No Groups or already presenting: silent no-op. */
+  enter(viewWidth: number, viewHeight: number, order: PresentOrder = 'reading'): void {
     if (this.active() || !this.canPresent()) return;
     this.viewWidth = viewWidth;
     this.viewHeight = viewHeight;
     this.savedViewport = this.graphService.viewportState();
+    this.order.set(order);
+    // Connection-following starts from the selected Group when exactly one
+    // Group is selected; anything else falls back to reading-first. Read
+    // before the existing clear-on-enter.
+    if (order === 'connection-following') {
+      const selectedId = this.graphService.selectedNodeId();
+      const selected = selectedId ? this.graphService.nodes().find(n => n.id === selectedId) : null;
+      this.startGroupId.set(selected && selected.kind === 'group' ? selected.id : null);
+    } else {
+      this.startGroupId.set(null);
+    }
     this.graphService.clearSelection();
     this.active.set(true);
     this.stepIndex.set(0);
@@ -54,6 +76,8 @@ export class PresentationService {
     this.savedViewport = null;
     this.targetViewport.set(null);
     this.active.set(false);
+    this.order.set('reading');
+    this.startGroupId.set(null);
   }
 
   /** Advance one Step; a hard no-op at the last Step — Escape is the only exit. */
