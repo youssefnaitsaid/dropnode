@@ -393,7 +393,7 @@
 
 ## outline
 
-- the Outline is a toggleable panel docked to the right of the Canvas (History Panel overlay pattern), listing every Group with its children plus loose Nodes and loose Text Blocks; Pins and Connections never appear as rows @implemented
+- the Outline is a toggleable panel docked to the left of the Canvas (mirroring the History Panel overlay pattern), listing every Group with its children plus loose Nodes and loose Text Blocks; Pins and Connections never appear as rows @implemented
 - Outline rows are ordered Groups in nodes-array order with children indented in nodes-array order, then loose Nodes, then loose Text Blocks; Text Block rows carry a "Text" badge @implemented
 - each Outline row shows its plain-text name (Formatting stripped, newlines to spaces) with its Emoji glyph, plus per-row in→out Connection counts; Text Blocks show — and Groups show Label plus child count plus aggregate in→out; Shape and Palette are omitted @implemented
 - the Outline is a read-only mirror with a single Selection model: clicking a row replaces the Selection and applies Zoom to Selection; Ctrl+click toggles membership without zooming @implemented

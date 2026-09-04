@@ -103,7 +103,7 @@ import {
     :host {
       position: absolute;
       top: 64px;
-      right: max(16px, env(safe-area-inset-right));
+      left: max(16px, env(safe-area-inset-left));
       bottom: 180px;
       width: 260px;
       z-index: var(--dn-z-overlay);
