@@ -48,6 +48,7 @@ import { ExportDialogService } from './export-dialog.service';
 import { ExportService } from './export.service';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
+import { HistoryPanelService } from './history-panel.service';
 import { MinimapService } from './minimap.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
 import { PinVisibilityService } from './pin-visibility.service';
@@ -188,6 +189,7 @@ type EntryOptions = {
 export class PaletteEntryRegistry {
   private readonly graphService = inject(GraphService);
   private readonly historyService = inject(HistoryService);
+  private readonly historyPanelService = inject(HistoryPanelService);
   private readonly clipboardService = inject(ClipboardService);
   private readonly contextMenuService = inject(ContextMenuService);
   private readonly canvasViewport = inject(CanvasViewportService);
@@ -238,6 +240,9 @@ export class PaletteEntryRegistry {
       this.action('redo', 'Redo', 'History', () => this.historyService.redo(), {
         aliases: ['repeat', 'step forward'], shortcut: SHORTCUTS.redo, icon: 'lucideRedo2',
         available: this.historyService.canRedo(), unavailableReason: 'Nothing to redo',
+      }),
+      this.action('toggle-history', 'Toggle History', 'History', () => this.historyPanelService.toggle(), {
+        aliases: ['show history', 'hide history'], icon: 'lucideHistory',
       }),
 
       this.action('select-all', 'Select All', 'Selection', () => this.graphService.selectAll(), {
