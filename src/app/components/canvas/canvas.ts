@@ -195,6 +195,10 @@ import { Text } from '../../models/text';
               <ng-icon name="lucideGroup" />
               <span>Add group</span>
             </button>
+            <button hlmDropdownMenuItem (triggered)="contextMenuService.addTextBlock()">
+              <ng-icon name="lucideSquarePlus" />
+              <span>Add text block</span>
+            </button>
             <button hlmDropdownMenuItem (triggered)="contextMenuService.addPin()">
               <ng-icon name="lucideMessageCircle" />
               <span>Add pin</span>
@@ -209,6 +213,10 @@ import { Text } from '../../models/text';
               <button hlmDropdownMenuItem (triggered)="contextMenuService.addNode()">
                 <ng-icon name="lucideSquarePlus" />
                 <span>Add node</span>
+              </button>
+              <button hlmDropdownMenuItem (triggered)="contextMenuService.addTextBlock()">
+                <ng-icon name="lucideSquarePlus" />
+                <span>Add text block</span>
               </button>
               <button hlmDropdownMenuItem (triggered)="contextMenuService.rename()">
                 <ng-icon name="lucidePencil" />

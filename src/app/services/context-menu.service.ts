@@ -4,7 +4,7 @@ import { HistoryService } from './history.service';
 import { ClipboardService } from './clipboard.service';
 import { ExportDialogService } from './export-dialog.service';
 import {
-  CreateNodeCommand, CreateGroupCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
+  CreateNodeCommand, CreateGroupCommand, CreateTextBlockCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
   DeletePinCommand, AddConnectionReroutePointCommand,
   buildDeleteSelectionCommand, buildAlignSelectionCommand, buildDistributeSelectionCommand,
 } from './commands';
@@ -151,6 +151,27 @@ export class ContextMenuService {
         'New Group',
         this.pointX - GROUP_OFFSET_X,
         this.pointY - GROUP_OFFSET_Y,
+      ),
+    );
+  }
+
+  /**
+   * Create a "New Text Block" (160x48) centered on the right-click point.
+   * When the menu was opened on a Group, the block becomes a child of that
+   * Group — the same placement rule as Add node.
+   */
+  addTextBlock(): void {
+    const target = this.target();
+    if (!target) return;
+    const parentId =
+      target.kind === 'node' && this.isGroup(target.nodeId) ? target.nodeId : undefined;
+    this.historyService.execute(
+      new CreateTextBlockCommand(
+        this.graphService,
+        'New Text Block',
+        this.pointX - NODE_OFFSET_X,
+        this.pointY - NODE_OFFSET_Y,
+        parentId,
       ),
     );
   }

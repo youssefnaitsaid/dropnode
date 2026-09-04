@@ -130,6 +130,24 @@ describe('expandExportScope', () => {
     expect(scope.rootIds).toEqual([child.id]);
     expect(scope.nodes.map(n => n.id)).toEqual([child.id]);
   });
+
+  it('scopes Text Blocks as Nodes: loose roots render, Groups bring Text Block children', () => {
+    const group: GraphNode = {
+      id: 'group', kind: 'group', label: 'Cluster', x: 0, y: 0, width: 320, height: 200,
+    };
+    const doc: GraphNode = {
+      id: 'doc', kind: 'annotation', x: 40, y: 60, width: 160, height: 48,
+    };
+    const childDoc: GraphNode = {
+      id: 'child-doc', kind: 'annotation', x: 40, y: 60, width: 160, height: 48, parentId: group.id,
+    };
+
+    const loose = expandExportScope([doc.id], [group, doc, childDoc], []);
+    expect(loose.nodes.map(n => n.id)).toEqual([doc.id]);
+
+    const clustered = expandExportScope([group.id], [group, doc, childDoc], []);
+    expect(clustered.nodes.map(n => n.id).sort()).toEqual(['child-doc', 'group']);
+  });
 });
 
 describe('Export Theme mapping', () => {

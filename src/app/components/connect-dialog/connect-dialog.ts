@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLink, lucideX } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
-import { GraphNode, HandleSide, oppositeHandle } from '../../models/node';
+import { GraphNode, HandleSide, isTextBlock, oppositeHandle } from '../../models/node';
 import { textToPlainString } from '../../models/text';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -103,7 +103,9 @@ export class ConnectDialogComponent {
   sourceNodeId = signal<string | null>(null);
   targetNodeId = signal<string | null>(null);
 
-  nodes = this.graphService.nodes;
+  nodes = computed(() =>
+    this.graphService.nodes().filter(n => !isTextBlock(n)),
+  );
 
   nodeName(node: GraphNode): string {
     if (node.kind === 'group') return node.label?.trim() || 'Group';

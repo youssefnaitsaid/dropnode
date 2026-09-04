@@ -1953,7 +1953,7 @@ describe('GraphService', () => {
       } as unknown as GraphState);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe("Invalid node a: kind must be 'group'");
+      expect(result.error).toBe("Invalid node a: kind must be 'group' or 'annotation'");
     });
 
     it('rejects a color outside the palette', () => {

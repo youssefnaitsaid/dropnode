@@ -362,3 +362,34 @@ describe('ConnectionLayerComponent Canvas Lock', () => {
     expect(fixture.nativeElement.querySelector('.connection-hit')?.getAttribute('tabindex')).toBeNull();
   });
 });
+
+describe('ConnectionLayerComponent Text Block snap', () => {
+  let fixture: ComponentFixture<ConnectionLayerComponent>;
+  let component: ConnectionLayerComponent;
+  let graphService: GraphService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [ConnectionLayerComponent] });
+    fixture = TestBed.createComponent(ConnectionLayerComponent);
+    component = fixture.componentInstance;
+    graphService = TestBed.inject(GraphService);
+    fixture.detectChanges();
+  });
+
+  it('never snaps a dragged endpoint to a Text Block, snapping to a regular Node instead', () => {
+    const source = graphService.createNode('Source', 0, 0);
+    graphService.createTextBlock('Parked doc', 300, 0);
+    const target = graphService.createNode('Target', 300, 500);
+    fixture.detectChanges();
+
+    component.startConnectionDrag(source.id, 'right', new MouseEvent('mousedown'));
+    // The Text Block's would-be left Handle sits at (300, 24): no snap
+    component.updateConnectionDrag(300, 24);
+    expect(component.endConnectionDrag()).toBeNull();
+
+    component.startConnectionDrag(source.id, 'right', new MouseEvent('mousedown'));
+    // The regular Node's left Handle sits at (300, 524): snaps
+    component.updateConnectionDrag(300, 524);
+    expect(component.endConnectionDrag()).toEqual({ targetNodeId: target.id, targetHandle: 'left' });
+  });
+});

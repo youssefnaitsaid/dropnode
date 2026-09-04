@@ -18,7 +18,7 @@
 - the Snap Zone is a 30-canvas-unit radius around a Handle; a dragged connection endpoint inside it attaches to that Handle
 - an Alignment Guide is a transient red line shown while dragging a Node when one of its edges or center axes lines up with an edge or center of another visible Node; it is never part of Graph State
 - Alignment Snap is the magnetic pull that locks a dragged Node onto a nearby Alignment Guide within a small threshold, distinct from the Snap Zone which attaches connection endpoints to a Handle
-- a Node owns exactly four Handles, one per edge; a Group carries the same four Handles
+- a regular Node owns exactly four Handles, one per edge; a Group carries the same four Handles; a Text Block (kind 'annotation') has none and is never connected @spec
 - deleting a Node cascade-deletes every Connection referencing it as source or target
 - all Graph State lives in GraphService signals; components mutate it only through the service, transient drags directly and undoable actions via Commands
 - Import replaces the Graph State wholesale after validation; Export serializes it to JSON
@@ -76,6 +76,16 @@
 - label: double-clicking a Group's label strip edits its label inline; double-clicking its body creates a "New Node" child at the cursor as one undo step
   command: grep -q 'createChild' src/app/components/node/node.ts
 - Groups render beneath Connections and regular nodes (ADR-0008 stacking) so children stay visible; their fill is solid (no alpha)
+
+## text blocks
+
+- a Text Block is a distinct kind of Node (kind 'annotation', absent means regular) carrying required Text, Shape, Palette, and Emoji like a regular Node but with zero Handles; it is never a Connection endpoint, snap target, or Connect-dialog option @spec
+- a Text Block is created either from the empty-Canvas Context Menu ("Add text block": 160x48, Text "New Text Block", Node offset 60/24) or its Group-menu child variant or the Command Palette ("Add Text Block": centered in the visible Canvas, opening the Text editor); each creation is a single undo step selecting the spawn, ids use the node_ pattern, and double-click still spawns only regular Nodes @spec
+- a Text Block behaves as a regular Node root everywhere except connection paths: Marquee-by-rect, Ctrl+A, move (single + multi rigid with frozen membership), Align/Distribute roots, Delete (cascade-deletes its anchored Pins), Cut/Copy/Duplicate/Alt-drag/Paste with id regeneration and parentId remap, Group containment by center-point with topmost-wins, Group-resize padding inclusion, Pin-anchorability, Export Scope roots, Present child-framing (loose never framed), and Chain Highlight dimming without ever triggering @spec
+- there is no Node↔Text-Block conversion in place; Quick-add never spawns a Text Block and a Text Block drag never Quick-adds @spec
+- Import accepts kind 'annotation' with the regular Node Text/Shape/Palette/Emoji whitelist and rejects wholesale any Connection touching a Text Block @spec
+- Tidy up pins Text Blocks in place: top-level ones never move and are excluded from components, loner-grid, handle re-pick, and bounds anchoring; Group children ride rigidly with their Group (relative offsets kept) and still count toward their Group's 16+28 rect @spec
+- the Minimap draws a Text Block pixel-identical to a regular Node (same fill, accent when selected, in-bounds); a future Outline panel lists Text Blocks alongside Nodes badged "Text" @spec
 
 ## colors
 

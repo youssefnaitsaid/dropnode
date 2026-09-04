@@ -1,5 +1,5 @@
 import { Component, computed, effect, input, output, signal, ChangeDetectionStrategy, inject } from '@angular/core';
-import { GraphNode, HandleSide, NODE_PALETTE, oppositeHandle } from '../../models/node';
+import { GraphNode, HandleSide, NODE_PALETTE, isTextBlock, oppositeHandle } from '../../models/node';
 import { DN_TOKENS } from '../../design-tokens';
 import { Connection, ArrowheadType, effectiveArrowhead, effectiveTextPosition, effectiveStrokePattern, effectiveStrokeWeight, strokeWidthPx, strokeDasharray } from '../../models/connection';
 import { ConnectionRoute, connectionRoute, routePointAt, routeProjection, sampleRoute, textPositionFromRoute } from '../../models/curve';
@@ -634,6 +634,8 @@ export class ConnectionLayerComponent {
     const sourceNode = this.nodes().find(n => n.id === state.sourceNodeId);
     for (const node of this.nodes()) {
       if (node.id === state.sourceNodeId) continue;
+      // Text Blocks own zero Handles and are never snap targets (ADR-0035)
+      if (isTextBlock(node)) continue;
       // A Group and its own children are never snap targets of each other
       if (node.parentId === state.sourceNodeId || sourceNode?.parentId === node.id) continue;
       for (const side of ['top', 'right', 'bottom', 'left'] as HandleSide[]) {

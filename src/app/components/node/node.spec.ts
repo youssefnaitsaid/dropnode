@@ -363,3 +363,35 @@ describe('NodeComponent Canvas Lock', () => {
     expect(hovered).toBe('n1');
   });
 });
+
+describe('NodeComponent Text Blocks', () => {
+  let fixture: ComponentFixture<NodeComponent>;
+
+  function render(node: GraphNode): void {
+    fixture = TestBed.createComponent(NodeComponent);
+    fixture.componentRef.setInput('node', node);
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [NodeComponent] });
+  });
+
+  it('renders Text Block Text and Shape with zero Handles', () => {
+    render({
+      id: 'doc',
+      kind: 'annotation',
+      text: textFromString('Parked doc'),
+      x: 100,
+      y: 80,
+      width: 160,
+      height: 48,
+      shape: 'pill',
+    });
+
+    const surface = fixture.nativeElement.querySelector('.node-surface') as HTMLElement;
+    expect(surface.classList.contains('shape-pill')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.node-text')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-handle')).toHaveLength(0);
+  });
+});
