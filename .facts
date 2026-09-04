@@ -391,6 +391,20 @@
 - Pins never join the Selection, are ignored by Marquee and Ctrl+A, never extend Zoom-to-fit bounds, are not drawn on the Minimap, and are hidden in Present Mode @implemented
 - right-clicking a Pin offers "Edit pin" and "Delete pin"; Delete pin runs the same removal Command as an empty commit, and the pin Context Menu never touches the Selection @implemented
 
+## outline
+
+- the Outline is a toggleable panel docked to the left of the Canvas (mirroring the History Panel overlay pattern), listing every Group with its children plus loose Nodes and loose Text Blocks; Pins and Connections never appear as rows @implemented
+- Outline rows are ordered Groups in nodes-array order with children indented in nodes-array order, then loose Nodes, then loose Text Blocks; Text Block rows carry a "Text" badge @implemented
+- each Outline row shows its plain-text name (Formatting stripped, newlines to spaces) with its Emoji glyph, plus per-row in→out Connection counts; Text Blocks show — and Groups show Label plus child count plus aggregate in→out; Shape and Palette are omitted @implemented
+- the Outline is a read-only mirror with a single Selection model: clicking a row replaces the Selection and applies Zoom to Selection; Ctrl+click toggles membership without zooming @implemented
+- double-clicking a Node or Text Block row selects it and opens its Text editor; double-clicking a Group row selects it and opens its Label editor @implemented
+- Up/Down moves the active Outline row and Enter selects and frames it; row hover never triggers Chain Highlight and the Outline opens no Context Menu @implemented
+- the Outline filter is a live case-insensitive substring over plain names with Emoji excluded from matching; empty shows all, a Group stays visible when itself or any child matches, and Enter frames the first visible hit @implemented
+- a matching child inside a collapsed Group forces it visibly expanded for the filter duration with prior collapse restored on clear; rows re-parent live while filtered @implemented
+- Import and Project switching clear the Outline collapse map while keeping the filter text; a selected Group lights only its own row and selected Connections light no row @implemented
+- the Outline is toggled by a "Toggle Outline" Palette Entry persisted under dropnode:outline-hidden, visible by default, hidden while the graph is empty and during Present Mode; in Canvas Lock clicks are Viewport-only with the Selection untouched and editors stay dead @implemented
+- the Outline subscribes to nodes, connections, and selectedNodeIds only (never viewportState or pins) and derives rows from a structural computed of id/kind/parentId/plainName/emoji, so position and size writes never re-render rows; rows render OnPush with track-by-id inside the ADR-0003 budget @implemented
+
 ## ui
 
 - a single toast shows at bottom-right; a new toast replaces the current one and resets the 4-second auto-dismiss timer

@@ -4,6 +4,8 @@ import { EditorPageComponent } from './editor-page';
 import { GraphService } from '../../services/graph.service';
 import { CollectionService } from '../../services/collection.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
+import { HistoryService } from '../../services/history.service';
+import { OutlineService } from '../../services/outline.service';
 import { ToastService } from '../toast/toast';
 
 describe('EditorPageComponent', () => {
@@ -113,5 +115,31 @@ describe('EditorPageComponent', () => {
 
     expect(canvasLock.locked()).toBe(false);
     expect(toast.message()).toBeNull();
+  });
+
+  it('mounts the Outline once the graph is non-empty and unmounts it on toggle', async () => {
+    fixture = TestBed.createComponent(EditorPageComponent);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+    expect(fixture.nativeElement.querySelector('app-outline')).toBeNull();
+
+    graphService.createNode('Todo', 0, 0);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-outline')).not.toBeNull();
+
+    TestBed.inject(OutlineService).toggle();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-outline')).toBeNull();
+  });
+
+  it('mounts the History Panel once History exists and hides it when empty', async () => {
+    fixture = TestBed.createComponent(EditorPageComponent);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+    expect(fixture.nativeElement.querySelector('app-history-panel')).toBeNull();
+
+    TestBed.inject(HistoryService).execute({ description: 'Do', execute: () => {}, undo: () => {} });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-history-panel')).not.toBeNull();
   });
 });

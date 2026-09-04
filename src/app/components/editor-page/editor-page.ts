@@ -14,6 +14,8 @@ import { MinimapComponent } from '../minimap/minimap';
 import { MinimapService } from '../../services/minimap.service';
 import { HistoryPanelComponent } from '../history-panel/history-panel';
 import { HistoryPanelService } from '../../services/history-panel.service';
+import { OutlineComponent } from '../outline/outline';
+import { OutlineService } from '../../services/outline.service';
 import { ToolbarComponent } from '../toolbar/toolbar';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -33,7 +35,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
   selector: 'app-editor-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CanvasComponent, ToolbarComponent, MinimapComponent, HistoryPanelComponent],
+  imports: [CanvasComponent, ToolbarComponent, MinimapComponent, HistoryPanelComponent, OutlineComponent],
   template: `
     <h1 class="sr-only">{{ projectTitle() }}</h1>
     @if (!presentationService.active()) {
@@ -54,12 +56,18 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
     @if (!presentationService.active() && !minimapService.hidden() && graphService.nodes().length > 0) {
       <app-minimap />
     }
-    <!-- History Panel: hidden when toggled off and in Present Mode (chrome-free
-         tour). Unlike the Minimap it stays mounted on an empty graph so the
-         empty state keeps the toggle discoverable. Canvas Lock disables its
-         rows in place rather than unmounting it. -->
-    @if (!presentationService.active() && !historyPanelService.hidden()) {
+    <!-- History Panel: mounted only while History has entries (appears with
+         the first Command, vanishes when History clears), hidden when
+         toggled off and in Present Mode (chrome-free tour). Canvas Lock
+         disables its rows in place rather than unmounting it. -->
+    @if (!presentationService.active() && !historyPanelService.hidden() && historyService.entries().length > 0) {
       <app-history-panel />
+    }
+    <!-- Outline: hidden when empty (nothing to list), when the user toggled
+         it off, and in Present Mode (chrome-free tour). Like History rows,
+         Canvas Lock narrows its behavior in place rather than unmounting. -->
+    @if (!presentationService.active() && !outlineService.hidden() && graphService.nodes().length > 0) {
+      <app-outline />
     }
     <!-- Present Mode's only overlay: a non-interactive Step counter. Live so
          screen readers announce each Step change (WCAG 4.1.3). -->
@@ -161,13 +169,14 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
 })
 export class EditorPageComponent implements OnDestroy {
   graphService = inject(GraphService);
-  private historyService = inject(HistoryService);
+  protected historyService = inject(HistoryService);
   private collectionService = inject(CollectionService);
   private urlLoader = inject(UrlLoaderService);
   private canvasLock = inject(CanvasLockService);
   protected presentationService = inject(PresentationService);
   protected minimapService = inject(MinimapService);
   protected historyPanelService = inject(HistoryPanelService);
+  protected outlineService = inject(OutlineService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
@@ -236,6 +245,8 @@ export class EditorPageComponent implements OnDestroy {
     this.canvasLock.unlock({ silent: true });
     this.flushSave();
     this.historyService.clear();
+    // Outline collapse references dead ids after a switch — land expanded.
+    this.outlineService.clearCollapsed();
 
     if (projectId) {
       // Arm auto-save only after a successful load — otherwise the previous
