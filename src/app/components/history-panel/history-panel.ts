@@ -196,10 +196,14 @@ export class HistoryPanelComponent {
     });
   }
 
-  /** Picking a row lands before it: the clicked entry ends up undone. */
+  /**
+   * Picking a row lands before it on the done side (the clicked entry ends
+   * up undone) and after it on the redo side (the clicked entry is redone).
+   */
   protected jumpToRow(index: number): void {
     if (this.canvasLock.locked()) return;
-    this.historyService.jumpTo(index);
+    const target = index < this.historyService.currentIndex() ? index : index + 1;
+    this.historyService.jumpTo(target);
   }
 
   protected close(): void {

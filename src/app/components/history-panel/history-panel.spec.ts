@@ -65,7 +65,7 @@ describe('HistoryPanelComponent', () => {
     expect(historyService.currentIndex()).toBe(0);
   });
 
-  it('clicking a redo row redoes only the entries before it', () => {
+  it('clicking a redo row lands after it, redoing the clicked entry too', () => {
     const executed: string[] = [];
     const track = (description: string) => ({
       description,
@@ -82,9 +82,9 @@ describe('HistoryPanelComponent', () => {
     rows()[1].click();
     fixture.detectChanges();
 
-    expect(executed).toEqual(['First']);
-    expect(historyService.currentIndex()).toBe(1);
-    expect(rows()[1].classList.contains('history-redo')).toBe(true);
+    expect(executed).toEqual(['First', 'Second']);
+    expect(historyService.currentIndex()).toBe(2);
+    expect(rows()[1].classList.contains('history-redo')).toBe(false);
   });
 
   it('renders the Import separator as a non-clickable marker', () => {
