@@ -136,12 +136,14 @@ async function capture() {
   
   if (!isDisabled && !isDataDisabled) {
     await presentButton.click();
+    await page.waitForTimeout(600);
+    await page.getByRole('menuitem', { name: 'Present in reading order' }).click();
     await page.waitForTimeout(1500);
   } else {
     // Use command palette to enter Present mode
     await page.keyboard.press('Control+k');
     await page.waitForTimeout(600);
-    await page.keyboard.type('Present');
+    await page.keyboard.type('Present in reading order');
     await page.waitForTimeout(600);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);

@@ -186,6 +186,7 @@ async function main() {
   await page.waitForTimeout(1000);
   const presentBtn = page.locator('button[aria-label="Present"]');
   await presentBtn.click({ force: true, timeout: 5000 });
+  await page.getByRole('menuitem', { name: 'Present in reading order' }).click({ timeout: 5000 });
   await page.waitForTimeout(3000);
 
   console.log('Capturing present-mode.png ...');

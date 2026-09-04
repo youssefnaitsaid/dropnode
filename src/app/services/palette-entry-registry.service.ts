@@ -377,11 +377,19 @@ export class PaletteEntryRegistry {
         const size = this.canvasViewport.visibleSize();
         this.graphService.zoomToFit(size.width, size.height);
       }, { aliases: ['auto layout', 'organize graph'], icon: 'lucideNetwork' }),
-      this.action('present', 'Present', 'Viewport', () => {
+      this.action('present-reading-order', 'Present in reading order', 'Viewport', () => {
         const size = this.canvasViewport.visibleSize();
-        this.presentationService.enter(size.width, size.height);
+        this.presentationService.enter(size.width, size.height, 'reading');
       }, {
-        aliases: ['presentation mode', 'start tour'], icon: 'lucidePresentation',
+        aliases: ['present', 'presentation mode', 'start tour'], icon: 'lucidePresentation',
+        available: this.presentationService.canPresent(),
+        unavailableReason: 'Add a Group before presenting',
+      }),
+      this.action('present-following-connections', 'Present following Connections', 'Viewport', () => {
+        const size = this.canvasViewport.visibleSize();
+        this.presentationService.enter(size.width, size.height, 'connection-following');
+      }, {
+        aliases: ['present following connections', 'follow connections', 'present along connections'], icon: 'lucidePresentation',
         available: this.presentationService.canPresent(),
         unavailableReason: 'Add a Group before presenting',
       }),

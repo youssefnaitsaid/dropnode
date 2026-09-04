@@ -194,4 +194,83 @@ describe('PresentationService', () => {
       }
     });
   });
+
+  describe('connection-following order', () => {
+    it('starts from the selected Group and follows outgoing Connections', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const c = graphService.createGroup('C', 0, 500);
+      graphService.createConnection(a.id, 'right', c.id, 'left');
+      graphService.createConnection(c.id, 'right', b.id, 'left');
+      graphService.setSelection([a.id], []);
+      service.enter(W, H, 'connection-following');
+      expect(service.active()).toBe(true);
+      expect(service.steps().map(g => g.id)).toEqual([a.id, c.id, b.id]);
+      expect(graphService.selectedNodeIds()).toEqual([]);
+    });
+
+    it('starts from a non-first selected Group, appending the rest in reading order', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const c = graphService.createGroup('C', 0, 500);
+      graphService.createConnection(c.id, 'right', b.id, 'left');
+      graphService.setSelection([c.id], []);
+      service.enter(W, H, 'connection-following');
+      expect(service.steps().map(g => g.id)).toEqual([c.id, b.id, a.id]);
+    });
+
+    it('falls back to the reading-order first Group when nothing is selected', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const c = graphService.createGroup('C', 0, 500);
+      graphService.createConnection(a.id, 'right', c.id, 'left');
+      graphService.createConnection(c.id, 'right', b.id, 'left');
+      service.enter(W, H, 'connection-following');
+      expect(service.steps().map(g => g.id)).toEqual([a.id, c.id, b.id]);
+    });
+
+    it('falls back when a loose Node is selected', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const loose = graphService.createNode('L', 250, 250);
+      graphService.createConnection(a.id, 'right', b.id, 'left');
+      graphService.setSelection([loose.id], []);
+      service.enter(W, H, 'connection-following');
+      expect(service.steps().map(g => g.id)).toEqual([a.id, b.id]);
+    });
+
+    it('navigates the following order and keeps the same total as reading order', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const c = graphService.createGroup('C', 0, 500);
+      graphService.createConnection(a.id, 'right', c.id, 'left');
+      graphService.createConnection(c.id, 'right', b.id, 'left');
+      graphService.setSelection([a.id], []);
+      service.enter(W, H, 'connection-following');
+      expect(service.stepCount()).toBe(3);
+      service.next();
+      expect(service.stepIndex()).toBe(1);
+      expect(service.steps()[service.stepIndex()].id).toBe(c.id);
+      service.next();
+      expect(service.steps()[service.stepIndex()].id).toBe(b.id);
+      service.next();
+      expect(service.stepIndex()).toBe(2);
+      service.exit();
+      service.enter(W, H);
+      expect(service.steps().map(g => g.id)).toEqual([a.id, b.id, c.id]);
+    });
+
+    it('follows child-wired Connections at the Group level', () => {
+      const a = graphService.createGroup('A', 0, 0);
+      const b = graphService.createGroup('B', 500, 0);
+      const a1 = graphService.createNode('a1', 10, 10);
+      const b1 = graphService.createNode('b1', 510, 10);
+      graphService.setNodeParent(a1.id, a.id);
+      graphService.setNodeParent(b1.id, b.id);
+      graphService.createConnection(a1.id, 'right', b1.id, 'left');
+      graphService.setSelection([a.id], []);
+      service.enter(W, H, 'connection-following');
+      expect(service.steps().map(g => g.id)).toEqual([a.id, b.id]);
+    });
+  });
 });

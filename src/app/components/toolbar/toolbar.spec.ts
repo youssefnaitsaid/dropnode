@@ -303,4 +303,25 @@ describe('ToolbarComponent Canvas Lock', () => {
     expect(button('Zoom to fit').disabled).toBe(false);
     expect(button('Present').disabled).toBe(false);
   });
+
+  it('offers both Present orders from one control behind the same gate', async () => {
+    expect(button('Present').disabled).toBe(true);
+    expect(button('Present').title).toContain('Group nodes');
+
+    graphService.createGroup('Tour', 0, 0);
+    fixture.detectChanges();
+    const trigger = button('Present');
+    expect(trigger.disabled).toBe(false);
+
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const menuButtons = Array.from(document.body.querySelectorAll('button')).map(
+      item => (item as HTMLButtonElement).textContent?.trim(),
+    );
+    expect(menuButtons).toContain('Present in reading order');
+    expect(menuButtons).toContain('Present following Connections');
+  });
 });

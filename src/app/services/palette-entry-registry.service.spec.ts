@@ -127,6 +127,18 @@ describe('PaletteEntryRegistry', () => {
     expect(historyService.canUndo()).toBe(false);
   });
 
+  it('offers both Present orders behind one availability gate', () => {
+    expect(find('present-reading-order').label).toBe('Present in reading order');
+    expect(find('present-following-connections').label).toBe('Present following Connections');
+    expect(find('present-reading-order').available).toBe(false);
+    expect(find('present-following-connections').available).toBe(false);
+    graphService.createGroup('G', 0, 0);
+    // Registry snapshots availability at build time; rebuild by re-reading entries
+    const rebuilt = registry.entries();
+    expect(rebuilt.find(e => e.id === 'present-reading-order')!.available).toBe(true);
+    expect(rebuilt.find(e => e.id === 'present-following-connections')!.available).toBe(true);
+  });
+
   it('keeps Shape entries unavailable until a regular Node is selected', () => {
     const group = graphService.createGroup('G', 0, 0, 240, 160);
     const shape = find('node-shape-pill');
@@ -427,7 +439,7 @@ describe('PaletteEntryRegistry Canvas Lock', () => {
       expect(entry.disabledReason).toBe('Unlock the Canvas to edit');
     }
 
-    for (const id of ['zoom-in', 'zoom-out', 'zoom-to-fit', 'present', 'export-png',
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-to-fit', 'present-reading-order', 'present-following-connections', 'export-png',
       'export-json', 'export-as', 'copy-json', 'copy-link', 'toggle-minimap',
       'toggle-connection-jumps', 'toggle-pins', 'toggle-sidebar', 'save-as-project',
       'new-collection', 'import-collection', 'unlock-canvas']) {

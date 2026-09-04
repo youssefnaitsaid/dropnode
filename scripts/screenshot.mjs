@@ -40,6 +40,7 @@ await page.waitForTimeout(400);
 
 // --- Present Mode: frames the first Group -----------------------------------
 await page.getByRole('button', { name: 'Present' }).click();
+await page.getByRole('menuitem', { name: 'Present in reading order' }).click();
 await page.waitForTimeout(900); // 500ms entrance animation
 await page.screenshot({ path: join(outDir, 'present-mode.png') });
 await page.keyboard.press('Escape');
