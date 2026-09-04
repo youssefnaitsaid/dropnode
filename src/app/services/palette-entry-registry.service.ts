@@ -13,7 +13,7 @@ import {
   StrokeWeight,
 } from '../models/connection';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
-import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES } from '../models/node';
+import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES, isTextBlock } from '../models/node';
 import { NODE_SHAPES, NodeShape } from '../models/node-shape';
 import { NODE_EMOJIS } from '../models/node-emoji';
 import {
@@ -24,6 +24,7 @@ import {
 import {
   CreateGroupCommand,
   CreateNodeCommand,
+  CreateTextBlockCommand,
   DeleteConnectionCommand,
   DeleteNodeCompoundCommand,
   buildAlignSelectionCommand,
@@ -159,7 +160,7 @@ const CANVAS_LOCK_GATED_IDS: ReadonlySet<string> = new Set([
   'undo', 'redo',
   'select-all', 'clear-selection', 'resize-mode',
   'cut', 'copy', 'paste', 'duplicate', 'delete',
-  'add-node', 'add-group', 'add-pin', 'connect-nodes', 'edit-text', 'rename-group',
+  'add-node', 'add-group', 'add-text-block', 'add-pin', 'connect-nodes', 'edit-text', 'rename-group',
   'add-reroute-point',
   'zoom-to-selection', 'tidy-up',
   'import-graph', 'export-selection-png',
@@ -314,13 +315,16 @@ export class PaletteEntryRegistry {
       this.action('add-group', 'Add Group', 'Nodes & Groups', () => this.addGroup(), {
         aliases: ['new group', 'create group'], icon: 'lucideGroup',
       }),
+      this.action('add-text-block', 'Add Text Block', 'Nodes & Groups', () => this.addTextBlock(), {
+        aliases: ['new text block', 'create text block', 'text annotation'], icon: 'lucideSquarePlus',
+      }),
       this.action('add-pin', 'Add pin', 'Nodes & Groups', () => this.addPin(), {
         // "Comment" is a hidden alias: the Figma lineage word users will type
         aliases: ['new pin', 'create pin', 'comment', 'add comment'], icon: 'lucideMessageCircle',
       }),
       this.action('connect-nodes', 'Connect Nodes…', 'Nodes & Groups', () => this.connectDialogService.requestOpen(), {
         aliases: ['connect', 'link nodes', 'add connection', 'connect two nodes'], icon: 'lucideLink',
-        available: this.graphService.nodes().length >= 2,
+        available: this.graphService.nodes().filter(n => !isTextBlock(n)).length >= 2,
         unavailableReason: 'Add at least two Nodes first',
       }),
       this.action('edit-text', 'Edit Text', 'Nodes & Groups', () => this.editText(), {
@@ -811,6 +815,13 @@ export class PaletteEntryRegistry {
     if (group) this.contextMenuService.requestRename(group.id);
   }
 
+  private addTextBlock(): void {
+    const center = this.canvasViewport.visibleCanvasCenter();
+    const command = new CreateTextBlockCommand(this.graphService, 'New Text Block', center.x - 80, center.y - 24);
+    this.historyService.execute(command);
+    const block = command.getNode();
+    if (block) this.contextMenuService.requestEditText(block.id);
+  }
   // Ghost-pin (ADR-0025): anchors to the single selected Node at its
   // top-right corner, else drops Canvas-anchored at the Viewport center.
   // The popover opens; nothing enters Graph State until a non-empty commit.

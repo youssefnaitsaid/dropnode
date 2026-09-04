@@ -35,6 +35,15 @@ describe('chainOf', () => {
     expect(result.connectionIds.size).toBe(0);
   });
 
+  it('returns empty for a Text Block hover: docs own no Connections and never light', () => {
+    const nodes = [node('a'), node('b'), node('t', { kind: 'annotation' })];
+    const connections = [conn('c1', 'a', 'b')];
+    const result = chainOf('t', nodes, connections);
+    expect(result.empty).toBe(true);
+    expect(result.nodeIds.size).toBe(0);
+    expect(result.connectionIds.size).toBe(0);
+  });
+
   it('returns empty when graph has no Connections at all', () => {
     const nodes = [node('a'), node('b')];
     const result = chainOf('a', nodes, []);

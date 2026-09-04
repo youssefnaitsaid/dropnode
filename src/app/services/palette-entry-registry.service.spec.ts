@@ -405,6 +405,34 @@ describe('PaletteEntryRegistry', () => {
     registry.execute('toggle-history');
     expect(historyPanel.hidden()).toBe(true);
   });
+
+  it('exposes Add Text Block beside Add Node and Add Group', () => {
+    const entry = find('add-text-block');
+    expect(entry.label).toBe('Add Text Block');
+    expect(entry.category).toBe('Nodes & Groups');
+    expect(entry.available).toBe(true);
+  });
+
+  it('Add Text Block creates an annotation Text Block with its editor requested', () => {
+    registry.execute('add-text-block');
+
+    expect(graphService.nodes().length).toBe(1);
+    const block = graphService.nodes()[0];
+    expect(block.kind).toBe('annotation');
+    expect(contextMenuService.editTextRequest()).toBe(block.id);
+    expect(historyService.canUndo()).toBe(true);
+  });
+
+  it('Connect Nodes stays unavailable while fewer than two connectable Nodes exist', () => {
+    expect(find('connect-nodes').available).toBe(false);
+
+    graphService.createTextBlock('Doc', 0, 0);
+    graphService.createNode('A', 300, 0);
+    expect(find('connect-nodes').available).toBe(false);
+
+    graphService.createNode('B', 600, 0);
+    expect(find('connect-nodes').available).toBe(true);
+  });
 });
 
 describe('PaletteEntryRegistry Canvas Lock', () => {
@@ -447,7 +475,7 @@ describe('PaletteEntryRegistry Canvas Lock', () => {
     TestBed.inject(CollectionService).createCollection('C');
     canvasLock.lock();
 
-    for (const id of ['undo', 'add-node', 'add-group', 'add-pin', 'connect-nodes', 'delete',
+    for (const id of ['undo', 'add-node', 'add-group', 'add-text-block', 'add-pin', 'connect-nodes', 'delete',
       'cut', 'copy', 'paste', 'duplicate', 'select-all', 'tidy-up', 'import-graph',
       'zoom-to-selection', 'export-selection-png', 'edit-text', 'add-reroute-point']) {
       const entry = find(id);

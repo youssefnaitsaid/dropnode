@@ -577,23 +577,34 @@ export function tidyLayout(
   connections: readonly Connection[],
 ): TidyResult {
   const result: TidyResult = { nodePositions: [], groupRects: [], handleAssignments: [], rerouteAdjustments: [] };
-  const oldBounds = graphBounds(nodes);
+  // Text Blocks stay pinned where the author parked them (ADR-0035): they
+  // never join layering, the loner grid, or the bounds anchor. Group Text
+  // Block children ride rigidly with their Group and still shrink-wrap its
+  // rect, so Groups never clip their own documentation.
+  const layoutNodes = nodes.filter(n => n.kind !== 'annotation');
+  const docChildrenOf = (groupId: string): GraphNode[] =>
+    nodes.filter(n => n.kind === 'annotation' && n.parentId === groupId);
+  const oldBounds = graphBounds(layoutNodes);
   if (!oldBounds) return result;
 
-  const orderOf = new Map(nodes.map((n, i) => [n.id, i]));
+  const orderOf = new Map(layoutNodes.map((n, i) => [n.id, i]));
   const nodeById = new Map(nodes.map(n => [n.id, n]));
-  const groups = nodes.filter(n => n.kind === 'group');
+  const groups = layoutNodes.filter(n => n.kind === 'group');
   const rootOf = (id: string): string => nodeById.get(id)?.parentId ?? id;
 
-  // Inside each Group: children arranged from intra-group Connections only,
-  // then the Group sized to exactly the arrangement plus padding. Positions
-  // stay relative to the Group's content origin until roots are placed.
+  // Inside each Group: connectable children arranged from intra-group
+  // Connections only, then the Group sized to exactly the arrangement plus
+  // padding. Positions stay relative to the Group's content origin until
+  // roots are placed.
   const innerLayouts = new Map<string, Map<string, Point>>();
+  const innerShifts = new Map<string, Point>();
   const groupSize = new Map<string, { width: number; height: number }>();
   for (const group of groups) {
-    const children = nodes.filter(n => n.parentId === group.id);
-    if (children.length === 0) {
+    const children = layoutNodes.filter(n => n.parentId === group.id);
+    const textChildren = docChildrenOf(group.id);
+    if (children.length === 0 && textChildren.length === 0) {
       groupSize.set(group.id, { width: group.width, height: group.height });
+      innerShifts.set(group.id, { x: 0, y: 0 });
       continue;
     }
     const childIds = new Set(children.map(c => c.id));
@@ -604,6 +615,11 @@ export function tidyLayout(
       children.map(c => ({ id: c.id, width: c.width, height: c.height, order: orderOf.get(c.id)! })),
       intraEdges,
     );
+    // Content union in content-local coords: the arranged grid plus each
+    // Text Block child at its current offset from the content origin, so the
+    // Group rect shrink-wraps documentation it never rearranges.
+    let minX = 0;
+    let minY = 0;
     let width = 0;
     let height = 0;
     for (const c of children) {
@@ -611,18 +627,30 @@ export function tidyLayout(
       width = Math.max(width, p.x + c.width);
       height = Math.max(height, p.y + c.height);
     }
+    for (const t of textChildren) {
+      const lx = t.x - group.x - TIDY_GROUP_PADDING;
+      const ly = t.y - group.y - TIDY_GROUP_LABEL_STRIP - TIDY_GROUP_PADDING;
+      minX = Math.min(minX, lx);
+      minY = Math.min(minY, ly);
+      width = Math.max(width, lx + t.width);
+      height = Math.max(height, ly + t.height);
+    }
     innerLayouts.set(group.id, local);
+    innerShifts.set(group.id, { x: -minX, y: -minY });
     groupSize.set(group.id, {
-      width: width + 2 * TIDY_GROUP_PADDING,
-      height: height + 2 * TIDY_GROUP_PADDING + TIDY_GROUP_LABEL_STRIP,
+      width: width - minX + 2 * TIDY_GROUP_PADDING,
+      height: height - minY + 2 * TIDY_GROUP_PADDING + TIDY_GROUP_LABEL_STRIP,
     });
   }
 
   // Top level: Groups (at their new exact-fit size) among loose Nodes, with
   // Connections touching a child promoted to its Group. Promoted self-edges
-  // (child↔child of one Group) are intra-group and stay out of this level.
-  const roots = nodes.filter(n => !n.parentId);
+  // (child→child of one Group) are intra-group and stay out of this level.
+  // Connections touching a Text Block are legacy-invalid and stay out too.
+  const roots = layoutNodes.filter(n => !n.parentId);
   const rootEdges = connections
+    .filter(c => nodeById.get(c.sourceNodeId)?.kind !== 'annotation' &&
+      nodeById.get(c.targetNodeId)?.kind !== 'annotation')
     .map(c => ({ from: rootOf(c.sourceNodeId), to: rootOf(c.targetNodeId) }))
     .filter(e => e.from !== e.to);
   const rootPositions = arrangeItems(
@@ -645,16 +673,30 @@ export function tidyLayout(
   }
   for (const [groupId, local] of innerLayouts) {
     const origin = newPos.get(groupId)!;
+    const shift = innerShifts.get(groupId) ?? { x: 0, y: 0 };
     for (const [childId, p] of local) {
       newPos.set(childId, {
-        x: origin.x + TIDY_GROUP_PADDING + p.x,
-        y: origin.y + TIDY_GROUP_LABEL_STRIP + TIDY_GROUP_PADDING + p.y,
+        x: origin.x + TIDY_GROUP_PADDING + shift.x + p.x,
+        y: origin.y + TIDY_GROUP_LABEL_STRIP + TIDY_GROUP_PADDING + shift.y + p.y,
       });
     }
   }
 
-  // Diff against the current Graph State: emit only actual changes
-  for (const node of nodes) {
+  // Group Text Block children ride rigidly with their Group: their new
+  // absolute position preserves their old offset from the Group's top-left.
+  for (const group of groups) {
+    const origin = newPos.get(group.id)!;
+    const dx = origin.x - group.x;
+    const dy = origin.y - group.y;
+    if (dx === 0 && dy === 0) continue;
+    for (const t of docChildrenOf(group.id)) {
+      newPos.set(t.id, { x: t.x + dx, y: t.y + dy });
+    }
+  }
+
+  // Diff against the current Graph State: emit only actual changes.
+  // Top-level Text Blocks never appear: they stay exactly where parked.
+  for (const node of layoutNodes) {
     const p = newPos.get(node.id)!;
     if (node.kind === 'group') {
       const size = groupSize.get(node.id)!;
@@ -663,6 +705,15 @@ export function tidyLayout(
       }
     } else if (node.x !== p.x || node.y !== p.y) {
       result.nodePositions.push({ id: node.id, x: p.x, y: p.y });
+    }
+  }
+  for (const group of groups) {
+    if (!newPos.has(group.id)) continue;
+    for (const t of docChildrenOf(group.id)) {
+      const p = newPos.get(t.id);
+      if (p && (t.x !== p.x || t.y !== p.y)) {
+        result.nodePositions.push({ id: t.id, x: p.x, y: p.y });
+      }
     }
   }
 
@@ -675,7 +726,9 @@ export function tidyLayout(
   // top instead: facing Handles would draw it as a straight line lying
   // exactly on the forward segments and behind the cards between.
   const newRect = (node: GraphNode): Bounds => {
-    const p = newPos.get(node.id)!;
+    // Endpoints always resolved above; parked Text Blocks fall back to
+    // their current rect so they still occlude corridors as rendered cards.
+    const p = newPos.get(node.id) ?? node;
     const size = groupSize.get(node.id) ?? node;
     return { x: p.x, y: p.y, width: size.width, height: size.height };
   };

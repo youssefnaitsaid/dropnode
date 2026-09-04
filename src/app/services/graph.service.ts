@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { GraphNode, HandleSide, NODE_PALETTE } from '../models/node';
+import { GraphNode, HandleSide, NODE_PALETTE, isTextBlock } from '../models/node';
 import { NodeShape, isNodeShape, storedNodeShape } from '../models/node-shape';
 import { isNodeEmoji } from '../models/node-emoji';
 import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, RouteStyle, ROUTE_STYLES, DEFAULT_ROUTE_STYLE, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
@@ -102,6 +102,22 @@ export class GraphService {
     this.nodes.update(nodes =>
       nodes.map(n => n.id === id ? { ...n, x, y } : n)
     );
+  }
+
+  // Text Block operations (ADR-0035): full regular Node minus Handles —
+  // required Text, same default size, node_ ids; zero Handles, never connected
+  createTextBlock(text: string, x: number, y: number, width = 160, height = 48): GraphNode {
+    const block: GraphNode = {
+      id: this.generateId('node'),
+      text: textFromString(text),
+      x,
+      y,
+      width,
+      height,
+      kind: 'annotation',
+    };
+    this.nodes.update(nodes => [...nodes, block]);
+    return block;
   }
 
   // Group operations
@@ -341,13 +357,16 @@ export class GraphService {
     sourceHandle: HandleSide,
     targetNodeId: string,
     targetHandle: HandleSide
-  ): 'self' | 'group-child' | 'duplicate' | null {
+  ): 'self' | 'group-child' | 'duplicate' | 'text-block' | null {
     // Prevent self-connections
     if (sourceNodeId === targetNodeId) return 'self';
 
-    // Prevent connections between a Group and its own children
+    // Text Blocks own zero Handles and can never be connected (ADR-0035)
     const source = this.nodes().find(n => n.id === sourceNodeId);
     const target = this.nodes().find(n => n.id === targetNodeId);
+    if ((source && isTextBlock(source)) || (target && isTextBlock(target))) return 'text-block';
+
+    // Prevent connections between a Group and its own children
     if (source?.parentId === targetNodeId || target?.parentId === sourceNodeId) return 'group-child';
 
     // Prevent duplicate connections
@@ -696,7 +715,9 @@ export class GraphService {
   // and the connection layer share one definition.
   getHandlePosition(nodeId: string, handle: HandleSide): { x: number; y: number } | null {
     const node = this.nodes().find(n => n.id === nodeId);
-    return node ? handlePoint(node, handle) : null;
+    // Text Blocks own zero Handles (ADR-0035): no position exists for any side
+    if (!node || node.kind === 'annotation') return null;
+    return handlePoint(node, handle);
   }
 
   // Import/Export
@@ -845,6 +866,10 @@ export class GraphService {
           return { valid: false, error: `Invalid node ${nodeId}: a Group cannot carry text` };
         }
       } else {
+        // Labels are the Group-only field: a Text Block carries Text, never a Label
+        if (node['kind'] === 'annotation' && node['label'] !== undefined) {
+          return { valid: false, error: `Invalid node ${nodeId}: a Text Block cannot carry label` };
+        }
         if (node['text'] !== undefined) {
           const reason = validateText(node['text']);
           if (reason) {
@@ -863,8 +888,8 @@ export class GraphService {
       if (typeof node['width'] !== 'number' || typeof node['height'] !== 'number') {
         return { valid: false, error: `Invalid node ${nodeId}: width and height must be numbers` };
       }
-      if (node['kind'] !== undefined && node['kind'] !== 'group') {
-        return { valid: false, error: `Invalid node ${nodeId}: kind must be 'group'` };
+      if (node['kind'] !== undefined && node['kind'] !== 'group' && node['kind'] !== 'annotation') {
+        return { valid: false, error: `Invalid node ${nodeId}: kind must be 'group' or 'annotation'` };
       }
       if (node['shape'] !== undefined) {
         if (node['kind'] === 'group') {
@@ -890,10 +915,12 @@ export class GraphService {
 
     // parentId rules need the full node set, so they run as a second pass
     const groupIds = new Set<string>();
+    const kindOf = new Map<string, unknown>();
     const parentOf = new Map<string, string>();
     for (const raw of nodesArr) {
       const node = raw as Record<string, unknown>;
       if (node['kind'] === 'group') groupIds.add(node['id'] as string);
+      kindOf.set(node['id'] as string, node['kind']);
     }
     for (const raw of nodesArr) {
       const node = raw as Record<string, unknown>;
@@ -995,6 +1022,10 @@ export class GraphService {
       }
       const sourceId = conn['sourceNodeId'] as string;
       const targetId = conn['targetNodeId'] as string;
+      // Text Blocks own zero Handles and can never be connected (ADR-0035)
+      if (kindOf.get(sourceId) === 'annotation' || kindOf.get(targetId) === 'annotation') {
+        return { valid: false, error: `Invalid connection ${connId}: connects a Text Block` };
+      }
       if (parentOf.get(sourceId) === targetId || parentOf.get(targetId) === sourceId) {
         return { valid: false, error: `Invalid connection ${connId}: connects a Group to its own child` };
       }

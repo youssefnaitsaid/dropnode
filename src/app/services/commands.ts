@@ -39,6 +39,36 @@ export class CreateNodeCommand implements Command {
   }
 }
 
+export class CreateTextBlockCommand implements Command {
+  description = 'Create Text Block';
+  private node: GraphNode | null = null;
+
+  constructor(
+    private graphService: GraphService,
+    private label: string,
+    private x: number,
+    private y: number,
+    private parentId?: string,
+  ) {}
+
+  execute(): void {
+    this.node = this.graphService.createTextBlock(this.label, this.x, this.y);
+    if (this.parentId) {
+      this.graphService.setNodeParent(this.node.id, this.parentId);
+    }
+  }
+
+  undo(): void {
+    if (this.node) {
+      this.graphService.deleteNode(this.node.id);
+    }
+  }
+
+  getNode(): GraphNode | null {
+    return this.node;
+  }
+}
+
 export class MoveNodeCommand implements Command {
   description = 'Move Node';
   private originalX = 0;

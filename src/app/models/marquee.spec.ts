@@ -80,6 +80,22 @@ describe('marqueeSelection', () => {
     expect(result.connectionIds).toEqual([]);
   });
 
+  it('selects a loose Text Block the rect touches like any Node root', () => {
+    const nodes = [
+      node('t', 0, 0, { kind: 'annotation' }),
+      node('b', 500, 500),
+    ];
+    const result = marqueeSelection(nodes, [], { x: 100, y: 20, width: 100, height: 100 });
+    expect(result.nodeIds).toEqual(['t']);
+  });
+
+  it('selects a Group when only its Text Block child rect is touched', () => {
+    const group = node('g', 0, 0, { kind: 'group', label: 'G', text: undefined, width: 320, height: 200 });
+    const child = node('t', 40, 40, { kind: 'annotation', parentId: 'g' });
+    const result = marqueeSelection([group, child], [], { x: 50, y: 50, width: 10, height: 10 });
+    expect(result.nodeIds).toEqual(['g']);
+  });
+
   it('never returns a child as an independent member — touching a child selects its Group', () => {
     const group = node('g', 0, 0, { kind: 'group', label: 'G', text: undefined, width: 320, height: 200 });
     const child = node('c', 40, 40, { parentId: 'g' });

@@ -413,4 +413,81 @@ describe('tidyLayout', () => {
 
     expect(applied.connections[0].routeStyle).toBe('orthogonal');
   });
+
+  describe('Text Blocks (ADR-0035)', () => {
+    const textBlock = (id: string, x: number, y: number, extra: Partial<GraphNode> = {}): GraphNode =>
+      node(id, x, y, 160, 48, { kind: 'annotation', text: [], ...extra });
+
+    it('leaves top-level Text Blocks fixed and excludes them from the bounds anchor', () => {
+      // A parked doc far from the flow must neither move nor drag the anchor
+      const nodes = [
+        node('a', 0, 0),
+        node('b', 500, 300),
+        textBlock('doc', -1000, -1000),
+      ];
+      const connections = [conn('c1', 'a', 'right', 'b', 'left')];
+
+      const result = tidyLayout(nodes, connections);
+      const byId = new Map(result.nodePositions.map(p => [p.id, p]));
+
+      expect(byId.has('doc')).toBe(false);
+      // Anchored at the connectable bounds top-left (0,0), not the doc's:
+      // a already sits at the anchor so it emits nothing, while b lands at
+      // one layer gap past it. Had the doc counted, both would shift to -1000.
+      expect(byId.get('a')).toBeUndefined();
+      expect(byId.get('b')).toEqual({ id: 'b', x: 160 + TIDY_LAYER_GAP, y: 0 });
+    });
+
+    it('is a no-op for a Text-Block-only graph', () => {
+      const result = tidyLayout([textBlock('doc', 50, 60)], []);
+
+      expect(isTidyEmpty(result)).toBe(true);
+    });
+
+    it('is a no-op when the connectable graph is already tidy, wherever docs sit', () => {
+      const nodes = [node('only', 50, 60), textBlock('doc', 900, 900)];
+
+      expect(isTidyEmpty(tidyLayout(nodes, []))).toBe(true);
+    });
+
+    it('keeps Group Text Block children fixed yet shrink-wraps them in the Group rect', () => {
+      const nodes = [
+        node('g', 0, 0, 320, 200, { kind: 'group', label: 'G' }),
+        node('c', 20, 40, 160, 48, { parentId: 'g' }),
+        textBlock('t', 20, 120, { parentId: 'g' }),
+      ];
+
+      const result = tidyLayout(nodes, []);
+      const byId = new Map(result.nodePositions.map(p => [p.id, p]));
+
+      // The doc never moves; the connectable child lays out at the content origin
+      expect(byId.has('t')).toBe(false);
+      expect(byId.get('c')).toEqual({ id: 'c', x: 16, y: 44 });
+      // Union of the arranged child and the doc, plus 16-unit padding and
+      // the 28-unit label strip: width 164 + 32, height 124 + 32 + 28
+      expect(result.groupRects).toEqual([{ id: 'g', x: 0, y: 0, width: 196, height: 184 }]);
+    });
+
+    it('rides Group Text Block children rigidly when their Group moves, staying idempotent', () => {
+      const nodes = [
+        node('a', 0, 0),
+        node('g', 500, 0, 320, 200, { kind: 'group', label: 'G' }),
+        node('c', 520, 60, 160, 48, { parentId: 'g' }),
+        textBlock('t', 520, 140, { parentId: 'g' }),
+      ];
+      const connections = [conn('c1', 'a', 'right', 'c', 'left')];
+
+      const result = tidyLayout(nodes, connections);
+      const byId = new Map(result.nodePositions.map(p => [p.id, p]));
+
+      // The Group advances one layer past a; the doc keeps its offset inside it
+      expect(result.groupRects).toEqual([{ id: 'g', x: 280, y: 0, width: 196, height: 204 }]);
+      expect(byId.get('c')).toEqual({ id: 'c', x: 296, y: 44 });
+      expect(byId.get('t')).toEqual({ id: 't', x: 300, y: 140 });
+
+      // A second tidy of the applied result moves nothing: rigid offsets kept
+      const applied = applyTidyToState(nodes, connections, result);
+      expect(isTidyEmpty(tidyLayout(applied.nodes, applied.connections))).toBe(true);
+    });
+  });
 });

@@ -126,9 +126,10 @@ export class KeyboardConnectionService {
     return violation ? KeyboardConnectionService.VIOLATION_MESSAGES[violation] : null;
   }
 
-  private static readonly VIOLATION_MESSAGES: Record<'self' | 'group-child' | 'duplicate', string> = {
+  private static readonly VIOLATION_MESSAGES: Record<'self' | 'group-child' | 'duplicate' | 'text-block', string> = {
     self: "Can't connect a Node to itself",
     'group-child': "Can't connect a Group to one of its children",
     duplicate: 'That Connection already exists',
+    'text-block': "Can't connect a Text Block — it has no Handles",
   };
 }

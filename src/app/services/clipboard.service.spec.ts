@@ -59,6 +59,20 @@ describe('ClipboardService', () => {
       expect(copies.every(item => item.emoji === '💡')).toBe(true);
     });
 
+    it('carries a Text Block kind and Text through Paste and Duplicate', () => {
+      const block = graphService.createTextBlock('Parked doc', 10, 20);
+
+      service.copy(block.id);
+      service.pasteAt(400, 300);
+      service.duplicate(block.id);
+
+      const copies = graphService.nodes().filter(item => item.id !== block.id);
+      expect(copies).toHaveLength(2);
+      expect(copies.every(item => item.kind === 'annotation')).toBe(true);
+      expect(copies.every(item => item.text !== undefined)).toBe(true);
+      expect(new Set(copies.map(item => item.id)).size).toBe(2);
+    });
+
     it('copying a Group captures the Group, its children, and only internal Connections', () => {
       const group = graphService.createGroup('G', 0, 0, 400, 300);
       const childA = graphService.createNode('A', 20, 20);

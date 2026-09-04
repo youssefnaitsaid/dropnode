@@ -2,7 +2,7 @@ import {
   Component, input, output, signal, computed, effect,
   ChangeDetectionStrategy, AfterViewInit, viewChild, ElementRef, inject,
 } from '@angular/core';
-import { DEFAULT_NODE_BACKGROUND, GraphNode, HandleSide } from '../../models/node';
+import { DEFAULT_NODE_BACKGROUND, GraphNode, HandleSide, isTextBlock } from '../../models/node';
 import {
   effectiveNodeShape,
   fitNodeShapeRect,
@@ -117,17 +117,19 @@ export interface NodeSizeChangedEvent {
         }
       </div>
 
-      @for (side of handleSides; track side) {
-        <app-handle
-          [side]="side"
-          [nodeId]="node().id"
-          [isHighlighted]="isHandleSnapped(side)"
-          [class.handle-top]="side === 'top'"
-          [class.handle-right]="side === 'right'"
-          [class.handle-bottom]="side === 'bottom'"
-          [class.handle-left]="side === 'left'"
-          (startDrag)="onHandleDragStart($event)"
-        />
+      @if (!isTextBlock()) {
+        @for (side of handleSides; track side) {
+          <app-handle
+            [side]="side"
+            [nodeId]="node().id"
+            [isHighlighted]="isHandleSnapped(side)"
+            [class.handle-top]="side === 'top'"
+            [class.handle-right]="side === 'right'"
+            [class.handle-bottom]="side === 'bottom'"
+            [class.handle-left]="side === 'left'"
+            (startDrag)="onHandleDragStart($event)"
+          />
+        }
       }
 
       @if (soleSelected() && !isEditing()) {
@@ -469,6 +471,8 @@ export class NodeComponent implements AfterViewInit {
   gripCorners: GripCorner[] = ['nw', 'ne', 'sw', 'se'];
 
   isGroup = computed(() => this.node().kind === 'group');
+  // Text Blocks own zero Handles and render none (ADR-0035)
+  isTextBlock = computed(() => isTextBlock(this.node()));
 
   nodeShape = computed<NodeShape>(() =>
     this.isGroup() ? 'rectangle' : effectiveNodeShape(this.node().shape)
