@@ -212,6 +212,7 @@
 - Zoom to selection frames the selected element — a Node by its rect, a Group unioned with its children, a Connection by its cubic bezier bounds (the control-point box, which encloses the bow) — into 90% of the Viewport, centered, magnifying no further than 2x; no selection is a silent no-op @spec
 - Zoom to fit and Zoom to selection are bounds-centered — a zoom-centering behavior distinct from the anchored zooms (cursor-centered wheel zoom, Canvas-center-centered toolbar buttons and Palette Entries); both write pan+zoom instantly within the [0.1,5] clamp, add no History entry, and persist via the normal Viewport auto-save @spec
 - the toolbar zoom cluster carries a Zoom to fit button; Zoom to selection is keyboard-only, with no toolbar button or Context Menu entry @spec
+- Canvas Search (Ctrl+F when the Canvas is focused, or the "Search Canvas Text…" Viewport Palette Entry) searches Node Text, Text Block Text, Connection Text, Group Labels, and Pin messages as a case-insensitive substring over plain text — Formatting stripped, Emoji excluded, hidden Pins skipped, empty query matching nothing — and shows at most 50 rows with a keep-typing tail; Enter on a Node, Text Block, Group, or Connection replaces the Selection and frames it with Zoom to Selection, Enter on a Pin clears the Selection, centers it at the current zoom, and opens its popover, and in Canvas Lock the same jump runs Viewport-only with the Selection untouched; it never opens in Present Mode, while editing Text, or over another modal, and it adds no History entry @implemented
 
 ## minimap
 
@@ -341,7 +342,7 @@
 - with nothing focused (focus on the page body or the Canvas containers), arrow keys pan the Viewport 40 screen px (10 with Shift), converted to world units by the current zoom — a Viewport change with no History entry, matching every other pan; the focus state owns the arrow grammar, so a focused Node card nudges/resizes and interactive elements keep native arrow behavior @implemented
 - Ctrl+X cuts and Ctrl+C copies the Selection's Nodes and Groups; Ctrl+V pastes at the cursor; Ctrl+D duplicates the Selection's Nodes and Groups; Ctrl+A selects all — no selection (or an empty Clipboard for paste) is a silent no-op
 - Shift+1 runs Zoom to fit and Shift+2 Zoom to selection, keyed off event.code (Digit1/Digit2) for layout independence and suppressed by the input-focus guard @spec
-- while Canvas Lock is active only Viewport keys live — arrows pan and Shift+1 fits; all element, Selection, History, and menu keys are dead and element cards are non-focusable @implemented
+- while Canvas Lock is active only Viewport keys live — arrows pan, Shift+1 fits, and Ctrl+F searches; all element, Selection, History, and menu keys are dead and element cards are non-focusable @implemented
 
 ## clipboard
 

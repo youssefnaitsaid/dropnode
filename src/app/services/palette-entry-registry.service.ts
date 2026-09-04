@@ -57,6 +57,7 @@ import { ImportDialogService } from './import-dialog.service';
 import { ConnectDialogService } from './connect-dialog.service';
 import { PresentationService } from './presentation.service';
 import { CanvasLockService } from './canvas-lock.service';
+import { CanvasSearchService } from './canvas-search.service';
 import { SidebarService } from './sidebar.service';
 import { ResizeModeService } from './resize-mode.service';
 
@@ -91,6 +92,7 @@ const SHORTCUTS = {
   toggleSidebar: 'Ctrl+B',
   zoomToFit: 'Shift+1',
   zoomToSelection: 'Shift+2',
+  canvasSearch: 'Ctrl+F',
 } as const;
 
 // Leading glyphs reuse the Context Menu / toolbar vocabulary for the same
@@ -201,6 +203,7 @@ export class PaletteEntryRegistry {
   private readonly exportService = inject(ExportService);
   private readonly presentationService = inject(PresentationService);
   private readonly canvasLock = inject(CanvasLockService);
+  private readonly canvasSearch = inject(CanvasSearchService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
   private readonly connectionJumpsService = inject(ConnectionJumpsService);
@@ -378,6 +381,20 @@ export class PaletteEntryRegistry {
       }, {
         aliases: ['frame selection', 'fit selection'], shortcut: SHORTCUTS.zoomToSelection, icon: 'lucideFocus',
         available: selectionSize > 0, unavailableReason: 'Nothing is selected',
+      }),
+      // Canvas Search stays live under Canvas Lock (a Viewport-only jump
+      // there) — so it is deliberately absent from CANVAS_LOCK_GATED_IDS.
+      // Unreachable in Present Mode (the Palette never opens there), but the
+      // flag keeps the entries() contract honest.
+      // Requests instead of opening: the Palette's own dialog still owns the
+      // keyboard while entries run, and its teardown races the consumer —
+      // so the overlay consumes this past the DOM guard (see openFromRequest).
+      // The deferred dialog pattern of Import/Export/Connect.
+      this.action('search-canvas-text', 'Search Canvas Text…', 'Viewport', () => {
+        this.canvasSearch.requestOpen();
+      }, {
+        aliases: ['find', 'find text', 'search text'], shortcut: SHORTCUTS.canvasSearch, icon: 'lucideSearch',
+        available: !this.presentationService.active(), unavailableReason: 'Not available in Present Mode',
       }),
       this.action('tidy-up', 'Tidy up', 'Viewport', () => {
         const command = buildTidyUpCommand(this.graphService);

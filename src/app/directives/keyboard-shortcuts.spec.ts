@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { KeyboardShortcuts } from './keyboard-shortcuts';
 import { CommandPaletteService } from '../services/command-palette.service';
+import { CanvasSearchService } from '../services/canvas-search.service';
 import { GraphService } from '../services/graph.service';
 import { HistoryService } from '../services/history.service';
 import { PresentationService } from '../services/presentation.service';
@@ -86,6 +87,76 @@ describe('KeyboardShortcuts Command Palette scope', () => {
     ctrlK();
     expect(palette.isOpen()).toBe(false);
     presentation.exit();
+  });
+});
+
+describe('KeyboardShortcuts Canvas Search scope', () => {
+  let fixture: ComponentFixture<KeyboardHost>;
+  let search: CanvasSearchService;
+  let palette: CommandPaletteService;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    TestBed.configureTestingModule({
+      imports: [KeyboardHost],
+      providers: [provideRouter([])],
+    });
+    fixture = TestBed.createComponent(KeyboardHost);
+    search = TestBed.inject(CanvasSearchService);
+    palette = TestBed.inject(CommandPaletteService);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    search.close(false);
+    palette.close(false);
+    document.body.innerHTML = '';
+  });
+
+  function ctrlF(target: EventTarget = document.body): void {
+    target.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }));
+  }
+
+  it('opens with Ctrl+F', () => {
+    ctrlF();
+    expect(search.isOpen()).toBe(true);
+  });
+
+  it('ignores Ctrl+F from text inputs (browser find stays)', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    ctrlF(input);
+    expect(search.isOpen()).toBe(false);
+  });
+
+  it('does not open during Present Mode', () => {
+    const graph = TestBed.inject(GraphService);
+    const presentation = TestBed.inject(PresentationService);
+    graph.createGroup('Tour', 0, 0);
+    presentation.enter(800, 600);
+
+    ctrlF();
+    expect(search.isOpen()).toBe(false);
+    presentation.exit();
+  });
+
+  it('stays available while Canvas Lock is active', () => {
+    TestBed.inject(CanvasLockService).lock();
+
+    ctrlF();
+    expect(search.isOpen()).toBe(true);
+  });
+
+  it('does not stack over the open Command Palette', () => {
+    palette.open(null);
+
+    ctrlF();
+    expect(search.isOpen()).toBe(false);
   });
 });
 

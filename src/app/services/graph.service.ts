@@ -684,13 +684,31 @@ export class GraphService {
     this.viewportState.set(frameViewport(bounds, viewWidth, viewHeight, GraphService.SELECTION_MAX_ZOOM));
   }
 
+  // Frame the given elements exactly like zoomToSelection but without reading
+  // or writing the Selection — the Canvas Search Viewport-only jump in Canvas
+  // Lock. Empty lists are a silent no-op. Pure Viewport change, no History.
+  zoomToElements(nodeIds: readonly string[], connectionIds: readonly string[], viewWidth: number, viewHeight: number): void {
+    const bounds = this.elementsBounds(nodeIds, connectionIds);
+    if (!bounds) return;
+    this.viewportState.set(frameViewport(bounds, viewWidth, viewHeight, GraphService.SELECTION_MAX_ZOOM));
+  }
+
   // Bounds of the current Selection: each Node by its rect, a Group unioned
   // with its children (a child's edge can overhang the Group rect), each
   // Connection by its cubic bezier curve bounds. Null when nothing is selected.
   private selectionBounds(): Bounds | null {
-    const parts: Bounds[] = [];
+    return this.elementsBounds(this.selectedNodeIds(), this.selectedConnectionIds());
+  }
 
-    for (const node of this.selectedNodes()) {
+  // Bounds of the given elements under the same rules as the Selection.
+  private elementsBounds(nodeIds: readonly string[], connectionIds: readonly string[]): Bounds | null {
+    const parts: Bounds[] = [];
+    const nodeSet = new Set(nodeIds);
+    const nodeById = new Map(this.nodes().map(n => [n.id, n]));
+
+    for (const id of nodeSet) {
+      const node = nodeById.get(id);
+      if (!node) continue;
       parts.push({ x: node.x, y: node.y, width: node.width, height: node.height });
       if (node.kind === 'group') {
         for (const c of this.childrenOf(node.id)) {
@@ -699,10 +717,10 @@ export class GraphService {
       }
     }
 
-    const selectedConns = this.selectedConnections();
-    if (selectedConns.length > 0) {
-      const nodeById = new Map(this.nodes().map(n => [n.id, n]));
-      for (const conn of selectedConns) {
+    if (connectionIds.length > 0) {
+      for (const id of new Set(connectionIds)) {
+        const conn = this.connections().find(c => c.id === id);
+        if (!conn) continue;
         const bounds = connectionBounds(conn, nodeById);
         if (bounds) parts.push(bounds);
       }

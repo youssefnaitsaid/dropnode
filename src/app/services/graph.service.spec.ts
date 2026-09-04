@@ -908,6 +908,41 @@ describe('GraphService', () => {
 
       expect(service.viewportState()).toEqual({ panX: 5, panY: 6, zoom: 3 });
     });
+
+    it('zoomToElements frames the given Node without touching the Selection', () => {
+      const n = service.createNode('n', 0, 0, 100, 100);
+
+      service.zoomToElements([n.id], [], W, H);
+
+      const vp = service.viewportState();
+      expect(vp.zoom).toBe(2);
+      expect(vp.panX).toBeCloseTo(300, 5);
+      expect(vp.panY).toBeCloseTo(200, 5);
+      expect(service.selectedNodeIds()).toEqual([]);
+      expect(service.selectedConnectionIds()).toEqual([]);
+    });
+
+    it('zoomToElements frames the given Connection by its whole curve', () => {
+      const a = service.createNode('a', 0, 0, 100, 100);
+      const b = service.createNode('b', 900, 0, 100, 100);
+      const conn = service.createConnection(a.id, 'top', b.id, 'top');
+
+      service.zoomToElements([], [conn!.id], W, H);
+
+      const vp = service.viewportState();
+      expect(vp.zoom).toBeCloseTo(0.8, 5);
+      expect(vp.panX).toBeCloseTo(0, 5);
+      expect(vp.panY).toBeCloseTo(345, 5);
+      expect(service.selectedNodeIds()).toEqual([]);
+    });
+
+    it('zoomToElements with no ids leaves the Viewport untouched', () => {
+      service.setViewport({ panX: 5, panY: 6, zoom: 3 });
+
+      service.zoomToElements([], [], W, H);
+
+      expect(service.viewportState()).toEqual({ panX: 5, panY: 6, zoom: 3 });
+    });
   });
 
   describe('getHandlePosition', () => {
