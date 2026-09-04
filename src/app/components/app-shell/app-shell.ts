@@ -11,12 +11,13 @@ import { ExportDialogService } from '../../services/export-dialog.service';
 import { ConnectDialogService } from '../../services/connect-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CommandPaletteComponent } from '../command-palette/command-palette';
+import { CanvasSearchComponent } from '../canvas-search/canvas-search';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, ToastComponent, ImportDialogComponent, ExportDialogComponent, ConnectDialogComponent, SidebarComponent, CommandPaletteComponent],
+  imports: [RouterOutlet, ToastComponent, ImportDialogComponent, ExportDialogComponent, ConnectDialogComponent, SidebarComponent, CommandPaletteComponent, CanvasSearchComponent],
   template: `
     <div
       class="app-frame"
@@ -36,6 +37,7 @@ import { CommandPaletteComponent } from '../command-palette/command-palette';
     <app-export-dialog #exportDialog />
     <app-connect-dialog #connectDialog />
     <app-command-palette />
+    <app-canvas-search />
   `,
   styles: [`
     :host {

@@ -6,6 +6,7 @@ import { ClipboardService } from '../services/clipboard.service';
 import { PresentationService } from '../services/presentation.service';
 import { CanvasLockService } from '../services/canvas-lock.service';
 import { CommandPaletteService } from '../services/command-palette.service';
+import { CanvasSearchService } from '../services/canvas-search.service';
 import { KeyboardScopeService } from '../services/keyboard-scope.service';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { KeyboardConnectionService } from '../services/keyboard-connection.service';
@@ -27,6 +28,7 @@ export class KeyboardShortcuts {
   private presentationService = inject(PresentationService);
   private canvasLock = inject(CanvasLockService);
   private commandPaletteService = inject(CommandPaletteService);
+  private canvasSearchService = inject(CanvasSearchService);
   private keyboardScope = inject(KeyboardScopeService);
   private canvasViewport = inject(CanvasViewportService);
   private keyboardConnection = inject(KeyboardConnectionService);
@@ -41,6 +43,12 @@ export class KeyboardShortcuts {
         event.preventDefault();
         this.commandPaletteService.close();
       }
+      return;
+    }
+
+    // Canvas Search owns the shell while open (its input owns Enter, Escape,
+    // and arrows); every global shortcut below is dead until it closes.
+    if (this.canvasSearchService.isOpen()) {
       return;
     }
 
@@ -71,15 +79,18 @@ export class KeyboardShortcuts {
     }
 
     // Canvas Lock is the Viewport-only keyboard context beside Present
-    // Mode: Ctrl+K (Palette), arrows (pan), and Shift+1 (Zoom to fit) fall
-    // through to their handlers below — every other global shortcut,
-    // including Escape (which never unlocks), is dead until unlocked.
+    // Mode: Ctrl+K (Palette), Ctrl+F (Canvas Search), arrows (pan), and
+    // Shift+1 (Zoom to fit) fall through to their handlers below — every
+    // other global shortcut, including Escape (which never unlocks), is dead
+    // until unlocked.
     if (this.canvasLock.locked()) {
       const paletteKey = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
         event.key.toLowerCase() === 'k';
+      const searchKey = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
+        event.key.toLowerCase() === 'f';
       const fitKey = event.shiftKey && !event.ctrlKey && !event.altKey && event.code === 'Digit1';
       const panKey = !event.ctrlKey && !event.altKey && !event.metaKey && event.key.startsWith('Arrow');
-      if (!paletteKey && !fitKey && !panKey) return;
+      if (!paletteKey && !searchKey && !fitKey && !panKey) return;
     }
 
     // Ctrl+K is the only Command Palette opener in this version. It stays
@@ -90,6 +101,18 @@ export class KeyboardShortcuts {
         ? document.activeElement
         : null;
       this.commandPaletteService.open(active);
+      return;
+    }
+
+    // Ctrl+F: Canvas Search. Claimed only with Canvas focus (the typing
+    // guard above keeps browser find alive while editing Text) and behind
+    // the modal guard (the service refuses Present Mode and stacked modals).
+    if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      const active = typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      this.canvasSearchService.open(active);
       return;
     }
 

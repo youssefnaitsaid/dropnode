@@ -10,6 +10,8 @@ import { PinVisibilityService } from './pin-visibility.service';
 import { HistoryPanelService } from './history-panel.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
 import { CanvasLockService } from './canvas-lock.service';
+import { CanvasSearchService } from './canvas-search.service';
+import { PresentationService } from './presentation.service';
 import { CollectionService } from './collection.service';
 
 @Component({ standalone: true, template: '' })
@@ -65,6 +67,34 @@ describe('PaletteEntryRegistry', () => {
     expect(styleIds.slice(9, 13).every(id => id.startsWith('node-shape-'))).toBe(true);
     expect(styleIds.slice(13).every(id => id.startsWith('node-emoji-'))).toBe(true);
     expect(styleIds.filter(id => id.startsWith('node-emoji-'))).toHaveLength(49);
+  });
+
+  it('exposes Canvas Search as a Viewport entry that requests the overlay', () => {
+    const entry = find('search-canvas-text');
+
+    expect(entry.label).toBe('Search Canvas Text…');
+    expect(entry.category).toBe('Viewport');
+    expect(entry.aliases).toEqual(expect.arrayContaining(['find', 'find text', 'search text']));
+    expect(entry.shortcut).toBe('Ctrl+F');
+    expect(entry.available).toBe(true);
+
+    entry.execute();
+    // Deferred like every dialog-opening entry: the Palette is still mounted
+    // here, so the overlay opens once it closes instead of this tick.
+    const search = TestBed.inject(CanvasSearchService);
+    expect(search.openRequests()).toBe(1);
+    expect(search.isOpen()).toBe(false);
+  });
+
+  it('marks Canvas Search unavailable in Present Mode', () => {
+    TestBed.inject(GraphService).createGroup('Tour', 0, 0);
+    const presentation = TestBed.inject(PresentationService);
+    presentation.enter(800, 600, 'reading');
+
+    const entry = find('search-canvas-text');
+    expect(entry.available).toBe(false);
+    expect(entry.disabledReason).toBe('Not available in Present Mode');
+    presentation.exit();
   });
 
   it('gives every entry exactly one leading visual (swatch, emoji, icon, or line preview)', () => {
