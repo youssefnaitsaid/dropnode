@@ -12,6 +12,8 @@ import {
 import { CanvasComponent } from '../canvas/canvas';
 import { MinimapComponent } from '../minimap/minimap';
 import { MinimapService } from '../../services/minimap.service';
+import { HistoryPanelComponent } from '../history-panel/history-panel';
+import { HistoryPanelService } from '../../services/history-panel.service';
 import { ToolbarComponent } from '../toolbar/toolbar';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -31,7 +33,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
   selector: 'app-editor-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CanvasComponent, ToolbarComponent, MinimapComponent],
+  imports: [CanvasComponent, ToolbarComponent, MinimapComponent, HistoryPanelComponent],
   template: `
     <h1 class="sr-only">{{ projectTitle() }}</h1>
     @if (!presentationService.active()) {
@@ -51,6 +53,13 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
          and in Present Mode (it's chrome). -->
     @if (!presentationService.active() && !minimapService.hidden() && graphService.nodes().length > 0) {
       <app-minimap />
+    }
+    <!-- History Panel: hidden when toggled off and in Present Mode (chrome-free
+         tour). Unlike the Minimap it stays mounted on an empty graph so the
+         empty state keeps the toggle discoverable. Canvas Lock disables its
+         rows in place rather than unmounting it. -->
+    @if (!presentationService.active() && !historyPanelService.hidden()) {
+      <app-history-panel />
     }
     <!-- Present Mode's only overlay: a non-interactive Step counter. Live so
          screen readers announce each Step change (WCAG 4.1.3). -->
@@ -158,6 +167,7 @@ export class EditorPageComponent implements OnDestroy {
   private canvasLock = inject(CanvasLockService);
   protected presentationService = inject(PresentationService);
   protected minimapService = inject(MinimapService);
+  protected historyPanelService = inject(HistoryPanelService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);

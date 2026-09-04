@@ -6,6 +6,7 @@ import { lucideUpload, lucideX } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { GraphService } from '../../services/graph.service';
+import { HistoryService } from '../../services/history.service';
 import { ToastService } from '../toast/toast';
 
 @Component({
@@ -107,6 +108,7 @@ import { ToastService } from '../toast/toast';
 })
 export class ImportDialogComponent {
   private graphService = inject(GraphService);
+  private historyService = inject(HistoryService);
   private toastService = inject(ToastService);
 
   private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
@@ -169,6 +171,7 @@ export class ImportDialogComponent {
       const parsed = JSON.parse(jsonStr);
       const result = this.graphService.importGraph(parsed);
       if (result.success) {
+        this.historyService.recordImportSeparator();
         this.toastService.show('Graph imported successfully', 'success');
         this.close();
       } else {

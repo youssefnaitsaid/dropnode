@@ -7,6 +7,7 @@ import { HistoryService } from './history.service';
 import { ContextMenuService } from './context-menu.service';
 import { ExportDialogService } from './export-dialog.service';
 import { PinVisibilityService } from './pin-visibility.service';
+import { HistoryPanelService } from './history-panel.service';
 import { ConnectionJumpsService } from './connection-jumps.service';
 import { CanvasLockService } from './canvas-lock.service';
 import { CollectionService } from './collection.service';
@@ -388,6 +389,21 @@ describe('PaletteEntryRegistry', () => {
     expect(pinVisibility.hidden()).toBe(true);
     registry.execute('toggle-pins');
     expect(pinVisibility.hidden()).toBe(false);
+  });
+
+  it('exposes Toggle History in History with no shortcut and it flips the panel', () => {
+    const toggleHistory = find('toggle-history');
+    const historyPanel = TestBed.inject(HistoryPanelService);
+
+    expect(toggleHistory.label).toBe('Toggle History');
+    expect(toggleHistory.category).toBe('History');
+    expect(toggleHistory.aliases).toContain('hide history');
+    expect(toggleHistory.shortcut).toBeUndefined();
+
+    registry.execute('toggle-history');
+    expect(historyPanel.hidden()).toBe(false);
+    registry.execute('toggle-history');
+    expect(historyPanel.hidden()).toBe(true);
   });
 });
 

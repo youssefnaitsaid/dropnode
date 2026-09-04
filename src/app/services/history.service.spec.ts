@@ -209,4 +209,122 @@ describe('HistoryService', () => {
       expect(service.canRedo()).toBe(false);
     });
   });
+
+  describe('History Panel snapshot', () => {
+    const named = (description: string): Command => ({
+      description,
+      execute: () => {},
+      undo: () => {},
+    });
+
+    it('lists executed Commands oldest-first with the divider at the end', () => {
+      service.execute(named('First'));
+      service.execute(named('Second'));
+
+      expect(service.entries().map(entry => entry.description)).toEqual(['First', 'Second']);
+      expect(service.currentIndex()).toBe(2);
+    });
+
+    it('moves the divider on undo and redo without dropping rows', () => {
+      service.execute(named('First'));
+      service.execute(named('Second'));
+
+      service.undo();
+      expect(service.currentIndex()).toBe(1);
+      expect(service.entries()).toHaveLength(2);
+
+      service.redo();
+      expect(service.currentIndex()).toBe(2);
+    });
+
+    it('jumps back to a picked entry by undoing each skipped Command', () => {
+      const undone: string[] = [];
+      const track = (description: string): Command => ({
+        description,
+        execute: () => {},
+        undo: () => { undone.push(description); },
+      });
+      service.execute(track('First'));
+      service.execute(track('Second'));
+      service.execute(track('Third'));
+
+      service.jumpTo(1);
+
+      expect(undone).toEqual(['Third', 'Second']);
+      expect(service.currentIndex()).toBe(1);
+      expect(service.canUndo()).toBe(true);
+      expect(service.canRedo()).toBe(true);
+    });
+
+    it('jumps forward to a redo entry and no-ops on the current position', () => {
+      let executions = 0;
+      service.execute(named('First'));
+      service.execute({ description: 'Second', execute: () => { executions++; }, undo: () => {} });
+      expect(executions).toBe(1);
+      service.undo();
+      service.undo();
+      expect(service.currentIndex()).toBe(0);
+
+      service.jumpTo(2);
+      expect(executions).toBe(2);
+      expect(service.currentIndex()).toBe(2);
+
+      service.jumpTo(2);
+      expect(executions).toBe(2);
+      expect(service.currentIndex()).toBe(2);
+    });
+
+    it('drops redo rows when a new Command executes and ignores out-of-range jumps', () => {
+      service.execute(named('First'));
+      service.execute(named('Second'));
+      service.undo();
+      expect(service.currentIndex()).toBe(1);
+
+      service.execute(named('Third'));
+      expect(service.entries().map(entry => entry.description)).toEqual(['First', 'Third']);
+      expect(service.currentIndex()).toBe(2);
+      expect(service.canRedo()).toBe(false);
+
+      service.jumpTo(-1);
+      service.jumpTo(99);
+      expect(service.currentIndex()).toBe(2);
+    });
+
+    it('records a non-undoable Import separator that undo and redo pass through', () => {
+      const undone: string[] = [];
+      service.execute({ description: 'Before', execute: () => {}, undo: () => { undone.push('Before'); } });
+      service.recordImportSeparator();
+
+      expect(service.entries().map(entry => entry.kind)).toEqual(['command', 'import']);
+      expect(service.currentIndex()).toBe(2);
+
+      service.undo();
+      expect(undone).toEqual(['Before']);
+      expect(service.currentIndex()).toBe(0);
+      expect(service.canUndo()).toBe(false);
+
+      service.redo();
+      expect(service.currentIndex()).toBe(2);
+    });
+
+    it('jumps across an Import separator and clears markers with the stacks', () => {
+      const undone: string[] = [];
+      const track = (description: string): Command => ({
+        description,
+        execute: () => {},
+        undo: () => { undone.push(description); },
+      });
+      service.execute(track('Before'));
+      service.recordImportSeparator();
+      service.execute(track('After'));
+
+      service.jumpTo(1);
+      expect(undone).toEqual(['After']);
+      expect(service.currentIndex()).toBe(1);
+
+      service.clear();
+      expect(service.entries()).toEqual([]);
+      expect(service.currentIndex()).toBe(0);
+    });
+  });
 });
