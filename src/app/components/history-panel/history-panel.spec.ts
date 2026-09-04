@@ -19,6 +19,7 @@ describe('HistoryPanelComponent', () => {
   }
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({ imports: [HistoryPanelComponent] });
     fixture = TestBed.createComponent(HistoryPanelComponent);
     historyService = TestBed.inject(HistoryService);
@@ -113,8 +114,6 @@ describe('HistoryPanelComponent', () => {
 
   it('closes the panel from its close button', () => {
     const panel = TestBed.inject(HistoryPanelService);
-    panel.toggle();
-    fixture.detectChanges();
     expect(panel.hidden()).toBe(false);
 
     (fixture.nativeElement.querySelector('.history-close') as HTMLButtonElement).click();
@@ -124,8 +123,6 @@ describe('HistoryPanelComponent', () => {
 
   it('closes the panel on Escape even when focus is outside it', () => {
     const panel = TestBed.inject(HistoryPanelService);
-    panel.toggle();
-    fixture.detectChanges();
     expect(panel.hidden()).toBe(false);
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

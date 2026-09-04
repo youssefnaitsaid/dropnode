@@ -56,11 +56,11 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
     @if (!presentationService.active() && !minimapService.hidden() && graphService.nodes().length > 0) {
       <app-minimap />
     }
-    <!-- History Panel: hidden when toggled off and in Present Mode (chrome-free
-         tour). Unlike the Minimap it stays mounted on an empty graph so the
-         empty state keeps the toggle discoverable. Canvas Lock disables its
-         rows in place rather than unmounting it. -->
-    @if (!presentationService.active() && !historyPanelService.hidden()) {
+    <!-- History Panel: mounted only while History has entries (appears with
+         the first Command, vanishes when History clears), hidden when
+         toggled off and in Present Mode (chrome-free tour). Canvas Lock
+         disables its rows in place rather than unmounting it. -->
+    @if (!presentationService.active() && !historyPanelService.hidden() && historyService.entries().length > 0) {
       <app-history-panel />
     }
     <!-- Outline: hidden when empty (nothing to list), when the user toggled
@@ -169,7 +169,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
 })
 export class EditorPageComponent implements OnDestroy {
   graphService = inject(GraphService);
-  private historyService = inject(HistoryService);
+  protected historyService = inject(HistoryService);
   private collectionService = inject(CollectionService);
   private urlLoader = inject(UrlLoaderService);
   private canvasLock = inject(CanvasLockService);

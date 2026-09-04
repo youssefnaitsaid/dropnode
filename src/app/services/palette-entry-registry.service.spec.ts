@@ -432,9 +432,9 @@ describe('PaletteEntryRegistry', () => {
     expect(toggleHistory.shortcut).toBeUndefined();
 
     registry.execute('toggle-history');
-    expect(historyPanel.hidden()).toBe(false);
-    registry.execute('toggle-history');
     expect(historyPanel.hidden()).toBe(true);
+    registry.execute('toggle-history');
+    expect(historyPanel.hidden()).toBe(false);
   });
 
   it('exposes Toggle Outline in Application with no shortcut and it flips the panel', () => {
