@@ -54,6 +54,7 @@ import { PinVisibilityService } from './pin-visibility.service';
 import { ImportDialogService } from './import-dialog.service';
 import { ConnectDialogService } from './connect-dialog.service';
 import { PresentationService } from './presentation.service';
+import { CanvasLockService } from './canvas-lock.service';
 import { SidebarService } from './sidebar.service';
 import { ResizeModeService } from './resize-mode.service';
 
@@ -147,6 +148,28 @@ const ROUTE_STYLE_ORDER: Record<RouteStyle, number> = {
   orthogonal: 13,
 };
 
+// Palette Entries that mutate Graph State, the Selection, History, or the
+// Clipboard (plus the graph-replacing Import). While Canvas Lock is active
+// they stay discoverable with a locked reason instead of running — everything
+// else (Viewport moves, whole-graph Export, app-level toggles, Lock itself)
+// stays live. New entries choose a side here explicitly.
+const CANVAS_LOCK_REASON = 'Unlock the Canvas to edit';
+const CANVAS_LOCK_GATED_IDS: ReadonlySet<string> = new Set([
+  'undo', 'redo',
+  'select-all', 'clear-selection', 'resize-mode',
+  'cut', 'copy', 'paste', 'duplicate', 'delete',
+  'add-node', 'add-group', 'add-pin', 'connect-nodes', 'edit-text', 'rename-group',
+  'add-reroute-point',
+  'zoom-to-selection', 'tidy-up',
+  'import-graph', 'export-selection-png',
+]);
+const CANVAS_LOCK_GATED_PREFIXES: readonly string[] = [
+  'align-', 'distribute-',
+  'node-color-', 'node-shape-', 'node-emoji-',
+  'connection-color-', 'connection-arrowhead-',
+  'connection-pattern-', 'connection-weight-', 'connection-route-',
+];
+
 type EntryOptions = {
   aliases?: readonly string[];
   shortcut?: string;
@@ -174,6 +197,7 @@ export class PaletteEntryRegistry {
   private readonly connectDialogService = inject(ConnectDialogService);
   private readonly exportService = inject(ExportService);
   private readonly presentationService = inject(PresentationService);
+  private readonly canvasLock = inject(CanvasLockService);
   private readonly sidebarService = inject(SidebarService);
   private readonly minimapService = inject(MinimapService);
   private readonly connectionJumpsService = inject(ConnectionJumpsService);
@@ -206,7 +230,7 @@ export class PaletteEntryRegistry {
     const canAddReroutePoint = !!selectedConnection &&
       (selectedConnection.reroutePoints?.length ?? 0) < MAX_REROUTE_POINTS;
 
-    return [
+    return this.applyCanvasLock([
       this.action('undo', 'Undo', 'History', () => this.historyService.undo(), {
         aliases: ['reverse', 'step back'], shortcut: SHORTCUTS.undo, icon: 'lucideUndo2',
         available: this.historyService.canUndo(), unavailableReason: 'Nothing to undo',
@@ -361,6 +385,16 @@ export class PaletteEntryRegistry {
         available: this.presentationService.canPresent(),
         unavailableReason: 'Add a Group before presenting',
       }),
+      this.action(
+        this.canvasLock.locked() ? 'unlock-canvas' : 'lock-canvas',
+        this.canvasLock.locked() ? 'Unlock Canvas' : 'Lock Canvas',
+        'Viewport',
+        () => this.canvasLock.toggle(),
+        {
+          aliases: ['lock', 'unlock', 'read only', 'view only', 'freeze canvas'],
+          icon: 'lucideLock',
+        },
+      ),
 
       this.action('import-graph', isScratch ? 'Import graph' : 'Import current Project graph', 'Project', () => {
         this.importDialogService.requestOpen();
@@ -430,7 +464,22 @@ export class PaletteEntryRegistry {
       this.action('toggle-pins', 'Toggle Pins', 'Application', () => this.pinVisibilityService.toggle(), {
         aliases: ['show pins', 'hide pins', 'toggle comments'], icon: 'lucideMessageCircle',
       }),
-    ];
+    ]);
+  }
+
+  /**
+   * Canvas Lock gating: mutating entries stay discoverable with the locked
+   * reason instead of running. Unlocked this is the identity — the single
+   * place a new entry's locked side is decided (see CANVAS_LOCK_GATED_IDS).
+   */
+  private applyCanvasLock(entries: PaletteEntry[]): PaletteEntry[] {
+    if (!this.canvasLock.locked()) return entries;
+    return entries.map(entry =>
+      CANVAS_LOCK_GATED_IDS.has(entry.id) ||
+      CANVAS_LOCK_GATED_PREFIXES.some(prefix => entry.id.startsWith(prefix))
+        ? { ...entry, available: false, disabledReason: CANVAS_LOCK_REASON }
+        : entry,
+    );
   }
 
   search(query: string): PaletteEntry[] {

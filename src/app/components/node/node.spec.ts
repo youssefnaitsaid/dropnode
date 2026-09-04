@@ -3,6 +3,7 @@ import { GraphNode } from '../../models/node';
 import { textFromString } from '../../models/text';
 import { NodeComponent } from './node';
 import { ResizeModeService } from '../../services/resize-mode.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { shapeMinimumSize } from '../../models/node-shape';
 
 describe('NodeComponent shapes', () => {
@@ -283,5 +284,82 @@ describe('NodeComponent keyboard operation', () => {
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(selected).toBeNull();
+  });
+});
+
+describe('NodeComponent Canvas Lock', () => {
+  let fixture: ComponentFixture<NodeComponent>;
+  let component: NodeComponent;
+  let canvasLock: CanvasLockService;
+
+  function render(node: GraphNode): void {
+    fixture = TestBed.createComponent(NodeComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('node', node);
+    fixture.detectChanges();
+  }
+
+  const cardEl = () => fixture.nativeElement.querySelector('.node-card') as HTMLElement;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [NodeComponent] });
+    canvasLock = TestBed.inject(CanvasLockService);
+  });
+
+  afterEach(() => {
+    canvasLock.unlock({ silent: true });
+  });
+
+  it('drops out of the tab order while locked', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    fixture.detectChanges();
+    expect(cardEl().getAttribute('tabindex')).toBeNull();
+  });
+
+  it('hides its Handles while locked', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    fixture.detectChanges();
+    expect(cardEl().classList.contains('locked')).toBe(true);
+  });
+
+  it('emits no select or move from keys while locked', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    let selected: { nodeId: string } | null = null;
+    const moves: { nodeId: string; dx: number; dy: number }[] = [];
+    component.keyboardSelect.subscribe(e => (selected = e));
+    component.keyboardMove.subscribe(e => moves.push(e));
+
+    cardEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    cardEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(selected).toBeNull();
+    expect(moves).toEqual([]);
+  });
+
+  it('does not start editing from double-click while locked', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    cardEl().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(component.isEditing()).toBe(false);
+  });
+
+  it('does not arm a drag from mousedown while locked', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    let moved = false;
+    component.startMove.subscribe(() => (moved = true));
+    cardEl().dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }));
+    expect(moved).toBe(false);
+  });
+
+  it('still reports hover while locked so Chain Highlight stays live', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    canvasLock.lock();
+    let hovered: string | null = null;
+    component.hoverEnter.subscribe(id => (hovered = id));
+    component.onMouseEnter();
+    expect(hovered).toBe('n1');
   });
 });

@@ -3,6 +3,7 @@ import { CanvasComponent } from './canvas';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 
 describe('CanvasComponent reroute interactions', () => {
   let fixture: ComponentFixture<CanvasComponent>;
@@ -313,5 +314,115 @@ describe('CanvasComponent keyboard context menu', () => {
     expect(contextMenuService.menuKind()).toBeNull();
 
     input.remove();
+  });
+});
+
+describe('CanvasComponent Canvas Lock', () => {
+  let fixture: ComponentFixture<CanvasComponent>;
+  let component: CanvasComponent;
+  let graphService: GraphService;
+  let historyService: HistoryService;
+  let contextMenuService: ContextMenuService;
+  let canvasLock: CanvasLockService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [CanvasComponent] });
+    fixture = TestBed.createComponent(CanvasComponent);
+    component = fixture.componentInstance;
+    graphService = TestBed.inject(GraphService);
+    historyService = TestBed.inject(HistoryService);
+    contextMenuService = TestBed.inject(ContextMenuService);
+    canvasLock = TestBed.inject(CanvasLockService);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    canvasLock.unlock({ silent: true });
+  });
+
+  const surface = () =>
+    fixture.nativeElement.querySelector('.canvas-container') as HTMLElement;
+
+  it('creates no Node from empty-Canvas double-click while locked', () => {
+    canvasLock.lock();
+    surface().dispatchEvent(
+      new MouseEvent('dblclick', { bubbles: true, clientX: 200, clientY: 150 }),
+    );
+    expect(graphService.nodes()).toHaveLength(0);
+  });
+
+  it('arms no Marquee from empty-Canvas mousedown while locked', () => {
+    canvasLock.lock();
+    surface().dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }));
+    expect(component['isMarqueeArmed']).toBe(false);
+  });
+
+  it('suppresses the Context Menu while locked', () => {
+    canvasLock.lock();
+    surface().dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, clientX: 200, clientY: 150 }),
+    );
+    expect(contextMenuService.menuKind()).toBeNull();
+  });
+
+  it('selects and drags no Node while locked', () => {
+    const node = graphService.createNode('N', 0, 0);
+    canvasLock.lock();
+    component.onNodeStartMove({ nodeId: node.id, event: new MouseEvent('mousedown', { button: 0 }) });
+    expect(graphService.selectedNodeIds()).toEqual([]);
+    expect(component['isDraggingNode']).toBe(false);
+  });
+
+  it('starts no Connection drag, text drag, resize, or keyboard select/move while locked', () => {
+    const node = graphService.createNode('N', 0, 0);
+    canvasLock.lock();
+    const press = new MouseEvent('mousedown', { button: 0 });
+    component.onHandleDragStart({ nodeId: node.id, handle: 'right', event: press });
+    component.onNodeStartResize({ nodeId: node.id, corner: 'se', minWidth: 120, minHeight: 48, event: press });
+    component.onKeyboardSelect({ nodeId: node.id });
+    component.onKeyboardMove({ nodeId: node.id, dx: 10, dy: 0 });
+    component.onKeyboardResize({
+      nodeId: node.id,
+      rect: { x: 0, y: 0, width: 200, height: 48 },
+      originalRect: { x: 0, y: 0, width: 160, height: 48 },
+    });
+    expect(component['isDraggingConnection']).toBe(false);
+    expect(component['isResizingNode']).toBe(false);
+    expect(graphService.selectedNodeIds()).toEqual([]);
+    expect(historyService.canUndo()).toBe(false);
+  });
+
+  it('adds, drags, and removes no Reroute Point while locked', () => {
+    const source = graphService.createNode('Source', 0, 0);
+    const target = graphService.createNode('Target', 320, 0);
+    const connection = graphService.createConnection(source.id, 'right', target.id, 'left')!;
+    graphService.setConnectionReroutePoints(connection.id, [{ x: 160, y: 100 }]);
+    canvasLock.lock();
+    component.onReroutePointAdd({ connectionId: connection.id, clientX: 240, clientY: 80 });
+    component.onReroutePointDragStart({
+      connectionId: connection.id,
+      pointIndex: 0,
+      event: new MouseEvent('mousedown', { button: 0, clientX: 160, clientY: 100 }),
+    });
+    component.onReroutePointRemove({ connectionId: connection.id, pointIndex: 0 });
+    expect(graphService.connections()[0].reroutePoints).toEqual([{ x: 160, y: 100 }]);
+    expect(historyService.canUndo()).toBe(false);
+  });
+
+  it('creates no Group child and selects no Connection while locked', () => {
+    const group = graphService.createGroup('G', 0, 0);
+    const a = graphService.createNode('A', 500, 500);
+    const b = graphService.createNode('B', 800, 500);
+    const connection = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    canvasLock.lock();
+    component.onCreateChild({ parentId: group.id, clientX: 100, clientY: 100 });
+    component.onConnectionSelect({ connectionId: connection.id, additive: false });
+    component.onConnectionTextDragStart({
+      connectionId: connection.id,
+      event: new MouseEvent('mousedown', { button: 0 }),
+    });
+    expect(graphService.nodes()).toHaveLength(3);
+    expect(graphService.selectedConnectionIds()).toEqual([]);
+    expect(component['isDraggingConnectionText']).toBe(false);
   });
 });

@@ -28,6 +28,8 @@ import {
   lucideAlignVerticalSpaceBetween,
   lucideNetwork,
   lucidePresentation,
+  lucideLock,
+  lucideLockOpen,
   lucideCheck,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -46,6 +48,7 @@ import { CollectionService } from '../../services/collection.service';
 import { ImportDialogService } from '../../services/import-dialog.service';
 import { ExportDialogService } from '../../services/export-dialog.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { CommandPaletteService } from '../../services/command-palette.service';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
@@ -100,6 +103,8 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideAlignVerticalSpaceBetween,
       lucideNetwork,
       lucidePresentation,
+      lucideLock,
+      lucideLockOpen,
       lucideCheck,
     }),
   ],
@@ -113,10 +118,10 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       </div>
 
       <div class="flex min-w-0 shrink-0 items-center gap-1">
-        <button hlmBtn variant="ghost" size="icon" (click)="undo()" [disabled]="!historyService.canUndo()" title="Undo (Ctrl+Z)" aria-label="Undo">
+        <button hlmBtn variant="ghost" size="icon" (click)="undo()" [disabled]="!historyService.canUndo() || canvasLock.locked()" title="Undo (Ctrl+Z)" aria-label="Undo">
           <ng-icon name="lucideUndo2" />
         </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="redo()" [disabled]="!historyService.canRedo()" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+        <button hlmBtn variant="ghost" size="icon" (click)="redo()" [disabled]="!historyService.canRedo() || canvasLock.locked()" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
           <ng-icon name="lucideRedo2" />
         </button>
         <button
@@ -418,7 +423,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         <button hlmBtn variant="ghost" size="icon" (click)="zoomToFit()" title="Zoom to fit" aria-label="Zoom to fit">
           <ng-icon name="lucideMaximize" />
         </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="tidyUp()" title="Tidy up" aria-label="Tidy up">
+        <button hlmBtn variant="ghost" size="icon" (click)="tidyUp()" [disabled]="canvasLock.locked()" [title]="canvasLock.locked() ? 'Unlock the Canvas to tidy up' : 'Tidy up'" aria-label="Tidy up">
           <ng-icon name="lucideNetwork" />
         </button>
         <button
@@ -432,10 +437,21 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
         >
           <ng-icon name="lucidePresentation" />
         </button>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon"
+          (click)="toggleLock()"
+          [attr.aria-pressed]="canvasLock.locked()"
+          [title]="canvasLock.locked() ? 'Unlock canvas' : 'Lock canvas'"
+          [attr.aria-label]="canvasLock.locked() ? 'Unlock canvas' : 'Lock canvas'"
+        >
+          <ng-icon [name]="canvasLock.locked() ? 'lucideLockOpen' : 'lucideLock'" />
+        </button>
         <span class="min-w-10 text-center text-sm font-medium text-sidebar-foreground">{{ zoomPercent() }}%</span>
         @if (scratchMode()) {
           <hlm-separator orientation="vertical" class="mx-1" />
-          <button hlmBtn variant="ghost" size="icon" (click)="openImport()" title="Import" aria-label="Import">
+          <button hlmBtn variant="ghost" size="icon" (click)="openImport()" [disabled]="canvasLock.locked()" [title]="canvasLock.locked() ? 'Unlock the Canvas to import' : 'Import'" aria-label="Import">
             <ng-icon name="lucideUpload" />
           </button>
           <button hlmBtn variant="ghost" size="icon" [hlmDropdownMenuTrigger]="exportMenu" title="Export" aria-label="Export">
@@ -571,6 +587,7 @@ export class ToolbarComponent {
   historyService = inject(HistoryService);
   collectionService = inject(CollectionService);
   presentationService = inject(PresentationService);
+  canvasLock = inject(CanvasLockService);
   private exportService = inject(ExportService);
   private importDialogService = inject(ImportDialogService);
   private exportDialogService = inject(ExportDialogService);
@@ -841,6 +858,10 @@ export class ToolbarComponent {
   // (which is still shrunk by the chrome at click time).
   present(): void {
     this.presentationService.enter(window.innerWidth, window.innerHeight);
+  }
+
+  toggleLock(): void {
+    this.canvasLock.toggle();
   }
 
   undo(): void {

@@ -8,6 +8,7 @@ import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { MoveConnectionReroutePointCommand } from '../../services/commands';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
@@ -97,7 +98,7 @@ interface JumpMaskEntry {
           [attr.data-connection-id]="conn.id"
           class="connection-hit"
           [class.chain-dimmed]="isChainDimmed(conn.id)"
-          [attr.tabindex]="presentationService.active() ? null : 0"
+          [attr.tabindex]="presentationService.active() || canvasLock.locked() ? null : 0"
           role="button"
           [attr.aria-label]="connectionAriaLabel(conn)"
           (mousedown)="onConnectionMouseDown(conn, $event)"
@@ -147,7 +148,7 @@ interface JumpMaskEntry {
               [style.stroke]="strokeColor(conn)"
               [attr.data-connection-id]="conn.id"
               [attr.data-reroute-point-index]="$index"
-              [attr.tabindex]="presentationService.active() ? null : 0"
+              [attr.tabindex]="presentationService.active() || canvasLock.locked() ? null : 0"
               role="button"
               [attr.aria-label]="'Reroute point ' + ($index + 1) + ' of ' + (conn.reroutePoints?.length ?? 0)"
               (mousedown)="onReroutePointMouseDown(conn, $index, $event)"
@@ -355,6 +356,7 @@ export class ConnectionLayerComponent {
   private historyService = inject(HistoryService);
   private jumpsService = inject(ConnectionJumpsService);
   protected presentationService = inject(PresentationService);
+  protected canvasLock = inject(CanvasLockService);
   private keyboardConnection = inject(KeyboardConnectionService);
   protected chainHighlightService = inject(ChainHighlightService);
 
@@ -679,7 +681,7 @@ export class ConnectionLayerComponent {
   // Keyboard selection (WCAG 2.1.1): Enter selects like a click, Shift+Enter
   // toggles membership like Shift+click — the app's additive convention
   onConnectionKeydown(conn: Connection, event: KeyboardEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       this.connectionSelect.emit({ connectionId: conn.id, additive: event.shiftKey });
@@ -716,6 +718,9 @@ export class ConnectionLayerComponent {
   }
 
   onTextCardDoubleClick(conn: Connection, event: MouseEvent): void {
+    // Present Mode never reaches here (text cards are pointer-dead); Canvas
+    // Lock keeps them hoverable, so the editor open needs its own guard
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     event.stopPropagation();
     this.editingConnectionId.set(conn.id);
   }
@@ -724,7 +729,7 @@ export class ConnectionLayerComponent {
   // point 10px (1px with Shift) as one undoable Command per step, matching the
   // nudge semantics. Delete is handled globally (focused point → remove).
   onReroutePointKeydown(conn: Connection, pointIndex: number, event: KeyboardEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const dx = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
     const dy = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
     if (dx === 0 && dy === 0) return;

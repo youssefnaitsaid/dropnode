@@ -222,6 +222,14 @@
 - while presenting the graph is read-only: mutation, Selection building, the Context Menu, and all global shortcuts are dead, and Handles and hover affordances disappear; free-roam wheel zoom and Space/middle pan stay live, as does Ctrl+Click on Text links — the next keypress re-frames from wherever the Viewport wandered @implemented
 - Viewport auto-save is suspended for the whole Present session — the pre-Present Viewport is what stays persisted, and a mid-Present reload lands there @implemented
 
+## canvas lock
+
+- Canvas Lock is entered from a toolbar toggle in the right cluster beside Present (pressed while locked, Lock/Unlock tooltips) and from Lock/Unlock Palette Entries, with no default shortcut; Escape never unlocks and unlocking needs the explicit toggle or Palette Entry @implemented
+- Canvas Lock is transient like the Selection — never Graph State, never JSON/PNG/link payloads, never localStorage, never the per-Project Viewport save; switching Projects and reloads land unlocked @implemented
+- entering Canvas Lock clears the Selection; while locked Selection building, Commands, History (Ctrl+Z / Ctrl+Shift+Z are no-ops, stacks kept not cleared), the Context Menu (fully suppressed), Text and Label editors with the Formatting Toolbar, Pin create/move/edit/delete, Handle commits, Reroute Point add/move, and graph-replacing Import are dead @implemented
+- while locked Viewport moves, Viewport auto-save, Zoom to fit, Minimap recenter, Chain Highlight, Connection hover-thicken, Ctrl+Click on Text links, Pin/Jump/Minimap visibility toggles, Sidebar navigation and Collection/Project management, Save-as-project, and filtered Palette view ops stay live; Tidy up disables with a locked hint and blocked attempts are silent with a toast only on toggle @implemented
+- entering Present Mode while locked is allowed with the lock preserved underneath — the Lock toggle hides mid-tour and exiting Present returns to locked restoring the pre-Present Viewport @implemented
+
 ## selection
 
 - the Selection is a set freely mixing Nodes and Connections — empty, one, or many (ADR-0015); it is transient interaction state, never serialized into Graph State, exports, or share links
@@ -322,6 +330,7 @@
 - with nothing focused (focus on the page body or the Canvas containers), arrow keys pan the Viewport 40 screen px (10 with Shift), converted to world units by the current zoom — a Viewport change with no History entry, matching every other pan; the focus state owns the arrow grammar, so a focused Node card nudges/resizes and interactive elements keep native arrow behavior @implemented
 - Ctrl+X cuts and Ctrl+C copies the Selection's Nodes and Groups; Ctrl+V pastes at the cursor; Ctrl+D duplicates the Selection's Nodes and Groups; Ctrl+A selects all — no selection (or an empty Clipboard for paste) is a silent no-op
 - Shift+1 runs Zoom to fit and Shift+2 Zoom to selection, keyed off event.code (Digit1/Digit2) for layout independence and suppressed by the input-focus guard @spec
+- while Canvas Lock is active only Viewport keys live — arrows pan and Shift+1 fits; all element, Selection, History, and menu keys are dead and element cards are non-focusable @implemented
 
 ## clipboard
 

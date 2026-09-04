@@ -3,6 +3,8 @@ import { provideRouter } from '@angular/router';
 import { EditorPageComponent } from './editor-page';
 import { GraphService } from '../../services/graph.service';
 import { CollectionService } from '../../services/collection.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
+import { ToastService } from '../toast/toast';
 
 describe('EditorPageComponent', () => {
   let fixture: ComponentFixture<EditorPageComponent>;
@@ -89,5 +91,27 @@ describe('EditorPageComponent', () => {
 
     expect(zoomToFit).not.toHaveBeenCalled();
     expect(resetViewport).toHaveBeenCalled();
+  });
+
+  it('lands unlocked (silently) when switching Projects', async () => {
+    const col = collectionService.createCollection('C');
+    const proj1 = collectionService.createProject(col.id, 'P1', storedGraph());
+    const proj2 = collectionService.createProject(col.id, 'P2', storedGraph());
+    const canvasLock = TestBed.inject(CanvasLockService);
+    const toast = TestBed.inject(ToastService);
+
+    fixture = TestBed.createComponent(EditorPageComponent);
+    fixture.componentRef.setInput('projectId', proj1.id);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+
+    canvasLock.lock();
+    toast.dismiss();
+    fixture.componentRef.setInput('projectId', proj2.id);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+
+    expect(canvasLock.locked()).toBe(false);
+    expect(toast.message()).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ import { HistoryService } from '../../services/history.service';
 import { CollectionService } from '../../services/collection.service';
 import { UrlLoaderService } from '../../services/url-loader.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 
 /**
  * The editor page behind both routes: `/` (Scratch Canvas) and
@@ -154,6 +155,7 @@ export class EditorPageComponent implements OnDestroy {
   private historyService = inject(HistoryService);
   private collectionService = inject(CollectionService);
   private urlLoader = inject(UrlLoaderService);
+  private canvasLock = inject(CanvasLockService);
   protected presentationService = inject(PresentationService);
   protected minimapService = inject(MinimapService);
 
@@ -219,6 +221,9 @@ export class EditorPageComponent implements OnDestroy {
     // hidden, history navigation isn't): a Present session never crosses a
     // Project boundary. exit() is a no-op when not presenting.
     this.presentationService.exit();
+    // Canvas Lock is transient UI state like the Selection: a switch lands
+    // unlocked, silently (the lock toast belongs to the explicit toggle).
+    this.canvasLock.unlock({ silent: true });
     this.flushSave();
     this.historyService.clear();
 

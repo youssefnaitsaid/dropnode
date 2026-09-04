@@ -17,6 +17,7 @@ import { TextViewComponent } from '../text-view/text-view';
 import { TextEditorComponent } from '../text-editor/text-editor';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
 
@@ -43,6 +44,7 @@ export interface NodeSizeChangedEvent {
       [class.chain-dimmed]="chainHighlightService.isNodeDimmed(node().id)"
       [class.editing]="isEditing()"
       [class.presenting]="presentationService.active()"
+      [class.locked]="canvasLock.locked()"
       [attr.data-node-id]="node().id"
       [attr.data-shape]="isGroup() ? null : nodeShape()"
       [style.left.px]="node().x"
@@ -50,7 +52,7 @@ export interface NodeSizeChangedEvent {
       [style.width.px]="node().width"
       [style.height.px]="node().height"
       [style.--selection-glow]="selectionGlow()"
-      [attr.tabindex]="presentationService.active() ? null : 0"
+      [attr.tabindex]="presentationService.active() || canvasLock.locked() ? null : 0"
       role="button"
       [attr.aria-label]="cardAriaLabel()"
       [attr.aria-pressed]="isSelected()"
@@ -213,6 +215,15 @@ export interface NodeSizeChangedEvent {
       box-shadow: var(--dn-shadow-node);
     }
     .node-card.presenting app-handle {
+      display: none;
+    }
+    /* Canvas Lock: the card is not a control either — default cursor and no
+       Handles — but hover glow stays, marking what Chain Highlight can light.
+       (Present Mode kills the glow too; Lock keeps exploring legible.) */
+    .node-card.locked {
+      cursor: default;
+    }
+    .node-card.locked app-handle {
       display: none;
     }
     .node-card.selected .node-surface,
@@ -394,6 +405,7 @@ export class NodeComponent implements AfterViewInit {
   private editInput = viewChild<ElementRef<HTMLInputElement>>('editInput');
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
+  protected canvasLock = inject(CanvasLockService);
   private resizeMode = inject(ResizeModeService);
   protected chainHighlightService = inject(ChainHighlightService);
   private viewReady = false;
@@ -508,9 +520,9 @@ export class NodeComponent implements AfterViewInit {
 
   onMouseDown(event: MouseEvent): void {
     if (this.isEditing()) return;
-    // Present Mode: no select/drag — let the event bubble to the canvas so
-    // Space+drag and middle-drag pans stay live over elements
-    if (this.presentationService.active()) return;
+    // Present Mode and Canvas Lock: no select/drag — let the event bubble
+    // to the canvas so Space+drag and middle-drag pans stay live over elements
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     // Left button only — right-click is reserved for the context menu
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -519,10 +531,11 @@ export class NodeComponent implements AfterViewInit {
 
   // Keyboard operation of the card (WCAG 2.1.1): Enter selects like a click;
   // arrow keys nudge by 10px (1px with Shift). Ignored while editing, in
-  // Present Mode, and while focus is in an input/contenteditable so typing
-  // shortcuts keep working (keyboard-shortcuts guard parity).
+  // Present Mode, while Canvas Lock is active, and while focus is in an
+  // input/contenteditable so typing shortcuts keep working
+  // (keyboard-shortcuts guard parity).
   onCardKeydown(event: KeyboardEvent): void {
-    if (this.isEditing() || this.presentationService.active()) return;
+    if (this.isEditing() || this.presentationService.active() || this.canvasLock.locked()) return;
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 
@@ -577,7 +590,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     event.stopPropagation();
     if (this.isEditing()) return;
     if (this.isGroup()) {
@@ -593,7 +606,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onLabelStripDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     event.stopPropagation();
     this.isEditing.set(true);
   }

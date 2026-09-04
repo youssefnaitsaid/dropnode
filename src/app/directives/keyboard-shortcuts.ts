@@ -4,6 +4,7 @@ import { HistoryService } from '../services/history.service';
 import { SidebarService } from '../services/sidebar.service';
 import { ClipboardService } from '../services/clipboard.service';
 import { PresentationService } from '../services/presentation.service';
+import { CanvasLockService } from '../services/canvas-lock.service';
 import { CommandPaletteService } from '../services/command-palette.service';
 import { KeyboardScopeService } from '../services/keyboard-scope.service';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
@@ -24,6 +25,7 @@ export class KeyboardShortcuts {
   private sidebarService = inject(SidebarService);
   private clipboardService = inject(ClipboardService);
   private presentationService = inject(PresentationService);
+  private canvasLock = inject(CanvasLockService);
   private commandPaletteService = inject(CommandPaletteService);
   private keyboardScope = inject(KeyboardScopeService);
   private canvasViewport = inject(CanvasViewportService);
@@ -66,6 +68,18 @@ export class KeyboardShortcuts {
         this.presentationService.exit();
       }
       return;
+    }
+
+    // Canvas Lock is the Viewport-only keyboard context beside Present
+    // Mode: Ctrl+K (Palette), arrows (pan), and Shift+1 (Zoom to fit) fall
+    // through to their handlers below — every other global shortcut,
+    // including Escape (which never unlocks), is dead until unlocked.
+    if (this.canvasLock.locked()) {
+      const paletteKey = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
+        event.key.toLowerCase() === 'k';
+      const fitKey = event.shiftKey && !event.ctrlKey && !event.altKey && event.code === 'Digit1';
+      const panKey = !event.ctrlKey && !event.altKey && !event.metaKey && event.key.startsWith('Arrow');
+      if (!paletteKey && !fitKey && !panKey) return;
     }
 
     // Ctrl+K is the only Command Palette opener in this version. It stays

@@ -22,6 +22,7 @@ import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { ClipboardService } from '../../services/clipboard.service';
 import { PresentationService } from '../../services/presentation.service';
+import { CanvasLockService } from '../../services/canvas-lock.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
 import {
@@ -423,6 +424,7 @@ export class CanvasComponent {
   graphService = inject(GraphService);
   contextMenuService = inject(ContextMenuService);
   presentationService = inject(PresentationService);
+  private canvasLock = inject(CanvasLockService);
   protected resizeMode = inject(ResizeModeService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
@@ -664,7 +666,7 @@ export class CanvasComponent {
   }
 
   onCanvasDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if ((event.target as HTMLElement).closest('app-node, [data-pin-id]')) return;
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -691,9 +693,10 @@ export class CanvasComponent {
     // Left button only — right-click is reserved for the context menu and
     // must never start a Marquee or clear selection (the menu handles that)
     if (event.button !== 0) return;
-    // Present Mode: no Marquee, no click-to-clear — the pan branches above
-    // stay live (free-roam is part of the tour)
-    if (this.presentationService.active()) return;
+    // Present Mode and Canvas Lock: no Marquee, no click-to-clear — the pan
+    // branches above stay live (free-roam is part of the tour, and Lock is
+    // Viewport-live by definition)
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
 
     // Arm a Marquee; whether it becomes one (drag) or stays a click (clear,
     // or Ctrl no-op) is resolved by the 2px threshold
@@ -723,9 +726,10 @@ export class CanvasComponent {
   onCanvasPointerDown(event: PointerEvent): void {
     if (event.pointerType === 'mouse') return;
     const isFirstFinger = this.touchPointers.size === 0;
-    // Present Mode is free-roam: pan over everything. Otherwise an element
-    // press belongs to its own (compatibility-mouse) drag, not a pan.
-    if (isFirstFinger && !this.presentationService.active()) {
+    // Present Mode and Canvas Lock are free-roam: pan over everything.
+    // Otherwise an element press belongs to its own (compatibility-mouse)
+    // drag, not a pan.
+    if (isFirstFinger && !this.presentationService.active() && !this.canvasLock.locked()) {
       const target = event.target as HTMLElement;
       if (target.closest('app-node, [data-pin-id], .pin-popover, .connection-text-card, .reroute-point')) return;
     }
@@ -817,7 +821,7 @@ export class CanvasComponent {
    * summon the browser's native menu).
    */
   private openContextMenuForKeyboard(): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     // Element, not HTMLElement: SVG paths (Connection hit targets) are
     // focusable too, and they are Elements, never HTMLElements
     const active = document.activeElement instanceof Element ? document.activeElement : null;
@@ -907,10 +911,11 @@ export class CanvasComponent {
   // outer element opens the menu; inline text inputs stop propagation so the
   // native browser menu still works there.
   onContextMenu(event: MouseEvent): void {
-    // Present Mode: the Context Menu is dead — stopPropagation keeps the
-    // event from the CdkContextMenuTrigger on the outer element, and
-    // preventDefault suppresses the native browser menu as usual
-    if (this.presentationService.active()) {
+    // Present Mode and Canvas Lock: the Context Menu is dead —
+    // stopPropagation keeps the event from the CdkContextMenuTrigger on the
+    // outer element, and preventDefault suppresses the native browser menu
+    // as usual
+    if (this.presentationService.active() || this.canvasLock.locked()) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -969,8 +974,9 @@ export class CanvasComponent {
       return;
     }
 
-    // Present Mode: no selection, no drag — only the pan branch above lives
-    if (this.presentationService.active()) return;
+    // Present Mode and Canvas Lock: no selection, no drag — only the pan
+    // branch above lives
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
 
     // Ctrl+click toggles Selection membership and never arms a drag
     if (event.event.ctrlKey && !event.event.altKey) {
@@ -1020,7 +1026,7 @@ export class CanvasComponent {
 
   // Keyboard select (Enter on a focused card): mirror a plain click.
   onKeyboardSelect(event: { nodeId: string }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     this.graphService.selectNode(event.nodeId);
   }
 
@@ -1028,7 +1034,7 @@ export class CanvasComponent {
   // multi-Selection shifts the whole set as one undoable CompoundCommand,
   // exactly like the drag commit — one nudge, one undo step.
   onKeyboardResize(event: { nodeId: string; rect: NodeRect; originalRect: NodeRect }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     // Select-first so the resize reads as the current target, mirroring the
     // nudge path; one undoable ResizeNodeCommand per keystroke
     this.graphService.selectNode(event.nodeId);
@@ -1041,7 +1047,7 @@ export class CanvasComponent {
   }
 
   onKeyboardMove(event: { nodeId: string; dx: number; dy: number }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const byId = new Map(this.graphService.nodes().map(n => [n.id, n]));
     const target = byId.get(event.nodeId);
     if (!target) return;
@@ -1078,7 +1084,7 @@ export class CanvasComponent {
   onNodeStartResize(event: {
     nodeId: string; corner: GripCorner; minWidth: number; minHeight: number; event: MouseEvent;
   }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const node = this.graphService.nodes().find(n => n.id === event.nodeId);
     if (!node) return;
     this.isResizingNode = true;
@@ -1098,7 +1104,7 @@ export class CanvasComponent {
 
   // Handle drag start (connection creation)
   onHandleDragStart(event: { nodeId: string; handle: HandleSide; event: MouseEvent }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     event.event.stopPropagation();
     this.isDraggingConnection = true;
     this.connectionSourceNodeId = event.nodeId;
@@ -1116,7 +1122,7 @@ export class CanvasComponent {
 
   // Text card drag start — armed on mousedown; becomes a drag past 2px
   onConnectionTextDragStart(event: { connectionId: string; event: MouseEvent }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn) return;
     this.isDraggingConnectionText = true;
@@ -1129,7 +1135,7 @@ export class CanvasComponent {
   }
 
   onReroutePointAdd(event: { connectionId: string; clientX: number; clientY: number }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
     const layer = this.connectionLayer();
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
@@ -1153,7 +1159,7 @@ export class CanvasComponent {
   }
 
   onReroutePointDragStart(event: { connectionId: string; pointIndex: number; event: MouseEvent }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn?.reroutePoints || !conn.reroutePoints[event.pointIndex]) return;
 
@@ -1169,7 +1175,7 @@ export class CanvasComponent {
   }
 
   onReroutePointRemove(event: { connectionId: string; pointIndex: number }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn?.reroutePoints?.[event.pointIndex]) return;
     this.historyService.execute(new RemoveConnectionReroutePointCommand(
@@ -1641,7 +1647,7 @@ export class CanvasComponent {
 
   // Double-click on a Group's body creates a child node at the cursor
   onCreateChild(event: { parentId: string; clientX: number; clientY: number }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
     if (!canvasPos) return;
 
@@ -1654,7 +1660,7 @@ export class CanvasComponent {
   // Plain click on a Connection collapses the Selection to it; Ctrl+click
   // toggles its membership (the layer already filtered to left-button)
   onConnectionSelect(event: { connectionId: string; additive: boolean }): void {
-    if (this.presentationService.active()) return;
+    if (this.presentationService.active() || this.canvasLock.locked()) return;
     if (event.additive) {
       this.graphService.toggleConnectionSelection(event.connectionId);
     } else {
