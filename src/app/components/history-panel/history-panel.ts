@@ -196,9 +196,10 @@ export class HistoryPanelComponent {
     });
   }
 
+  /** Picking a row lands before it: the clicked entry ends up undone. */
   protected jumpToRow(index: number): void {
     if (this.canvasLock.locked()) return;
-    this.historyService.jumpTo(index + 1);
+    this.historyService.jumpTo(index);
   }
 
   protected close(): void {

@@ -52,7 +52,7 @@ describe('HistoryPanelComponent', () => {
     expect(second.getAttribute('aria-label')).toBe('2 of 2: Second');
   });
 
-  it('clicking a row jumps History to that point', () => {
+  it('clicking a row lands before it, leaving the clicked entry undone', () => {
     const undone: string[] = [];
     historyService.execute({ description: 'First', execute: () => {}, undo: () => { undone.push('First'); } });
     historyService.execute({ description: 'Second', execute: () => {}, undo: () => { undone.push('Second'); } });
@@ -61,8 +61,30 @@ describe('HistoryPanelComponent', () => {
     rows()[0].click();
     fixture.detectChanges();
 
-    expect(undone).toEqual(['Second']);
+    expect(undone).toEqual(['Second', 'First']);
+    expect(historyService.currentIndex()).toBe(0);
+  });
+
+  it('clicking a redo row redoes only the entries before it', () => {
+    const executed: string[] = [];
+    const track = (description: string) => ({
+      description,
+      execute: () => { executed.push(description); },
+      undo: () => {},
+    });
+    historyService.execute(track('First'));
+    historyService.execute(track('Second'));
+    historyService.undo();
+    historyService.undo();
+    executed.length = 0;
+    fixture.detectChanges();
+
+    rows()[1].click();
+    fixture.detectChanges();
+
+    expect(executed).toEqual(['First']);
     expect(historyService.currentIndex()).toBe(1);
+    expect(rows()[1].classList.contains('history-redo')).toBe(true);
   });
 
   it('renders the Import separator as a non-clickable marker', () => {
