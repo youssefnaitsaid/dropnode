@@ -16,7 +16,10 @@ import { HistoryPanelComponent } from '../history-panel/history-panel';
 import { HistoryPanelService } from '../../services/history-panel.service';
 import { OutlineComponent } from '../outline/outline';
 import { OutlineService } from '../../services/outline.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import { ToolbarComponent } from '../toolbar/toolbar';
+import { FloatingToolbarComponent } from '../floating-toolbar/floating-toolbar';
+import { SelectionActionsBarComponent } from '../selection-actions-bar/selection-actions-bar';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { CollectionService } from '../../services/collection.service';
@@ -35,7 +38,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
   selector: 'app-editor-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CanvasComponent, ToolbarComponent, MinimapComponent, HistoryPanelComponent, OutlineComponent],
+  imports: [CanvasComponent, ToolbarComponent, FloatingToolbarComponent, SelectionActionsBarComponent, MinimapComponent, HistoryPanelComponent, OutlineComponent],
   template: `
     <h1 class="sr-only">{{ projectTitle() }}</h1>
     @if (!presentationService.active()) {
@@ -69,6 +72,17 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
     @if (!presentationService.active() && !outlineService.hidden() && graphService.nodes().length > 0) {
       <app-outline />
     }
+    <!-- Floating stack (spec #68): Selection Actions Bar above the Floating
+         Toolbar, bottom-center over the Canvas. Chrome: hidden in Present
+         Mode like the top Toolbar; Canvas Lock disables its controls in
+         place rather than unmounting. pointer-events none on the wrapper so
+         the Canvas stays clickable around the pills. -->
+    @if (!presentationService.active()) {
+      <div class="floating-stack">
+        <app-selection-actions-bar />
+        <app-floating-toolbar />
+      </div>
+    }
     <!-- Present Mode's only overlay: a non-interactive Step counter. Live so
          screen readers announce each Step change (WCAG 4.1.3). -->
     @if (presentationService.active()) {
@@ -97,6 +111,25 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
     app-canvas {
       flex: 1 1 auto;
       min-height: 0;
+    }
+    /* Floating stack: bottom-center column (actions above tools), above the
+       Minimap band via the overlay z-token. The wrapper is click-through;
+       the pills re-enable pointer events so the Canvas stays interactive
+       around them. */
+    .floating-stack {
+      position: absolute;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      z-index: var(--dn-z-overlay);
+      pointer-events: none;
+    }
+    .floating-stack > * {
+      pointer-events: auto;
     }
     .step-counter {
       position: absolute;
@@ -177,6 +210,7 @@ export class EditorPageComponent implements OnDestroy {
   protected minimapService = inject(MinimapService);
   protected historyPanelService = inject(HistoryPanelService);
   protected outlineService = inject(OutlineService);
+  private canvasTool = inject(CanvasToolService);
 
   /** Bound from the route param; undefined on the Scratch Canvas route. */
   projectId = input<string | undefined>(undefined);
@@ -243,6 +277,9 @@ export class EditorPageComponent implements OnDestroy {
     // Canvas Lock is transient UI state like the Selection: a switch lands
     // unlocked, silently (the lock toast belongs to the explicit toggle).
     this.canvasLock.unlock({ silent: true });
+    // Tool mode is transient UI state like the Selection: a switch lands on
+    // Select (spec #68).
+    this.canvasTool.reset();
     this.flushSave();
     this.historyService.clear();
     // Outline collapse references dead ids after a switch — land expanded.

@@ -25,6 +25,7 @@ import { PresentationService } from '../../services/presentation.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import {
   CreateNodeCommand,
   MoveNodeCommand,
@@ -79,6 +80,7 @@ import { Text } from '../../models/text';
         class="canvas-container"
         [class.panning]="isPanning"
         [class.space-pan]="spaceHeld()"
+        [class.pin-armed]="canvasTool.isPinArmed()"
         (dblclick)="onCanvasDoubleClick($event)"
         (mousedown)="onCanvasMouseDown($event)"
         (pointerdown)="onCanvasPointerDown($event)"
@@ -399,6 +401,11 @@ import { Text } from '../../models/text';
     .canvas-container.panning {
       cursor: grabbing;
     }
+    /* Armed Pin placement (spec #68): a placement cursor until the anchor
+       click lands or arming is cancelled. */
+    .canvas-container.pin-armed {
+      cursor: crosshair;
+    }
     .marquee-rect {
       position: absolute;
       border: 1px solid var(--dn-accent);
@@ -437,6 +444,7 @@ export class CanvasComponent {
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
   private chainHighlightService = inject(ChainHighlightService);
+  canvasTool = inject(CanvasToolService);
 
   constructor() {
     // Ctrl+V converts the raw cursor point to canvas coordinates lazily at
@@ -690,6 +698,21 @@ export class CanvasComponent {
     // A touch pan already owns this press — its compatibility mousedown must
     // never also arm a Marquee or clear selection (touch pans, mouse marquees)
     if (this.touchPanPointerId !== null) return;
+    // Armed Pin placement: left-click drops a ghost-pin anchor (Node presses
+    // are handled in onNodeStartMove, which fires first); any other button
+    // cancels arming with no History entry.
+    if (this.canvasTool.isPinArmed()) {
+      if (event.button !== 0) {
+        this.canvasTool.reset();
+        return;
+      }
+      const pinTarget = event.target as HTMLElement | null;
+      if (pinTarget?.closest?.('[data-node-id]')) return;
+      const pinPos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
+      this.contextMenuService.requestCreatePin({ kind: 'canvas', x: pinPos.x, y: pinPos.y });
+      this.canvasTool.reset();
+      return;
+    }
     // Middle-mouse-drag pans from anywhere; Space turns a left-drag into a
     // pan even over elements (ADR-0016)
     if (event.button === 1 || (event.button === 0 && this.spaceHeld())) {
@@ -697,7 +720,13 @@ export class CanvasComponent {
       this.startPan(event);
       return;
     }
-    if ((event.target as HTMLElement).closest('app-node, [data-pin-id], .pin-popover')) return;
+    // Pan tool: left-drag pans from anywhere, never Marquees (spec #68)
+    if (event.button === 0 && this.canvasTool.isPan()) {
+      event.preventDefault();
+      this.startPan(event);
+      return;
+    }
+    if ((event.target as HTMLElement | null)?.closest?.('app-node, [data-pin-id], .pin-popover')) return;
     // Left button only — right-click is reserved for the context menu and
     // must never start a Marquee or clear selection (the menu handles that)
     if (event.button !== 0) return;
@@ -919,6 +948,14 @@ export class CanvasComponent {
   // outer element opens the menu; inline text inputs stop propagation so the
   // native browser menu still works there.
   onContextMenu(event: MouseEvent): void {
+    // Armed Pin placement: right-click cancels arming with no History entry
+    // and no menu (spec #68)
+    if (this.canvasTool.isPinArmed()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.canvasTool.reset();
+      return;
+    }
     // Present Mode and Canvas Lock: the Context Menu is dead —
     // stopPropagation keeps the event from the CdkContextMenuTrigger on the
     // outer element, and preventDefault suppresses the native browser menu
@@ -928,10 +965,10 @@ export class CanvasComponent {
       event.stopPropagation();
       return;
     }
-    const el = event.target as HTMLElement;
+    const el = event.target as HTMLElement | null;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
 
-    const nodeEl = el.closest('[data-node-id]');
+    const nodeEl = el?.closest?.('[data-node-id]');
     if (nodeEl) {
       this.contextMenuService.openFor(
         { kind: 'node', nodeId: nodeEl.getAttribute('data-node-id')! },
@@ -940,7 +977,7 @@ export class CanvasComponent {
       return;
     }
 
-    const connEl = el.closest('[data-connection-id]');
+    const connEl = el?.closest?.('[data-connection-id]');
     if (connEl) {
       this.contextMenuService.openFor(
         { kind: 'connection', connectionId: connEl.getAttribute('data-connection-id')! },
@@ -949,7 +986,7 @@ export class CanvasComponent {
       return;
     }
 
-    const pinEl = el.closest('[data-pin-id]');
+    const pinEl = el?.closest?.('[data-pin-id]');
     if (pinEl) {
       this.contextMenuService.openFor(
         { kind: 'pin', pinId: pinEl.getAttribute('data-pin-id')! },
@@ -976,8 +1013,27 @@ export class CanvasComponent {
 
   // Node drag handling
   onNodeStartMove(event: { nodeId: string; event: MouseEvent }): void {
-    // Space+drag pans even when the press lands on a node (ADR-0016)
-    if (this.spaceHeld()) {
+    // Armed Pin placement from a Node press: anchor to the Node at the click
+    // point, open the ghost popover, revert to Select — never drag.
+    if (this.canvasTool.isPinArmed()) {
+      const node = this.graphService.nodes().find(n => n.id === event.nodeId);
+      if (node) {
+        const pos = this.clientPointToCanvas(event.event.clientX, event.event.clientY);
+        const x = pos?.x ?? node.x;
+        const y = pos?.y ?? node.y;
+        this.contextMenuService.requestCreatePin({
+          kind: 'node',
+          nodeId: node.id,
+          offsetX: x - node.x,
+          offsetY: y - node.y,
+        });
+      }
+      this.canvasTool.reset();
+      return;
+    }
+    // Space+drag pans even when the press lands on a node (ADR-0016); the Pan
+    // tool pans from anywhere including over Nodes (spec #68)
+    if (this.spaceHeld() || this.canvasTool.isPan()) {
       this.startPan(event.event);
       return;
     }
@@ -1113,6 +1169,12 @@ export class CanvasComponent {
   // Handle drag start (connection creation)
   onHandleDragStart(event: { nodeId: string; handle: HandleSide; event: MouseEvent }): void {
     if (this.presentationService.active() || this.canvasLock.locked()) return;
+    // Pan tool is Viewport-only: Handles are dead while it is active; an
+    // armed Pin press on a Handle cancels arming instead of connecting.
+    if (this.canvasTool.isPan() || this.canvasTool.isPinArmed()) {
+      if (this.canvasTool.isPinArmed()) this.canvasTool.reset();
+      return;
+    }
     event.event.stopPropagation();
     this.isDraggingConnection = true;
     this.connectionSourceNodeId = event.nodeId;

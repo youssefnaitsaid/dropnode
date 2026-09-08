@@ -274,18 +274,18 @@ describe('ToolbarComponent Canvas Lock', () => {
     expect(canvasLock.locked()).toBe(false);
   });
 
-  it('disables Tidy up, Undo, and Import while locked', () => {
+  it('disables Tidy up and Import while locked (Undo/Redo live in the floating bar)', () => {
     historyService.execute(new CreateNodeCommand(graphService, 'N', 0, 0));
     fixture.detectChanges();
-    expect(button('Undo').disabled).toBe(false);
+    // Undo/Redo left the top row for the floating Selection Actions Bar.
+    expect(button('Undo')).toBeUndefined();
+    expect(button('Redo')).toBeUndefined();
 
     canvasLock.lock();
     fixture.detectChanges();
 
     expect(button('Tidy up').disabled).toBe(true);
     expect(button('Tidy up').title).toContain('Unlock');
-    expect(button('Undo').disabled).toBe(true);
-    expect(button('Redo').disabled).toBe(true);
     expect(button('Import').disabled).toBe(true);
 
     canvasLock.unlock();
