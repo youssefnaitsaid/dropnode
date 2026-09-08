@@ -91,4 +91,94 @@ describe('CanvasComponent tool modes', () => {
     expect(menus.pinCreateRequest()).toBeNull();
     expect(menus.menuKind()).toBeNull();
   });
+
+  it('places a Node centered on the armed click with its Text editor requested', () => {
+    tool.armNode();
+    component.onCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: 200, clientY: 200 }));
+    expect(graph.nodes().length).toBe(1);
+    const node = graph.nodes()[0];
+    expect(node.x).toBe(120);
+    expect(node.y).toBe(176);
+    expect(node.width).toBe(160);
+    expect(node.height).toBe(48);
+    expect(history.canUndo()).toBe(true);
+    expect(menus.editTextRequest()).toBe(node.id);
+    expect(tool.tool()).toBe('select');
+  });
+
+  it('places a Group centered on the armed click with its Label editor requested', () => {
+    tool.armGroup();
+    component.onCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: 200, clientY: 200 }));
+    expect(graph.nodes().length).toBe(1);
+    const group = graph.nodes()[0];
+    expect(group.kind).toBe('group');
+    expect(group.x).toBe(40);
+    expect(group.y).toBe(100);
+    expect(menus.renameRequest()).toBe(group.id);
+    expect(history.canUndo()).toBe(true);
+    expect(tool.tool()).toBe('select');
+  });
+
+  it('places a Text Block centered on the armed click with its Text editor requested', () => {
+    tool.armTextBlock();
+    component.onCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: 200, clientY: 200 }));
+    expect(graph.nodes().length).toBe(1);
+    const block = graph.nodes()[0];
+    expect(block.kind).toBe('annotation');
+    expect(block.x).toBe(120);
+    expect(block.y).toBe(176);
+    expect(menus.editTextRequest()).toBe(block.id);
+    expect(tool.tool()).toBe('select');
+  });
+
+  it('parents an armed Node into the Group it lands on', () => {
+    const group = graph.createGroup('G', 0, 0);
+    fixture.detectChanges();
+    tool.armNode();
+    component.onNodeStartMove({
+      nodeId: group.id,
+      event: new MouseEvent('mousedown', { button: 0, clientX: 100, clientY: 100 }),
+    });
+    expect(graph.nodes().length).toBe(2);
+    const child = graph.nodes().find(n => n.id !== group.id)!;
+    expect(child.parentId).toBe(group.id);
+    expect(child.x).toBe(20);
+    expect(child.y).toBe(76);
+    expect(tool.tool()).toBe('select');
+  });
+
+  it('never nests an armed Group even when landing on a Group', () => {
+    const group = graph.createGroup('G', 0, 0);
+    fixture.detectChanges();
+    tool.armGroup();
+    component.onNodeStartMove({
+      nodeId: group.id,
+      event: new MouseEvent('mousedown', { button: 0, clientX: 100, clientY: 100 }),
+    });
+    const spawn = graph.nodes().find(n => n.id !== group.id)!;
+    expect(spawn.kind).toBe('group');
+    expect(spawn.parentId).toBeUndefined();
+    expect(tool.tool()).toBe('select');
+  });
+
+  it('cancels an armed Node on right-click without creating anything', () => {
+    tool.armNode();
+    const event = new MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 });
+    component.onContextMenu(event);
+    expect(tool.tool()).toBe('select');
+    expect(graph.nodes().length).toBe(0);
+    expect(history.canUndo()).toBe(false);
+    expect(menus.menuKind()).toBeNull();
+  });
+
+  it('shows a placement cursor while any add is armed', () => {
+    const container = fixture.nativeElement.querySelector('.canvas-container') as HTMLElement;
+    expect(container.classList.contains('armed')).toBe(false);
+    tool.armNode();
+    fixture.detectChanges();
+    expect(container.classList.contains('armed')).toBe(true);
+    tool.reset();
+    fixture.detectChanges();
+    expect(container.classList.contains('armed')).toBe(false);
+  });
 });

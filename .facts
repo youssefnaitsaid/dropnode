@@ -412,10 +412,10 @@
 
 ## floating tools
 
-- the Floating Toolbar is the bottom-center pill holding the Select (default, V) and Pan (H) tool modes with Add Node, Add Group, Add Text Block, and Add Pin; it is hidden in Present Mode and its adds disable while locked or presenting @implemented
+- the Floating Toolbar is the bottom-center pill holding the Select (default, V) and Pan (H) tool modes with armed-placement Add Node, Add Group, Add Text Block, and Add Pin — the next click chooses where the element lands and a placement cursor shows while any add is armed; it is hidden in Present Mode and arming disables while locked or presenting @implemented
 - Pan mode turns left-drag anywhere into Viewport pan: no Marquee, no Node drag, dead Handles; Space/middle-drag, wheel zoom, and touch gestures behave as in Select @implemented
-- Add Node (160x48), Add Group (320x200), and Add Text Block (160x48) create centered in the visible Canvas as one undoable Command reusing the palette path, opening the Text editor (Node, Text Block) or Label editor (Group) @implemented
-- Add Pin arms placement: the next left-click anchors canvas- or Node-positioned then opens the ghost Pin editor committing one Create Pin Command; right-click, Escape, re-click, or tool switch cancels with no History entry; arming is unavailable while presenting, locked, or Pins-hidden @implemented
+- an armed Add click commits centered on the click point as one undoable Command — Node and Text Block 160x48 opening the Text editor, Group 320x200 opening the Label editor; a Node or Text Block landing on a Group joins it while Groups never nest; re-clicking the tool, switching tools, right-click, or Escape cancels with no History entry @implemented
+- Add Pin arms placement: the next left-click anchors canvas- or Node-positioned then opens the ghost Pin editor committing one Create Pin Command under the same cancel rules; arming is unavailable while presenting, locked, or Pins-hidden @implemented
 - the Selection Actions Bar floats above the Floating Toolbar, always mounted, with Undo/Redo (History-gated), Delete (non-empty Selection), Duplicate (needs a Node/Group), and More (needs two node roots), all dead while locked or presenting @implemented
 - the Align Popover grids the six Align plus two Distribute actions above the bar behind More; Distribute disables below three roots; each runs one compound Command with frozen membership and silent no-op when arranged @implemented
 - the top Toolbar no longer carries Undo, Redo, or the Align trigger; Node/Connection styling, Commands, zoom, Tidy up, Present, Lock, and transfer controls stay @implemented

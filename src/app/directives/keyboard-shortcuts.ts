@@ -342,12 +342,12 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Escape: an armed Pin placement cancels first (keeping the Selection —
-    // the user was placing, not dismissing); then Pan yields back to Select
-    // (spec #68, keeping the Selection); then Resize mode exits; otherwise
-    // clear the Selection
+    // Escape: an armed one-shot placement cancels first (keeping the
+    // Selection — the user was placing, not dismissing); then Pan yields
+    // back to Select (spec #68, keeping the Selection); then Resize mode
+    // exits; otherwise clear the Selection
     if (event.key === 'Escape') {
-      if (this.canvasTool.isPinArmed()) {
+      if (this.canvasTool.armed()) {
         event.preventDefault();
         this.canvasTool.reset();
         return;

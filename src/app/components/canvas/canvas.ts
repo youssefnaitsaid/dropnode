@@ -28,6 +28,8 @@ import { ChainHighlightService } from '../../services/chain-highlight.service';
 import { CanvasToolService } from '../../services/canvas-tool.service';
 import {
   CreateNodeCommand,
+  CreateGroupCommand,
+  CreateTextBlockCommand,
   MoveNodeCommand,
   MoveGroupCommand,
   RenameNodeCommand,
@@ -80,7 +82,7 @@ import { Text } from '../../models/text';
         class="canvas-container"
         [class.panning]="isPanning"
         [class.space-pan]="spaceHeld()"
-        [class.pin-armed]="canvasTool.isPinArmed()"
+        [class.armed]="canvasTool.armed()"
         (dblclick)="onCanvasDoubleClick($event)"
         (mousedown)="onCanvasMouseDown($event)"
         (pointerdown)="onCanvasPointerDown($event)"
@@ -401,9 +403,9 @@ import { Text } from '../../models/text';
     .canvas-container.panning {
       cursor: grabbing;
     }
-    /* Armed Pin placement (spec #68): a placement cursor until the anchor
-       click lands or arming is cancelled. */
-    .canvas-container.pin-armed {
+    /* Armed placement (Floating Toolbar one-shots): a placement cursor
+       until the anchor click lands or arming is cancelled. */
+    .canvas-container.armed {
       cursor: crosshair;
     }
     .marquee-rect {
@@ -698,19 +700,19 @@ export class CanvasComponent {
     // A touch pan already owns this press — its compatibility mousedown must
     // never also arm a Marquee or clear selection (touch pans, mouse marquees)
     if (this.touchPanPointerId !== null) return;
-    // Armed Pin placement: left-click drops a ghost-pin anchor (Node presses
+    // Armed one-shot placement (Floating Toolbar adds): left-click commits
+    // the element at the click point as one undoable Command (Node presses
     // are handled in onNodeStartMove, which fires first); any other button
     // cancels arming with no History entry.
-    if (this.canvasTool.isPinArmed()) {
+    if (this.canvasTool.armed()) {
       if (event.button !== 0) {
         this.canvasTool.reset();
         return;
       }
-      const pinTarget = event.target as HTMLElement | null;
-      if (pinTarget?.closest?.('[data-node-id]')) return;
-      const pinPos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
-      this.contextMenuService.requestCreatePin({ kind: 'canvas', x: pinPos.x, y: pinPos.y });
-      this.canvasTool.reset();
+      const placeTarget = event.target as HTMLElement | null;
+      if (placeTarget?.closest?.('[data-node-id]')) return;
+      const placePos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
+      this.placeArmedOnCanvas(placePos.x, placePos.y);
       return;
     }
     // Middle-mouse-drag pans from anywhere; Space turns a left-drag into a
@@ -948,9 +950,9 @@ export class CanvasComponent {
   // outer element opens the menu; inline text inputs stop propagation so the
   // native browser menu still works there.
   onContextMenu(event: MouseEvent): void {
-    // Armed Pin placement: right-click cancels arming with no History entry
-    // and no menu (spec #68)
-    if (this.canvasTool.isPinArmed()) {
+    // Armed placement: right-click cancels arming with no History entry
+    // and no menu
+    if (this.canvasTool.armed()) {
       event.preventDefault();
       event.stopPropagation();
       this.canvasTool.reset();
@@ -1011,22 +1013,61 @@ export class CanvasComponent {
     this.graphService.zoomBy(delta, centerX, centerY);
   }
 
+  /**
+   * Commit an armed Floating Toolbar placement at a Canvas point: one
+   * undoable Command centered on the point plus its Text/Label editor
+   * request (Pin opens the ghost popover instead), then revert to Select.
+   * Node/Text Block take an optional Group parent; Groups never nest.
+   */
+  private placeArmedOnCanvas(x: number, y: number, parentId?: string): void {
+    const tool = this.canvasTool.tool();
+    if (tool === 'pin') {
+      this.contextMenuService.requestCreatePin({ kind: 'canvas', x, y });
+    } else if (tool === 'node') {
+      const command = new CreateNodeCommand(this.graphService, 'New Node', x - 80, y - 24, parentId);
+      this.historyService.execute(command);
+      const node = command.getNode();
+      if (node) this.contextMenuService.requestEditText(node.id);
+    } else if (tool === 'group') {
+      const command = new CreateGroupCommand(this.graphService, 'New Group', x - 160, y - 100);
+      this.historyService.execute(command);
+      const group = command.getGroup();
+      if (group) this.contextMenuService.requestRename(group.id);
+    } else if (tool === 'text-block') {
+      const command = new CreateTextBlockCommand(this.graphService, 'New Text Block', x - 80, y - 24, parentId);
+      this.historyService.execute(command);
+      const block = command.getNode();
+      if (block) this.contextMenuService.requestEditText(block.id);
+    }
+    this.canvasTool.reset();
+  }
+
   // Node drag handling
   onNodeStartMove(event: { nodeId: string; event: MouseEvent }): void {
-    // Armed Pin placement from a Node press: anchor to the Node at the click
-    // point, open the ghost popover, revert to Select — never drag.
-    if (this.canvasTool.isPinArmed()) {
-      const node = this.graphService.nodes().find(n => n.id === event.nodeId);
-      if (node) {
+    // Armed one-shot placement from a Node press: resolve the anchor against
+    // the pressed Node, commit, revert to Select — never drag.
+    if (this.canvasTool.armed()) {
+      const target = this.graphService.nodes().find(n => n.id === event.nodeId);
+      if (target) {
         const pos = this.clientPointToCanvas(event.event.clientX, event.event.clientY);
-        const x = pos?.x ?? node.x;
-        const y = pos?.y ?? node.y;
-        this.contextMenuService.requestCreatePin({
-          kind: 'node',
-          nodeId: node.id,
-          offsetX: x - node.x,
-          offsetY: y - node.y,
-        });
+        const x = pos?.x ?? target.x;
+        const y = pos?.y ?? target.y;
+        if (this.canvasTool.isPinArmed()) {
+          this.contextMenuService.requestCreatePin({
+            kind: 'node',
+            nodeId: target.id,
+            offsetX: x - target.x,
+            offsetY: y - target.y,
+          });
+        } else {
+          // A Node/Text Block landing on a Group joins it (topmost wins is
+          // the caller's; here the pressed card is the claimant); Groups
+          // never nest, so an armed Group always lands unparented.
+          const parentId =
+            this.canvasTool.isGroupArmed() || target.kind !== 'group' ? undefined : target.id;
+          this.placeArmedOnCanvas(x, y, parentId);
+          return;
+        }
       }
       this.canvasTool.reset();
       return;
@@ -1169,10 +1210,10 @@ export class CanvasComponent {
   // Handle drag start (connection creation)
   onHandleDragStart(event: { nodeId: string; handle: HandleSide; event: MouseEvent }): void {
     if (this.presentationService.active() || this.canvasLock.locked()) return;
-    // Pan tool is Viewport-only: Handles are dead while it is active; an
-    // armed Pin press on a Handle cancels arming instead of connecting.
-    if (this.canvasTool.isPan() || this.canvasTool.isPinArmed()) {
-      if (this.canvasTool.isPinArmed()) this.canvasTool.reset();
+    // Pan tool is Viewport-only: Handles are dead while it is active; a press
+    // on a Handle while any placement is armed cancels arming instead.
+    if (this.canvasTool.isPan() || this.canvasTool.armed()) {
+      if (this.canvasTool.armed()) this.canvasTool.reset();
       return;
     }
     event.event.stopPropagation();

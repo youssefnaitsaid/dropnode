@@ -43,4 +43,31 @@ describe('CanvasToolService', () => {
     tool.reset();
     expect(tool.tool()).toBe('select');
   });
+
+  it('arms Node, Group, and Text Block placement as one-shot tools', () => {
+    tool.armNode();
+    expect(tool.tool()).toBe('node');
+    expect(tool.isNodeArmed()).toBe(true);
+    expect(tool.armed()).toBe(true);
+    tool.armGroup();
+    expect(tool.tool()).toBe('group');
+    expect(tool.isGroupArmed()).toBe(true);
+    tool.armTextBlock();
+    expect(tool.tool()).toBe('text-block');
+    expect(tool.isTextBlockArmed()).toBe(true);
+    expect(tool.isSelect()).toBe(false);
+    expect(tool.isPan()).toBe(false);
+  });
+
+  it('reports armed for any one-shot tool but never for Select or Pan', () => {
+    expect(tool.armed()).toBe(false);
+    tool.pan();
+    expect(tool.armed()).toBe(false);
+    tool.armPin();
+    expect(tool.armed()).toBe(true);
+    tool.armNode();
+    expect(tool.armed()).toBe(true);
+    tool.select();
+    expect(tool.armed()).toBe(false);
+  });
 });

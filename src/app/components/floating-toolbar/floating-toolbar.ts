@@ -8,25 +8,19 @@ import {
   lucideMessageCircle,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
-import { GraphService } from '../../services/graph.service';
-import { HistoryService } from '../../services/history.service';
-import { ContextMenuService } from '../../services/context-menu.service';
-import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import { CanvasToolService } from '../../services/canvas-tool.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
 import { PresentationService } from '../../services/presentation.service';
 import { PinVisibilityService } from '../../services/pin-visibility.service';
-import {
-  CreateNodeCommand,
-  CreateGroupCommand,
-  CreateTextBlockCommand,
-} from '../../services/commands';
 
 /**
- * The Floating Toolbar: persistent Select/Pan modes plus immediate Add
- * Node/Group/Text Block and armed Add Pin. Bottom pill of the floating
- * stack; the parent hides it in Present Mode. Adds are disabled while the
- * Canvas is locked or presenting; Pin additionally while Pins are hidden.
+ * The Floating Toolbar: persistent Select/Pan modes plus one-shot armed
+ * placements for Node, Group, Text Block, and Pin. Bottom pill of the
+ * floating stack; the parent hides it in Present Mode. Arming is disabled
+ * while the Canvas is locked or presenting; Pin additionally while Pins are
+ * hidden. The placement click on the Canvas commits one undoable Command
+ * and reverts to Select; re-clicking the tool, switching tools,
+ * right-clicking, or Escape cancels with no History entry.
  */
 @Component({
   selector: 'app-floating-toolbar',
@@ -65,24 +59,30 @@ import {
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button
         hlmBtn variant="ghost" size="icon"
-        (click)="addNode()"
+        (click)="toggleNode()"
         [disabled]="addDisabled()"
+        [class.tool-active]="tool.isNodeArmed()"
+        [attr.aria-pressed]="tool.isNodeArmed()"
         title="Add Node" aria-label="Add Node"
       >
         <ng-icon name="lucideSquarePlus" />
       </button>
       <button
         hlmBtn variant="ghost" size="icon"
-        (click)="addGroup()"
+        (click)="toggleGroup()"
         [disabled]="addDisabled()"
+        [class.tool-active]="tool.isGroupArmed()"
+        [attr.aria-pressed]="tool.isGroupArmed()"
         title="Add Group" aria-label="Add Group"
       >
         <ng-icon name="lucideGroup" />
       </button>
       <button
         hlmBtn variant="ghost" size="icon"
-        (click)="addTextBlock()"
+        (click)="toggleTextBlock()"
         [disabled]="addDisabled()"
+        [class.tool-active]="tool.isTextBlockArmed()"
+        [attr.aria-pressed]="tool.isTextBlockArmed()"
         title="Add Text Block" aria-label="Add Text Block"
       >
         <ng-icon name="lucideSquarePlus" />
@@ -131,15 +131,11 @@ import {
 })
 export class FloatingToolbarComponent {
   readonly tool = inject(CanvasToolService);
-  private readonly graphService = inject(GraphService);
-  private readonly historyService = inject(HistoryService);
-  private readonly menus = inject(ContextMenuService);
-  private readonly viewport = inject(CanvasViewportService);
   private readonly lock = inject(CanvasLockService);
   private readonly presenting = inject(PresentationService);
   private readonly pins = inject(PinVisibilityService);
 
-  /** Adds are Viewport-centered Commands: dead while locked or presenting. */
+  /** Arming is dead while locked or presenting (the parent hides the stack). */
   readonly addDisabled = computed(() => this.lock.locked() || this.presenting.active());
   /** Pin arming additionally needs Pins visible. */
   readonly pinDisabled = computed(
@@ -154,39 +150,27 @@ export class FloatingToolbarComponent {
     this.tool.pan();
   }
 
+  toggleNode(): void {
+    if (this.addDisabled()) return;
+    if (this.tool.isNodeArmed()) this.tool.select();
+    else this.tool.armNode();
+  }
+
+  toggleGroup(): void {
+    if (this.addDisabled()) return;
+    if (this.tool.isGroupArmed()) this.tool.select();
+    else this.tool.armGroup();
+  }
+
+  toggleTextBlock(): void {
+    if (this.addDisabled()) return;
+    if (this.tool.isTextBlockArmed()) this.tool.select();
+    else this.tool.armTextBlock();
+  }
+
   togglePin(): void {
     if (this.pinDisabled()) return;
     if (this.tool.isPinArmed()) this.tool.select();
     else this.tool.armPin();
-  }
-
-  /** Palette-path verbatim: centered 160x48 Node plus its Text editor request. */
-  addNode(): void {
-    if (this.addDisabled()) return;
-    const center = this.viewport.visibleCanvasCenter();
-    const command = new CreateNodeCommand(this.graphService, 'New Node', center.x - 80, center.y - 24);
-    this.historyService.execute(command);
-    const node = command.getNode();
-    if (node) this.menus.requestEditText(node.id);
-  }
-
-  /** Palette-path verbatim: centered 320x200 Group plus its Label editor request. */
-  addGroup(): void {
-    if (this.addDisabled()) return;
-    const center = this.viewport.visibleCanvasCenter();
-    const command = new CreateGroupCommand(this.graphService, 'New Group', center.x - 160, center.y - 100);
-    this.historyService.execute(command);
-    const group = command.getGroup();
-    if (group) this.menus.requestRename(group.id);
-  }
-
-  /** Palette-path verbatim: centered 160x48 Text Block plus its Text editor request. */
-  addTextBlock(): void {
-    if (this.addDisabled()) return;
-    const center = this.viewport.visibleCanvasCenter();
-    const command = new CreateTextBlockCommand(this.graphService, 'New Text Block', center.x - 80, center.y - 24);
-    this.historyService.execute(command);
-    const block = command.getNode();
-    if (block) this.menus.requestEditText(block.id);
   }
 }

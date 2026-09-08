@@ -59,14 +59,21 @@ describe('KeyboardShortcuts tool keys', () => {
     expect(graph.selectedNodeId()).toBe(node.id);
   });
 
-  it('reverts Pan to Select on Escape without clearing the Selection', () => {
-    const graph = TestBed.inject(GraphService);
+  it('reverts Pan to Select on Escape without clearing the Selection', () => {    const graph = TestBed.inject(GraphService);
     const node = graph.createNode('N', 0, 0);
     graph.selectNode(node.id);
     tool.pan();
     key('Escape');
     expect(tool.tool()).toBe('select');
     expect(graph.selectedNodeId()).toBe(node.id);
+  });
+
+  it('cancels an armed Node on Escape without touching Graph State', () => {
+    const graph = TestBed.inject(GraphService);
+    tool.armNode();
+    key('Escape');
+    expect(tool.tool()).toBe('select');
+    expect(graph.nodes().length).toBe(0);
   });
 
   it('ignores V and H while typing', () => {
