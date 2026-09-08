@@ -166,23 +166,27 @@ export class SelectionActionsBarComponent {
   undo(): void {
     if (this.undoDisabled()) return;
     this.history.undo();
+    this.graph.clearSelection();
   }
 
   redo(): void {
     if (this.redoDisabled()) return;
     this.history.redo();
+    this.graph.clearSelection();
   }
 
   remove(): void {
     if (this.deleteDisabled()) return;
     this.popoverOpen.set(false);
     this.menus.deleteSelection();
+    this.graph.clearSelection();
   }
 
   duplicate(): void {
     if (this.duplicateDisabled()) return;
     this.popoverOpen.set(false);
     this.clipboard.duplicate(this.graph.selectedNodeIds());
+    this.graph.clearSelection();
   }
 
   toggleMore(): void {

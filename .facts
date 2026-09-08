@@ -419,6 +419,7 @@
 - the Selection Actions Bar floats above the Floating Toolbar, always mounted, with Undo/Redo (History-gated), Delete (non-empty Selection), Duplicate (needs a Node/Group), and More (needs two node roots), all dead while locked or presenting @implemented
 - the Align Popover grids the six Align plus two Distribute actions above the bar behind More; Distribute disables below three roots; each runs one compound Command with frozen membership and silent no-op when arranged @implemented
 - the top Toolbar no longer carries Undo, Redo, or the Align trigger; Node/Connection styling, Commands, zoom, Tidy up, Present, Lock, and transfer controls stay @implemented
+- pressing any Floating Toolbar tool button clears the Selection immediately; Undo, Redo, Delete, Duplicate, Align, and Distribute act on the prior Selection and clear it afterwards, while More only opens the Align Popover so the Selection stays until an arrangement runs @implemented
 
 ## architecture
 

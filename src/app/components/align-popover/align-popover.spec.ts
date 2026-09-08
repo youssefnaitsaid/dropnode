@@ -69,8 +69,7 @@ describe('AlignPopoverComponent', () => {
     expect(graph.nodes().find(n => n.id === b.id)!.x).toBe(300);
   });
 
-  it('distributes horizontally with the outer roots anchored', () => {
-    const a = graph.createNode('A', 0, 0);
+  it('distributes horizontally with the outer roots anchored', () => {    const a = graph.createNode('A', 0, 0);
     const b = graph.createNode('B', 200, 0);
     const c = graph.createNode('C', 600, 0);
     graph.setSelection([a.id, b.id, c.id], []);
@@ -82,5 +81,16 @@ describe('AlignPopoverComponent', () => {
     // A [0,160], B [200,360], C [600,760]: span 760, widths 480, two gaps of
     // 140 — B lands at 160+140 = 300 with C anchored.
     expect(middle.x).toBe(300);
+  });
+
+  it('clears the Selection after running an arrangement', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 50);
+    graph.setSelection([a.id, b.id], []);
+    fixture.detectChanges();
+
+    button('Align Left').click();
+    expect(graph.nodes().find(n => n.id === b.id)!.x).toBe(0);
+    expect(graph.selectedNodeIds()).toEqual([]);
   });
 });

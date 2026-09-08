@@ -113,4 +113,16 @@ describe('FloatingToolbarComponent', () => {
       expect(button(label).disabled).toBe(true);
     }
   });
+
+  it('clears the Selection when any tool button is clicked', () => {
+    const node = graph.createNode('N', 0, 0);
+    for (const label of ['Select', 'Pan', 'Add Node', 'Add Group', 'Add Text Block', 'Add Pin']) {
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      button(label).click();
+      fixture.detectChanges();
+      expect(graph.selectedNodeIds()).toEqual([]);
+    }
+    tool.select();
+  });
 });

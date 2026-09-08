@@ -85,6 +85,36 @@ describe('SelectionActionsBarComponent', () => {
     expect(button('Duplicate').disabled).toBe(true);
   });
 
+  it('clears the Selection after Undo, Delete, and Duplicate', () => {
+    const node = graph.createNode('N', 0, 0);
+    graph.selectNode(node.id);
+    fixture.detectChanges();
+
+    button('Duplicate').click();
+    expect(graph.nodes().length).toBe(2);
+    expect(graph.selectedNodeIds()).toEqual([]);
+
+    graph.selectNode(node.id);
+    fixture.detectChanges();
+    button('Delete').click();
+    expect(graph.selectedNodeIds()).toEqual([]);
+
+    fixture.detectChanges();
+    button('Undo').click();
+    expect(graph.selectedNodeIds()).toEqual([]);
+  });
+
+  it('keeps the Selection while More opens the popover', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 0);
+    graph.setSelection([a.id, b.id], []);
+    fixture.detectChanges();
+    button('More options').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-align-popover')).not.toBeNull();
+    expect(graph.selectedNodeIds()).toEqual([a.id, b.id]);
+  });
+
   it('opens the Align popover from More with two node roots and closes on second click', () => {
     const a = graph.createNode('A', 0, 0);
     const b = graph.createNode('B', 300, 0);

@@ -9,6 +9,7 @@ import {
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { CanvasToolService } from '../../services/canvas-tool.service';
+import { GraphService } from '../../services/graph.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
 import { PresentationService } from '../../services/presentation.service';
 import { PinVisibilityService } from '../../services/pin-visibility.service';
@@ -131,6 +132,7 @@ import { PinVisibilityService } from '../../services/pin-visibility.service';
 })
 export class FloatingToolbarComponent {
   readonly tool = inject(CanvasToolService);
+  private readonly graphService = inject(GraphService);
   private readonly lock = inject(CanvasLockService);
   private readonly presenting = inject(PresentationService);
   private readonly pins = inject(PinVisibilityService);
@@ -143,33 +145,39 @@ export class FloatingToolbarComponent {
   );
 
   select(): void {
+    this.graphService.clearSelection();
     this.tool.select();
   }
 
   pan(): void {
+    this.graphService.clearSelection();
     this.tool.pan();
   }
 
   toggleNode(): void {
     if (this.addDisabled()) return;
+    this.graphService.clearSelection();
     if (this.tool.isNodeArmed()) this.tool.select();
     else this.tool.armNode();
   }
 
   toggleGroup(): void {
     if (this.addDisabled()) return;
+    this.graphService.clearSelection();
     if (this.tool.isGroupArmed()) this.tool.select();
     else this.tool.armGroup();
   }
 
   toggleTextBlock(): void {
     if (this.addDisabled()) return;
+    this.graphService.clearSelection();
     if (this.tool.isTextBlockArmed()) this.tool.select();
     else this.tool.armTextBlock();
   }
 
   togglePin(): void {
     if (this.pinDisabled()) return;
+    this.graphService.clearSelection();
     if (this.tool.isPinArmed()) this.tool.select();
     else this.tool.armPin();
   }

@@ -105,10 +105,12 @@ export class AlignPopoverComponent {
 
   align(kind: AlignKind): void {
     this.menus.alignSelection(kind);
+    this.graphService.clearSelection();
   }
 
   distribute(axis: DistributeAxis): void {
     if (this.distributeDisabled()) return;
     this.menus.distributeSelection(axis);
+    this.graphService.clearSelection();
   }
 }
