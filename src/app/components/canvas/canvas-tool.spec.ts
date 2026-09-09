@@ -181,4 +181,32 @@ describe('CanvasComponent tool modes', () => {
     fixture.detectChanges();
     expect(container.classList.contains('armed')).toBe(false);
   });
+
+  it('creates no Node from empty double-click in Pan mode', () => {
+    tool.pan();
+    component.onCanvasDoubleClick(new MouseEvent('dblclick', { bubbles: true, clientX: 200, clientY: 150 }));
+    expect(graph.nodes().length).toBe(0);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('suppresses the Context Menu entirely in Pan mode', () => {
+    tool.pan();
+    const event = new MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 });
+    component.onContextMenu(event);
+    expect(menus.menuKind()).toBeNull();
+    expect(tool.tool()).toBe('pan');
+  });
+
+  it('adds and removes no Reroute Point in Pan mode', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 320, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.setConnectionReroutePoints(conn.id, [{ x: 160, y: 100 }]);
+    tool.pan();
+    component.onReroutePointAdd({ connectionId: conn.id, clientX: 240, clientY: 80 });
+    expect(graph.connections()[0].reroutePoints).toEqual([{ x: 160, y: 100 }]);
+    component.onReroutePointRemove({ connectionId: conn.id, pointIndex: 0 });
+    expect(graph.connections()[0].reroutePoints).toEqual([{ x: 160, y: 100 }]);
+    expect(history.canUndo()).toBe(false);
+  });
 });

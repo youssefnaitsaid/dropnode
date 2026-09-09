@@ -684,7 +684,7 @@ export class CanvasComponent {
   }
 
   onCanvasDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     if ((event.target as HTMLElement).closest('app-node, [data-pin-id]')) return;
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -958,11 +958,11 @@ export class CanvasComponent {
       this.canvasTool.reset();
       return;
     }
-    // Present Mode and Canvas Lock: the Context Menu is dead —
+    // Present Mode, Canvas Lock, and Pan mode: the Context Menu is dead —
     // stopPropagation keeps the event from the CdkContextMenuTrigger on the
     // outer element, and preventDefault suppresses the native browser menu
-    // as usual
-    if (this.presentationService.active() || this.canvasLock.locked()) {
+    // as usual. Pan mode is drag-only.
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -1246,7 +1246,7 @@ export class CanvasComponent {
   }
 
   onReroutePointAdd(event: { connectionId: string; clientX: number; clientY: number }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY);
     const layer = this.connectionLayer();
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
@@ -1286,7 +1286,7 @@ export class CanvasComponent {
   }
 
   onReroutePointRemove(event: { connectionId: string; pointIndex: number }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn?.reroutePoints?.[event.pointIndex]) return;
     this.historyService.execute(new RemoveConnectionReroutePointCommand(

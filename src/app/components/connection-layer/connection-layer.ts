@@ -9,6 +9,7 @@ import { HistoryService } from '../../services/history.service';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { MoveConnectionReroutePointCommand } from '../../services/commands';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
@@ -357,6 +358,7 @@ export class ConnectionLayerComponent {
   private jumpsService = inject(ConnectionJumpsService);
   protected presentationService = inject(PresentationService);
   protected canvasLock = inject(CanvasLockService);
+  private canvasTool = inject(CanvasToolService);
   private keyboardConnection = inject(KeyboardConnectionService);
   protected chainHighlightService = inject(ChainHighlightService);
 
@@ -721,8 +723,9 @@ export class ConnectionLayerComponent {
 
   onTextCardDoubleClick(conn: Connection, event: MouseEvent): void {
     // Present Mode never reaches here (text cards are pointer-dead); Canvas
-    // Lock keeps them hoverable, so the editor open needs its own guard
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    // Lock keeps them hoverable, so the editor open needs its own guard.
+    // Pan mode is drag-only: no editing.
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     event.stopPropagation();
     this.editingConnectionId.set(conn.id);
   }

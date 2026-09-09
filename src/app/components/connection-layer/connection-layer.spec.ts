@@ -4,6 +4,7 @@ import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import { ConnectionJumpsService } from '../../services/connection-jumps.service';
 import { KeyboardConnectionService } from '../../services/keyboard-connection.service';
 import { textFromString } from '../../models/text';
@@ -337,6 +338,13 @@ describe('ConnectionLayerComponent Canvas Lock', () => {
   it('does not open the Text editor from a card double-click while locked', () => {
     const connection = makeConnection();
     canvasLock.lock();
+    component.onTextCardDoubleClick(connection, new MouseEvent('dblclick'));
+    expect(component.editingConnectionId()).toBeNull();
+  });
+
+  it('does not open the Text editor from a card double-click in Pan mode', () => {
+    const connection = makeConnection();
+    TestBed.inject(CanvasToolService).pan();
     component.onTextCardDoubleClick(connection, new MouseEvent('dblclick'));
     expect(component.editingConnectionId()).toBeNull();
   });
