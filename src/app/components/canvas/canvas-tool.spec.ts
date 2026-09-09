@@ -209,4 +209,29 @@ describe('CanvasComponent tool modes', () => {
     expect(graph.connections()[0].reroutePoints).toEqual([{ x: 160, y: 100 }]);
     expect(history.canUndo()).toBe(false);
   });
+
+  it('selects no Connection on click in Pan mode, plain or additive', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 320, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    tool.pan();
+    component.onConnectionSelect({ connectionId: conn.id, additive: false });
+    expect(graph.selectedConnectionIds()).toEqual([]);
+    component.onConnectionSelect({ connectionId: conn.id, additive: true });
+    expect(graph.selectedConnectionIds()).toEqual([]);
+  });
+
+  it('arms no Connection text, Reroute, or resize drag in Pan mode', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 320, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.setConnectionReroutePoints(conn.id, [{ x: 160, y: 100 }]);
+    tool.pan();
+    component.onConnectionTextDragStart({ connectionId: conn.id, event: new MouseEvent('mousedown', { button: 0 }) });
+    expect(component['isDraggingConnectionText']).toBe(false);
+    component.onReroutePointDragStart({ connectionId: conn.id, pointIndex: 0, event: new MouseEvent('mousedown', { button: 0 }) });
+    expect(component['isDraggingReroutePoint']).toBe(false);
+    component.onNodeStartResize({ nodeId: a.id, corner: 'se', minWidth: 120, minHeight: 48, event: new MouseEvent('mousedown', { button: 0 }) });
+    expect(component['isResizingNode']).toBe(false);
+  });
 });

@@ -1189,7 +1189,7 @@ export class CanvasComponent {
   onNodeStartResize(event: {
     nodeId: string; corner: GripCorner; minWidth: number; minHeight: number; event: MouseEvent;
   }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     const node = this.graphService.nodes().find(n => n.id === event.nodeId);
     if (!node) return;
     this.isResizingNode = true;
@@ -1233,7 +1233,7 @@ export class CanvasComponent {
 
   // Text card drag start — armed on mousedown; becomes a drag past 2px
   onConnectionTextDragStart(event: { connectionId: string; event: MouseEvent }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn) return;
     this.isDraggingConnectionText = true;
@@ -1270,7 +1270,7 @@ export class CanvasComponent {
   }
 
   onReroutePointDragStart(event: { connectionId: string; pointIndex: number; event: MouseEvent }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     const conn = this.graphService.connections().find(c => c.id === event.connectionId);
     if (!conn?.reroutePoints || !conn.reroutePoints[event.pointIndex]) return;
 
@@ -1771,7 +1771,7 @@ export class CanvasComponent {
   // Plain click on a Connection collapses the Selection to it; Ctrl+click
   // toggles its membership (the layer already filtered to left-button)
   onConnectionSelect(event: { connectionId: string; additive: boolean }): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     if (event.additive) {
       this.graphService.toggleConnectionSelection(event.connectionId);
     } else {
