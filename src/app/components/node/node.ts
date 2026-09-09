@@ -18,6 +18,7 @@ import { TextEditorComponent } from '../text-editor/text-editor';
 import { ContextMenuService } from '../../services/context-menu.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import { ResizeModeService } from '../../services/resize-mode.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
 
@@ -408,6 +409,7 @@ export class NodeComponent implements AfterViewInit {
   private contextMenuService = inject(ContextMenuService);
   protected presentationService = inject(PresentationService);
   protected canvasLock = inject(CanvasLockService);
+  private canvasTool = inject(CanvasToolService);
   private resizeMode = inject(ResizeModeService);
   protected chainHighlightService = inject(ChainHighlightService);
   private viewReady = false;
@@ -594,7 +596,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     event.stopPropagation();
     if (this.isEditing()) return;
     if (this.isGroup()) {
@@ -610,7 +612,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onLabelStripDoubleClick(event: MouseEvent): void {
-    if (this.presentationService.active() || this.canvasLock.locked()) return;
+    if (this.presentationService.active() || this.canvasLock.locked() || this.canvasTool.isPan()) return;
     event.stopPropagation();
     this.isEditing.set(true);
   }

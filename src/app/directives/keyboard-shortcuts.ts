@@ -11,6 +11,7 @@ import { KeyboardScopeService } from '../services/keyboard-scope.service';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { KeyboardConnectionService } from '../services/keyboard-connection.service';
 import { ResizeModeService } from '../services/resize-mode.service';
+import { CanvasToolService } from '../services/canvas-tool.service';
 import {
   DeleteConnectionCommand, DeleteNodeCompoundCommand, RemoveConnectionReroutePointCommand,
   buildDeleteSelectionCommand,
@@ -33,6 +34,7 @@ export class KeyboardShortcuts {
   private canvasViewport = inject(CanvasViewportService);
   private keyboardConnection = inject(KeyboardConnectionService);
   private resizeMode = inject(ResizeModeService);
+  private canvasTool = inject(CanvasToolService);
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
@@ -76,6 +78,23 @@ export class KeyboardShortcuts {
         this.presentationService.exit();
       }
       return;
+    }
+
+    // V/H: Floating Toolbar tool modes (spec #68). Plain keys only — never
+    // while typing or in a shell context (guarded above), and never with
+    // modifiers (Ctrl+V stays paste). Before the Lock gate: Pan is
+    // Viewport-live while locked, and mode switches are harmless UI state.
+    // Dead in Present Mode via the tour gate above.
+    if (!event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
+      const toolKey = event.key.toLowerCase();
+      if (toolKey === 'v') {
+        this.canvasTool.select();
+        return;
+      }
+      if (toolKey === 'h') {
+        this.canvasTool.pan();
+        return;
+      }
     }
 
     // Canvas Lock is the Viewport-only keyboard context beside Present
@@ -323,9 +342,21 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Escape: Resize mode is modal, so it exits first (keeping the Selection
-    // — the user was resizing, not dismissing); otherwise clear the Selection
+    // Escape: an armed one-shot placement cancels first (keeping the
+    // Selection — the user was placing, not dismissing); then Pan yields
+    // back to Select (spec #68, keeping the Selection); then Resize mode
+    // exits; otherwise clear the Selection
     if (event.key === 'Escape') {
+      if (this.canvasTool.armed()) {
+        event.preventDefault();
+        this.canvasTool.reset();
+        return;
+      }
+      if (this.canvasTool.isPan()) {
+        event.preventDefault();
+        this.canvasTool.select();
+        return;
+      }
       if (this.resizeMode.mode()) {
         event.preventDefault();
         this.resizeMode.exit();

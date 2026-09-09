@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HandleSide } from '../models/node';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
+import { CanvasToolService } from './canvas-tool.service';
 import { ToastService } from '../components/toast/toast';
 import { CreateConnectionCommand } from './commands';
 
@@ -17,6 +18,7 @@ import { CreateConnectionCommand } from './commands';
 export class KeyboardConnectionService {
   private readonly graphService = inject(GraphService);
   private readonly historyService = inject(HistoryService);
+  private readonly canvasTool = inject(CanvasToolService);
   private readonly toastService = inject(ToastService);
 
   /** The armed source Handle, or null when no Connection is being composed. */
@@ -51,8 +53,9 @@ export class KeyboardConnectionService {
     handles[next].focus();
   }
 
-  /** `[`/`]`: cycle the focusable Connection hit paths; Shift extends Selection. */
+  /** `[`/`]`: cycle the focusable Connection hit paths; Shift extends Selection. Dead in Pan mode (drag-only). */
   cycleConnections(direction: 1 | -1, extend: boolean): void {
+    if (this.canvasTool.isPan()) return;
     const hits = Array.from(document.querySelectorAll<SVGPathElement>('path.connection-hit'));
     if (hits.length === 0) return;
     const active = document.activeElement;

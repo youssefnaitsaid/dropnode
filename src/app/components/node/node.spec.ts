@@ -4,6 +4,7 @@ import { textFromString } from '../../models/text';
 import { NodeComponent } from './node';
 import { ResizeModeService } from '../../services/resize-mode.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
+import { CanvasToolService } from '../../services/canvas-tool.service';
 import { shapeMinimumSize } from '../../models/node-shape';
 
 describe('NodeComponent shapes', () => {
@@ -341,6 +342,13 @@ describe('NodeComponent Canvas Lock', () => {
   it('does not start editing from double-click while locked', () => {
     render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
     canvasLock.lock();
+    cardEl().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(component.isEditing()).toBe(false);
+  });
+
+  it('does not start editing from double-click in Pan mode', () => {
+    render({ id: 'n1', text: textFromString('X'), x: 0, y: 0, width: 160, height: 48 });
+    TestBed.inject(CanvasToolService).pan();
     cardEl().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     expect(component.isEditing()).toBe(false);
   });

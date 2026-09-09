@@ -2,8 +2,6 @@ import { Component, inject, ChangeDetectionStrategy, input, computed } from '@an
 import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  lucideUndo2,
-  lucideRedo2,
   lucideCommand,
   lucideZoomIn,
   lucideZoomOut,
@@ -18,14 +16,6 @@ import {
   lucideMinus,
   lucideArrowRight,
   lucidePlay,
-  lucideAlignStartVertical,
-  lucideAlignCenterVertical,
-  lucideAlignEndVertical,
-  lucideAlignStartHorizontal,
-  lucideAlignCenterHorizontal,
-  lucideAlignEndHorizontal,
-  lucideAlignHorizontalSpaceBetween,
-  lucideAlignVerticalSpaceBetween,
   lucideNetwork,
   lucidePresentation,
   lucideLock,
@@ -60,11 +50,8 @@ import {
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
   buildSetConnectionsRouteStyleCommand,
-  buildAlignSelectionCommand,
-  buildDistributeSelectionCommand,
   buildTidyUpCommand,
 } from '../../services/commands';
-import { AlignKind, DistributeAxis } from '../../models/align-distribute';
 import { NODE_PALETTE, NODE_PALETTE_NAMES } from '../../models/node';
 import { NODE_EMOJIS } from '../../models/node-emoji';
 import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
@@ -77,8 +64,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
   imports: [NgIcon, HlmButton, HlmSeparator, HlmDropdownMenu, HlmDropdownMenuTrigger, HlmDropdownMenuItem, HlmDropdownMenuLabel, HlmDropdownMenuSeparator],
   providers: [
     provideIcons({
-      lucideUndo2,
-      lucideRedo2,
       lucideCommand,
       lucideZoomIn,
       lucideZoomOut,
@@ -93,14 +78,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideMinus,
       lucideArrowRight,
       lucidePlay,
-      lucideAlignStartVertical,
-      lucideAlignCenterVertical,
-      lucideAlignEndVertical,
-      lucideAlignStartHorizontal,
-      lucideAlignCenterHorizontal,
-      lucideAlignEndHorizontal,
-      lucideAlignHorizontalSpaceBetween,
-      lucideAlignVerticalSpaceBetween,
       lucideNetwork,
       lucidePresentation,
       lucideLock,
@@ -118,12 +95,10 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       </div>
 
       <div class="flex min-w-0 shrink-0 items-center gap-1">
-        <button hlmBtn variant="ghost" size="icon" (click)="undo()" [disabled]="!historyService.canUndo() || canvasLock.locked()" title="Undo (Ctrl+Z)" aria-label="Undo">
-          <ng-icon name="lucideUndo2" />
-        </button>
-        <button hlmBtn variant="ghost" size="icon" (click)="redo()" [disabled]="!historyService.canRedo() || canvasLock.locked()" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
-          <ng-icon name="lucideRedo2" />
-        </button>
+        <!-- Undo/Redo live in the floating Selection Actions Bar and Align in
+             the floating Align Popover (spec #68, deliberately moved out of
+             the ADR-0028 top-row triggers); the top row keeps Commands,
+             styling triggers, and view controls. -->
         <button
           hlmBtn
           variant="outline"
@@ -172,21 +147,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
             </svg>
           </button>
         }
-        @if (graphService.selectedNodes().length >= 2) {
-          <!-- Arrange: Align and Distribute are actions, not a value, so the
-               trigger is a fixed glyph with no preview (ADR-0028). -->
-          <hlm-separator orientation="vertical" class="mx-1" />
-          <button
-            hlmBtn
-            variant="ghost"
-            size="icon"
-            [hlmDropdownMenuTrigger]="alignMenu"
-            title="Align and distribute"
-            aria-label="Align and distribute"
-          >
-            <ng-icon name="lucideAlignStartVertical" />
-          </button>
-        }
+        <!-- Align lives in the floating Align Popover behind More (spec #68). -->
         @if (graphService.selectedConnections().length > 0) {
           <!-- Connection styling: one trigger previewing the shared color,
                pattern, and weight; the details live in the dropdown so a
@@ -303,30 +264,6 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               </button>
             }
           </div>
-        </div>
-      </ng-template>
-
-      <ng-template #alignMenu>
-        <div hlmDropdownMenu class="w-56">
-          <div hlmDropdownMenuLabel>Align</div>
-          @for (option of alignOptions; track option.kind) {
-            <button hlmDropdownMenuItem (triggered)="align(option.kind)">
-              <ng-icon [name]="option.icon" />
-              <span>{{ option.label }}</span>
-            </button>
-          }
-          <hlm-dropdown-menu-separator />
-          <div hlmDropdownMenuLabel>Distribute</div>
-          @for (option of distributeOptions; track option.axis) {
-            <button
-              hlmDropdownMenuItem
-              [disabled]="graphService.selectedNodes().length < 3"
-              (triggered)="distribute(option.axis)"
-            >
-              <ng-icon [name]="option.icon" />
-              <span>{{ option.label }}</span>
-            </button>
-          }
         </div>
       </ng-template>
 
@@ -749,22 +686,6 @@ export class ToolbarComponent {
   nodePreviewShape = (): NodeShape => this.sharedNodeShape() ?? 'rectangle';
   nodePreviewFill = (): string => this.sharedNodeColor() ?? 'var(--dn-paper)';
 
-  // Align/Distribute menu options (ADR-0028): actions under their section
-  // labels, so items carry short names — the label carries the intent.
-  alignOptions: { kind: AlignKind; icon: string; label: string }[] = [
-    { kind: 'left', icon: 'lucideAlignStartVertical', label: 'Left' },
-    { kind: 'center', icon: 'lucideAlignCenterVertical', label: 'Horizontal center' },
-    { kind: 'right', icon: 'lucideAlignEndVertical', label: 'Right' },
-    { kind: 'top', icon: 'lucideAlignStartHorizontal', label: 'Top' },
-    { kind: 'middle', icon: 'lucideAlignCenterHorizontal', label: 'Vertical middle' },
-    { kind: 'bottom', icon: 'lucideAlignEndHorizontal', label: 'Bottom' },
-  ];
-
-  distributeOptions: { axis: DistributeAxis; icon: string; label: string }[] = [
-    { axis: 'horizontal', icon: 'lucideAlignHorizontalSpaceBetween', label: 'Horizontally' },
-    { axis: 'vertical', icon: 'lucideAlignVerticalSpaceBetween', label: 'Vertically' },
-  ];
-
   // Bulk styling (ADR-0015): one compound Command over all selected targets;
   // the factories return null when nothing would change — no dead undo steps.
   setColor(color: string | null): void {
@@ -823,22 +744,6 @@ export class ToolbarComponent {
     if (cmd) this.historyService.execute(cmd);
   }
 
-  // Align/Distribute (spec #25): one compound undo step over the Selection's
-  // roots, a silent no-op when nothing would move
-  align(kind: AlignKind): void {
-    const cmd = buildAlignSelectionCommand(
-      this.graphService, this.graphService.selectedNodeIds(), kind,
-    );
-    if (cmd) this.historyService.execute(cmd);
-  }
-
-  distribute(axis: DistributeAxis): void {
-    const cmd = buildDistributeSelectionCommand(
-      this.graphService, this.graphService.selectedNodeIds(), axis,
-    );
-    if (cmd) this.historyService.execute(cmd);
-  }
-
   zoomIn(): void {
     this.canvasViewport.zoomByCentered(0.1);
   }
@@ -879,14 +784,6 @@ export class ToolbarComponent {
 
   toggleLock(): void {
     this.canvasLock.toggle();
-  }
-
-  undo(): void {
-    this.historyService.undo();
-  }
-
-  redo(): void {
-    this.historyService.redo();
   }
 
   openImport(): void {
