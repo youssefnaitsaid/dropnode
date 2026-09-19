@@ -264,21 +264,21 @@ export function anchorToolbar(
       transform: translateX(-50%);
       bottom: calc(100% + 8px);
     }
-    /* More docks outward from the Selection and never animates: above the
-       toolbar when the toolbar is above the Selection (top 0, lifted by its
-       own height), below it when the toolbar flipped underneath (top 100%).
-       Either way it is out of flow, so the toolbar row stays fixed. */
+    /* More docks against the toolbar row and never animates: top 0 with a
+       plain centering transform when the toolbar is above the Selection;
+       lifted by 108% of its own height when the toolbar flipped underneath
+       (the extra 8% keeps it attached). Either way it is out of flow, so
+       the toolbar row stays fixed. */
     .toolbar-stack > [data-slot='dropdown-menu'] {
       position: absolute;
-      left: 50%;
-      top: 0;
-      transform: translateX(-50%) translateY(-100%);
+      left: 0;
       animation: none !important;
       transition: none !important;
+      --side-offset: 1 !important;
     }
     :host(.flipped) .toolbar-stack > [data-slot='dropdown-menu'] {
-      top: 100%;
-      transform: translateX(-50%);
+      transform: translateY(-100%);
+      --side-offset: -1 !important;
     }
     .selection-toolbar {
       display: flex;
