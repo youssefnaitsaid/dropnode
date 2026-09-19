@@ -1799,7 +1799,7 @@ describe('GraphService', () => {
       expect(service.customPalette()).toHaveLength(16);
     });
 
-    it('removing a hue leaves existing uses stored (orphans keep rendering)', () => {
+    it('removing a hue drops only the roster entry (callers reset uses first)', () => {
       service.addCustomPaletteColor('#A1B2C3');
       const node = service.createNode('Branded', 0, 0);
       service.setNodeColor(node.id, '#A1B2C3');

@@ -36,6 +36,7 @@ import {
   buildSetConnectionsStrokeWeightCommand,
   buildSetConnectionsRouteStyleCommand,
   buildSetNodesColorCommand,
+  buildResetCustomPaletteUsesCommand,
   buildSetNodesShapeCommand,
   buildSetNodesEmojiCommand,
   buildTidyUpCommand,
@@ -612,6 +613,8 @@ export class PaletteEntryRegistry {
         `Remove ${value} from Project customs`,
         'Nodes & Groups',
         () => {
+          const reset = buildResetCustomPaletteUsesCommand(this.graphService, value);
+          if (reset) this.historyService.execute(reset);
           this.graphService.removeCustomPaletteColor(value);
         },
         {
@@ -765,6 +768,8 @@ export class PaletteEntryRegistry {
         `Remove ${value} from Project customs`,
         'Connections',
         () => {
+          const reset = buildResetCustomPaletteUsesCommand(this.graphService, value);
+          if (reset) this.historyService.execute(reset);
           this.graphService.removeCustomPaletteColor(value);
         },
         {

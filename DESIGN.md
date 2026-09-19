@@ -123,7 +123,8 @@ Graph State — changing the palette array changes rendering of *new* choices
 only and must never re-map stored hexes (ADR-0006). Each Project may extend
 the eight with up to sixteen custom hues (`customPalette`, `#RRGGBB` hex,
 stored by-value); the toolbar shows them as a Custom row below the curated
-row, and deleting an entry orphans existing uses (they keep rendering).
+row, and deleting an entry resets its uses to the default appearance as one
+undo step while the roster removal itself is permanent.
 The Minimap's selection highlight is PastelBlue (`DN_TOKENS.minimapAccent`).
 A selected element's glow (`--selection-glow`) is its own solid color
 identity, so curated and custom Palette colors double as feedback; an

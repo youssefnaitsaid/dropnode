@@ -39,6 +39,7 @@ import {
   buildSetNodesShapeCommand,
   buildSetNodesEmojiCommand,
   buildSetConnectionsColorCommand,
+  buildResetCustomPaletteUsesCommand,
   buildSetConnectionsArrowheadCommand,
   buildSetConnectionsStrokePatternCommand,
   buildSetConnectionsStrokeWeightCommand,
@@ -1253,6 +1254,45 @@ describe('Commands', () => {
       graphService.setNodeColor(a.id, NODE_PALETTE[1]);
 
       expect(buildSetNodesColorCommand(graphService, [a.id], NODE_PALETTE[1])).toBeNull();
+    });
+  });
+
+  describe('buildResetCustomPaletteUsesCommand', () => {
+    it('resets every Node and Connection carrying the hue to default as one step, undo restores', () => {
+      const a = graphService.createNode('A', 0, 0);
+      const group = graphService.createGroup('G', 400, 0);
+      const b = graphService.createNode('B', 900, 0);
+      const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+      graphService.setNodeColor(a.id, '#A1B2C3');
+      graphService.setNodeColor(group.id, '#A1B2C3');
+      graphService.setNodeColor(b.id, NODE_PALETTE[0]);
+      graphService.setConnectionColor(conn.id, '#A1B2C3');
+
+      const cmd = buildResetCustomPaletteUsesCommand(graphService, '#A1B2C3')!;
+      cmd.execute();
+
+      expect(graphService.nodes().find(n => n.id === a.id)?.color).toBeUndefined();
+      expect(graphService.nodes().find(n => n.id === group.id)?.color).toBeUndefined();
+      expect(graphService.nodes().find(n => n.id === b.id)?.color).toBe(NODE_PALETTE[0]);
+      expect(graphService.connections()[0].color).toBeUndefined();
+
+      cmd.undo();
+
+      expect(graphService.nodes().find(n => n.id === a.id)?.color).toBe('#A1B2C3');
+      expect(graphService.nodes().find(n => n.id === group.id)?.color).toBe('#A1B2C3');
+      expect(graphService.connections()[0].color).toBe('#A1B2C3');
+    });
+
+    it('matches hues case-insensitively and returns null when nothing uses the hue', () => {
+      const a = graphService.createNode('A', 0, 0);
+      graphService.setNodeColor(a.id, '#a1b2c3');
+
+      const cmd = buildResetCustomPaletteUsesCommand(graphService, '#A1B2C3')!;
+      cmd.execute();
+
+      expect(graphService.nodes().find(n => n.id === a.id)?.color).toBeUndefined();
+      expect(buildResetCustomPaletteUsesCommand(graphService, '#A1B2C3')).toBeNull();
+      expect(buildResetCustomPaletteUsesCommand(graphService, '#D4E5F6')).toBeNull();
     });
   });
 

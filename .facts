@@ -93,6 +93,7 @@
   command: grep -q 'NODE_PALETTE' src/app/models/node.ts
 - the Node styling trigger's Color section (default + 8 curated + Custom row) appears in the toolbar while any Node is in the Selection; choosing a swatch recolors every selected Node as one compound undo step, skipping Nodes already carrying the color — an item reads active only when ALL selected Nodes share its value, and an all-no-op click touches nothing
 - Import rejects color values outside the curated set plus the Project's declared customPalette wholesale with "Invalid node {id}: color must be a palette or custom palette color"
+- removing a Custom hue resets every Node and Connection carrying it to the default appearance as one undo step; the roster removal itself is permanent — undo restores the hues, not the entry
 
 ## connections
 

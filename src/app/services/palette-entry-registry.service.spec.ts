@@ -250,7 +250,7 @@ describe('PaletteEntryRegistry', () => {
     expect(graphService.connections()[0].color).toBe('#A1B2C3');
   });
 
-  it('exposes custom remove entries that drop the hue without touching uses or History', () => {
+  it('exposes custom remove entries that reset uses to default as one undo step', () => {
     graphService.addCustomPaletteColor('#A1B2C3');
     const node = graphService.createNode('A', 0, 0);
     graphService.setNodeColor(node.id, '#A1B2C3');
@@ -262,8 +262,12 @@ describe('PaletteEntryRegistry', () => {
 
     expect(registry.execute('node-color-custom-remove-a1b2c3')).toBe(true);
     expect(graphService.customPalette()).toEqual([]);
+    expect(graphService.nodes()[0].color).toBeUndefined();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
     expect(graphService.nodes()[0].color).toBe('#A1B2C3');
-    expect(historyService.canUndo()).toBe(false);
+    expect(graphService.customPalette()).toEqual([]);
   });
 
   it('executes Route Style entries through the bulk Route Style Command', () => {

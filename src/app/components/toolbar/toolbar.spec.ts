@@ -225,7 +225,7 @@ describe('ToolbarComponent', () => {
     expect(graphService.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
   });
 
-  it('adds a custom hue from the menu hex input and deletes it while the orphan keeps its color', async () => {
+  it('adds a custom hue from the menu hex input and deletes it resetting uses to default as one undo step', async () => {
     const node = graphService.createNode('Node', 0, 0);
     graphService.setSelection([node.id], []);
     fixture.detectChanges();
@@ -273,7 +273,14 @@ describe('ToolbarComponent', () => {
     fixture.detectChanges();
 
     expect(graphService.customPalette()).toEqual([]);
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
+    expect(fixture.componentInstance.sharedNodeColor()).toBeNull();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    // Undo restores the hues but not the roster entry — re-adding re-links.
     expect(graphService.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+    expect(graphService.customPalette()).toEqual([]);
   });
 
   it('explains invalid hex input instead of storing it', async () => {

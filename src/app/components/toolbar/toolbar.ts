@@ -44,6 +44,7 @@ import { CommandPaletteService } from '../../services/command-palette.service';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
   buildSetNodesColorCommand,
+  buildResetCustomPaletteUsesCommand,
   buildSetNodesShapeCommand,
   buildSetNodesEmojiCommand,
   buildSetConnectionsColorCommand,
@@ -705,8 +706,12 @@ export class ToolbarComponent {
     this.customError.set(null);
   }
 
-  // Deleting never rewrites elements — orphaned uses keep their stored hue.
+  // Deleting a hue resets its uses to the default appearance as one undo
+  // step (ADR-0038); the roster removal itself is permanent, like
+  // Collection and Project deletion — undo restores hues, not the entry.
   removeCustom(value: string): void {
+    const reset = buildResetCustomPaletteUsesCommand(this.graphService, value);
+    if (reset) this.historyService.execute(reset);
     this.graphService.removeCustomPaletteColor(value);
   }
   selectedRegularNodes = computed(() =>

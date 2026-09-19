@@ -877,8 +877,8 @@ export class GraphService {
     return normalized;
   }
 
-  // Deleting never rewrites elements: orphaned uses keep their stored hue
-  // (by-value model) and keep rendering and exporting untouched.
+  // Roster-only removal: callers reset the hue's uses first (one undoable
+  // Command, ADR-0038), so by the time the entry drops nothing references it.
   removeCustomPaletteColor(hex: string): void {
     const normalized = String(hex).toUpperCase();
     this.customPalette.update(current => current.filter(entry => entry !== normalized));
