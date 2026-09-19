@@ -320,13 +320,14 @@ describe('SelectionToolbarComponent', () => {
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
-      // Not flipped: top 0 with a plain centering transform.
+      // Not flipped: static position below the row, left edge aligned.
       const menu = fixture.nativeElement.querySelector(
         '[aria-label="More selection actions"]',
       ) as HTMLElement;
       const style = getComputedStyle(menu);
-      expect(style.top).toBe('0px');
-      expect(style.transform).not.toContain('-108%');
+      expect(style.top).toBe('auto');
+      expect(style.left).toBe('0px');
+      expect(style.transform).not.toContain('translateY');
     });
 
     it('lifts More above the toolbar when the toolbar is below the Selection', () => {
@@ -336,13 +337,13 @@ describe('SelectionToolbarComponent', () => {
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
-      // Toolbar flipped below the Selection (y=68): top 0 lifted 108%.
+      // Toolbar flipped below the Selection (y=68): lifted by its own height.
       const menu = fixture.nativeElement.querySelector(
         '[aria-label="More selection actions"]',
       ) as HTMLElement;
       const style = getComputedStyle(menu);
-      expect(style.top).toBe('0px');
-      expect(style.transform).toContain('-108%');
+      expect(style.top).toBe('auto');
+      expect(style.transform).toContain('-100%');
     });
 
     it('keeps panels out of flow so opening them never moves the toolbar row', () => {
@@ -358,20 +359,21 @@ describe('SelectionToolbarComponent', () => {
       expect(getComputedStyle(menu).position).toBe('absolute');
     });
 
-    it('docks More flush to the toolbar with no entry animation', () => {
+    it('docks More to the toolbar with no entry animation', () => {
       stubContainer({ left: 0, top: 80, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 0);
       graph.selectNode(node.id);
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
-      // Toolbar above the Selection: flush at top 0, plain centering transform.
+      // Static position below the row, left edge aligned, no lift.
       const menu = fixture.nativeElement.querySelector(
         '[aria-label="More selection actions"]',
       ) as HTMLElement;
       const style = getComputedStyle(menu);
-      expect(style.top).toBe('0px');
-      expect(style.transform).not.toContain('-108%');
+      expect(style.top).toBe('auto');
+      expect(style.left).toBe('0px');
+      expect(style.transform).not.toContain('translateY');
       expect(style.animationName).toBe('none');
     });
   });

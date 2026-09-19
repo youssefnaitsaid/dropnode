@@ -264,11 +264,11 @@ export function anchorToolbar(
       transform: translateX(-50%);
       bottom: calc(100% + 8px);
     }
-    /* More docks against the toolbar row and never animates: top 0 with a
-       plain centering transform when the toolbar is above the Selection;
-       lifted by 108% of its own height when the toolbar flipped underneath
-       (the extra 8% keeps it attached). Either way it is out of flow, so
-       the toolbar row stays fixed. */
+    /* More hangs off the toolbar row and never animates: static position
+       below the row, left edge aligned, by default; lifted by its own
+       height when the toolbar flipped underneath — the side offset flips
+       sign with it. Either way it is out of flow, so the toolbar row
+       stays fixed. */
     .toolbar-stack > [data-slot='dropdown-menu'] {
       position: absolute;
       left: 0;
