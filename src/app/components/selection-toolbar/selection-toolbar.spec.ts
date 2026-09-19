@@ -313,39 +313,41 @@ describe('SelectionToolbarComponent', () => {
       expect(hostStyle().top).toBe('70px');
     });
 
-    it('pops More below the toolbar', () => {
+    it('keeps More below the toolbar when the Viewport bottom fits it', () => {
       stubContainer({ left: 0, top: 80, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 0);
       graph.selectNode(node.id);
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
+      // Toolbar above the Selection at y=70: 768-70-10 >= 230 below.
       const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
-      const children = Array.from(stack.children).map(el =>
-        el.getAttribute('aria-label') ?? el.tagName,
-      );
-      // Toolbar row first, More menu after it.
-      expect(children.indexOf('Selection toolbar')).toBeLessThan(
-        children.indexOf('More selection actions'),
-      );
+      expect(stack.classList.contains('more-above')).toBe(false);
     });
 
-    it('keeps More below the toolbar even when the Viewport bottom cannot fit it', () => {
+    it('docks More above the toolbar when the Viewport bottom cannot fit it', () => {
       stubContainer({ left: 0, top: 0, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 700);
       graph.selectNode(node.id);
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
-      // Toolbar above the Selection at y=690; the panel hangs below it over
-      // the node and past the Viewport edge — overlap and overflow accepted.
+      // Toolbar above the Selection at y=690: 768-690-10 < 230 below.
       const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
-      const children = Array.from(stack.children).map(el =>
-        el.getAttribute('aria-label') ?? el.tagName,
-      );
-      expect(children.indexOf('Selection toolbar')).toBeLessThan(
-        children.indexOf('More selection actions'),
-      );
+      expect(stack.classList.contains('more-above')).toBe(true);
+    });
+
+    it('keeps panels out of flow so opening them never moves the toolbar row', () => {
+      stubContainer({ left: 0, top: 80, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 0);
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      button('More options')!.click();
+      fixture.detectChanges();
+      const menu = fixture.nativeElement.querySelector(
+        '[aria-label="More selection actions"]',
+      ) as HTMLElement;
+      expect(getComputedStyle(menu).position).toBe('absolute');
     });
   });
 

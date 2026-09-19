@@ -55,6 +55,10 @@ export interface ToolbarAnchor {
 const ANCHOR_GAP = 10;
 const FLIP_MARGIN = 8;
 const TOOLBAR_HEIGHT_ESTIMATE = 60;
+// Row and More-panel height estimates for the More pop direction: the panel
+// holds up to six items, so the estimate covers the tallest mirror.
+const TOOLBAR_ROW_HEIGHT = 48;
+const MORE_PANEL_HEIGHT = 230;
 
 /**
  * Pure anchor math: Selection bounds top-center in canvas coords to a fixed
@@ -132,7 +136,7 @@ export function anchorToolbar(
   ],
   template: `
     @if (visible()) {
-      <div class="toolbar-stack" (keydown)="onToolbarKeydown($event)">
+      <div class="toolbar-stack" [class.more-above]="!moreBelow()" (keydown)="onToolbarKeydown($event)">
         @if (alignOpen()) {
           <app-align-popover />
         }
@@ -242,16 +246,40 @@ export function anchorToolbar(
       position: fixed;
       z-index: var(--dn-z-overlay);
       pointer-events: auto;
-      transform: translate(-50%, -100%);
-    }
-    :host(.flipped) {
-      transform: translate(-50%, 0);
     }
     .toolbar-stack {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
+    }
+    /* The toolbar row owns the anchor: it is the only in-flow child, so
+       opening the Align or More panels never moves it. */
+    .selection-toolbar {
+      transform: translate(-50%, -100%);
+    }
+    :host(.flipped) .selection-toolbar {
+      transform: translate(-50%, 0);
+    }
+    app-align-popover {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(100% + 8px);
+    }
+    /* More pops below the toolbar by default; .more-above docks it above
+       when the Viewport bottom cannot fit it. Either way it is out of flow,
+       so the toolbar row stays fixed. */
+    .toolbar-stack > [data-slot='dropdown-menu'] {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: calc(100% + 8px);
+    }
+    .toolbar-stack.more-above > [data-slot='dropdown-menu'] {
+      top: auto;
+      bottom: calc(100% + 8px);
     }
     .selection-toolbar {
       display: flex;
@@ -319,6 +347,17 @@ export class SelectionToolbarComponent {
 
   readonly canPaste = this.clipboard.canPaste;
   readonly canAlign = this.menus.canAlign;
+
+  /**
+   * More pops below the toolbar by default, docking above only when the
+   * Viewport bottom cannot fit the panel. Reads position() so pan, zoom,
+   * and resize re-evaluate it.
+   */
+  readonly moreBelow = computed(() => {
+    const pos = this.position();
+    const toolbarBottom = pos.y + (pos.flipped ? TOOLBAR_ROW_HEIGHT : 0);
+    return window.innerHeight - toolbarBottom - ANCHOR_GAP >= MORE_PANEL_HEIGHT;
+  });
 
   /** The single selected Node, when the Selection is exactly one Node. */
   private readonly singleNode = computed(() => {
