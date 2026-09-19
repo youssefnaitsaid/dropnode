@@ -95,6 +95,37 @@ describe('EditorPageComponent', () => {
     expect(resetViewport).toHaveBeenCalled();
   });
 
+  it('persists Project customs across a switch (each Project keeps its own hues)', async () => {
+    const col = collectionService.createCollection('C');
+    const proj1 = collectionService.createProject(col.id, 'P1', storedGraph());
+    const proj2 = collectionService.createProject(col.id, 'P2', storedGraph());
+
+    fixture = TestBed.createComponent(EditorPageComponent);
+    fixture.componentRef.setInput('projectId', proj1.id);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+
+    graphService.addCustomPaletteColor('#A1B2C3');
+    const node = graphService.createNode('Branded', 0, 0);
+    graphService.setNodeColor(node.id, '#A1B2C3');
+    fixture.detectChanges();
+
+    // Switching flushes the debounced auto-save into the stored Project.
+    fixture.componentRef.setInput('projectId', proj2.id);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+
+    expect(collectionService.getProjectGraph(proj1.id)?.customPalette).toEqual(['#A1B2C3']);
+    expect(collectionService.getProjectGraph(proj2.id)).not.toHaveProperty('customPalette');
+
+    fixture.componentRef.setInput('projectId', proj1.id);
+    fixture.detectChanges();
+    await flushLoadAndFrame();
+
+    expect(graphService.customPalette()).toEqual(['#A1B2C3']);
+    expect(graphService.nodes().find(n => n.id === node.id)?.color).toBe('#A1B2C3');
+  });
+
   it('lands unlocked (silently) when switching Projects', async () => {
     const col = collectionService.createCollection('C');
     const proj1 = collectionService.createProject(col.id, 'P1', storedGraph());

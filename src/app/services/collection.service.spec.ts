@@ -455,6 +455,59 @@ describe('CollectionService', () => {
       expect(service.collections()).toEqual([]);
     });
 
+    it('carries each Project custom palette through export and import', () => {
+      const service = freshService();
+      const col = service.createCollection('Branded');
+      const graph: GraphState = {
+        nodes: [{ id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, color: '#A1B2C3' } as never],
+        connections: [],
+        customPalette: ['#A1B2C3'],
+      };
+      service.createProject(col.id, 'P', graph);
+
+      expect(service.exportCollection(col.id).projects[0].graph.customPalette).toEqual(['#A1B2C3']);
+
+      const result = service.importCollection(service.exportCollection(col.id));
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const copy = service.projectsIn(result.collection.id)[0];
+      expect(service.getProjectGraph(copy.id)?.customPalette).toEqual(['#A1B2C3']);
+    });
+
+    it('normalizes envelope customs to the uppercase storage form', () => {
+      const service = freshService();
+      const result = service.importCollection({
+        name: 'X',
+        projects: [{
+          name: 'P',
+          graph: {
+            nodes: [{ id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, color: '#a1b2c3' }],
+            connections: [],
+            customPalette: ['#a1b2c3'],
+          },
+        }],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const graph = service.getProjectGraph(service.projectsIn(result.collection.id)[0].id)!;
+      expect(graph.customPalette).toEqual(['#A1B2C3']);
+    });
+
+    it('rejects a collection envelope whose customs fall outside the rules', () => {
+      const service = freshService();
+      const result = service.importCollection({
+        name: 'X',
+        projects: [{ name: 'Bad', graph: { nodes: [], connections: [], customPalette: ['red'] } }],
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toContain('must be a #RRGGBB hex color');
+      expect(service.collections()).toEqual([]);
+    });
+
     it('round-trips: export then import yields the same names and graphs under new ids', () => {
       const service = freshService();
       const col = service.createCollection('Round trip');

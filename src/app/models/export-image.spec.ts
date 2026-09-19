@@ -188,6 +188,13 @@ describe('Export Theme mapping', () => {
       expect(themedNodeBackground(color, EXPORT_THEMES.light)).toBe(color);
     }
   });
+
+  it('a custom palette hue passes through untouched in both themes', () => {
+    for (const color of ['#A1B2C3', '#123ABC']) {
+      expect(themedNodeBackground(color, EXPORT_THEMES.dark)).toBe(color);
+      expect(themedNodeBackground(color, EXPORT_THEMES.light)).toBe(color);
+    }
+  });
 });
 
 describe('Pins in export', () => {

@@ -34,6 +34,23 @@ export const NODE_PALETTE_NAMES: readonly string[] = [
   'Emerald', 'Lavender', 'Pink', 'LightOrange',
 ];
 
+// Custom Palette (CONTEXT.md: Custom Palette): the per-Project extension to
+// the curated set — user hues stored by-value, applied like Palette colors.
+// The curated eight stay fixed; customs live in Graph State alongside them.
+export const MAX_CUSTOM_PALETTE_COLORS = 16;
+
+const CUSTOM_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+/** A strict six-digit hex hue (`#RRGGBB`), case-insensitive. */
+export function isCustomPaletteHex(value: unknown): value is string {
+  return typeof value === 'string' && CUSTOM_HEX_PATTERN.test(value);
+}
+
+/** Normalize a hex hue to its uppercase storage form. */
+export function normalizeCustomPaletteHex(value: string): string {
+  return value.toUpperCase();
+}
+
 export interface GraphNode {
   id: string;
   // Text carried by a regular node or Text Block (required for both; never on Groups)

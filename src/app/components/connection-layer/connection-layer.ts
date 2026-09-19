@@ -47,7 +47,7 @@ interface JumpMaskEntry {
   template: `
     <svg class="connection-layer" [class.presenting]="presentationService.active()" [attr.width]="svgWidth()" [attr.height]="svgHeight()">
       <defs>
-        @for (color of markerColors; track color) {
+        @for (color of markerColors(); track color) {
           <marker
             [attr.id]="markerId('arrow', color)"
             viewBox="0 0 10 10" refX="9" refY="5"
@@ -371,11 +371,12 @@ export class ConnectionLayerComponent {
   private static readonly DEFAULT_STROKE = DN_TOKENS.accent;
 
   // SVG markers don't inherit stroke color, so one marker is emitted per
-  // possible stroke color: the default plus every palette color.
-  readonly markerColors: readonly string[] = [
+  // possible stroke color: the default plus every curated and custom hue.
+  readonly markerColors = computed(() => [
     ConnectionLayerComponent.DEFAULT_STROKE,
     ...NODE_PALETTE,
-  ];
+    ...this.graphService.customPalette(),
+  ]);
 
   markerId(type: 'arrow' | 'triangle', color: string): string {
     return `ah-${type}-${color.replace('#', '')}`;

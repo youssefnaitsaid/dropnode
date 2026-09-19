@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy, input, computed } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, input, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -21,6 +21,7 @@ import {
   lucideLock,
   lucideLockOpen,
   lucideCheck,
+  lucideX,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmSeparator } from '@spartan-ng/helm/separator';
@@ -43,6 +44,7 @@ import { CommandPaletteService } from '../../services/command-palette.service';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import {
   buildSetNodesColorCommand,
+  buildResetCustomPaletteUsesCommand,
   buildSetNodesShapeCommand,
   buildSetNodesEmojiCommand,
   buildSetConnectionsColorCommand,
@@ -52,7 +54,7 @@ import {
   buildSetConnectionsRouteStyleCommand,
   buildTidyUpCommand,
 } from '../../services/commands';
-import { NODE_PALETTE, NODE_PALETTE_NAMES } from '../../models/node';
+import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES, MAX_CUSTOM_PALETTE_COLORS, isCustomPaletteHex } from '../../models/node';
 import { NODE_EMOJIS } from '../../models/node-emoji';
 import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
 import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, RouteStyle, effectiveRouteStyle } from '../../models/connection';
@@ -83,6 +85,7 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
       lucideLock,
       lucideLockOpen,
       lucideCheck,
+      lucideX,
     }),
   ],
   template: `
@@ -195,6 +198,64 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
               }
             </button>
           }
+          <!-- Custom Palette (ADR-0037): Project hues beside the curated row —
+               same apply rules, per-hue delete, inline add. -->
+          <div hlmDropdownMenuLabel>Custom</div>
+          @for (entry of customPaletteEntries(); track entry.value) {
+            <div class="flex items-center gap-1 px-1">
+              <button hlmDropdownMenuItem class="grow" (triggered)="setColor(entry.value)" [attr.aria-label]="'Apply custom hue ' + entry.value">
+                <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                <span>{{ entry.name }}</span>
+                @if (sharedNodeColor() === entry.value) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                (click)="removeCustom(entry.value); $event.stopPropagation()"
+                [title]="'Remove custom hue ' + entry.value"
+                [attr.aria-label]="'Remove custom hue ' + entry.value"
+                [disabled]="canvasLock.locked()"
+              >
+                <ng-icon name="lucideX" />
+              </button>
+            </div>
+          }
+          <div class="flex items-center gap-1 px-2 py-1" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+            <input
+              type="color"
+              [value]="customPickerValue()"
+              (input)="customDraft.set($any($event.target).value)"
+              aria-label="Pick a custom hue"
+              [disabled]="canvasLock.locked()"
+            />
+            <input
+              type="text"
+              [value]="customDraft()"
+              (input)="customDraft.set($any($event.target).value)"
+              placeholder="#RRGGBB"
+              aria-label="New custom hue hex"
+              [disabled]="canvasLock.locked()"
+            />
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              (click)="addCustomFromInput()"
+              aria-label="Add custom hue"
+              [disabled]="customPaletteFull() || canvasLock.locked()"
+            >
+              Add
+            </button>
+          </div>
+          @if (customError() !== null) {
+            <div class="px-2 pb-1 text-xs" role="alert">{{ customError() }}</div>
+          }
+          @if (customPaletteFull()) {
+            <div class="px-2 pb-1 text-xs">Custom palette full (16 hues).</div>
+          }
           <hlm-dropdown-menu-separator />
           <!-- Groups carry no Shape (ADR-0023); the section stays visible but
                disabled so the state is explained (ADR-0028) -->
@@ -285,6 +346,63 @@ import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeW
                 <ng-icon name="lucideCheck" class="ml-auto" />
               }
             </button>
+          }
+          <!-- Custom Palette (ADR-0037): same Project hues as the Node menu. -->
+          <div hlmDropdownMenuLabel>Custom</div>
+          @for (entry of customPaletteEntries(); track entry.value) {
+            <div class="flex items-center gap-1 px-1">
+              <button hlmDropdownMenuItem class="grow" (triggered)="setConnectionColor(entry.value)" [attr.aria-label]="'Apply custom hue ' + entry.value">
+                <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                <span>{{ entry.name }}</span>
+                @if (sharedConnectionColor() === entry.value) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                (click)="removeCustom(entry.value); $event.stopPropagation()"
+                [title]="'Remove custom hue ' + entry.value"
+                [attr.aria-label]="'Remove custom hue ' + entry.value"
+                [disabled]="canvasLock.locked()"
+              >
+                <ng-icon name="lucideX" />
+              </button>
+            </div>
+          }
+          <div class="flex items-center gap-1 px-2 py-1" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+            <input
+              type="color"
+              [value]="customPickerValue()"
+              (input)="customDraft.set($any($event.target).value)"
+              aria-label="Pick a custom hue"
+              [disabled]="canvasLock.locked()"
+            />
+            <input
+              type="text"
+              [value]="customDraft()"
+              (input)="customDraft.set($any($event.target).value)"
+              placeholder="#RRGGBB"
+              aria-label="New custom hue hex"
+              [disabled]="canvasLock.locked()"
+            />
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              (click)="addCustomFromInput()"
+              aria-label="Add custom hue"
+              [disabled]="customPaletteFull() || canvasLock.locked()"
+            >
+              Add
+            </button>
+          </div>
+          @if (customError() !== null) {
+            <div class="px-2 pb-1 text-xs" role="alert">{{ customError() }}</div>
+          }
+          @if (customPaletteFull()) {
+            <div class="px-2 pb-1 text-xs">Custom palette full (16 hues).</div>
           }
           <hlm-dropdown-menu-separator />
           <div hlmDropdownMenuLabel>Start arrowhead</div>
@@ -558,6 +676,44 @@ export class ToolbarComponent {
   readonly paletteEntries: readonly { name: string; value: string }[] = NODE_PALETTE.map(
     (value, index) => ({ value, name: NODE_PALETTE_NAMES[index] ?? value }),
   );
+  // Custom Palette entries (CONTEXT.md: Custom Palette): Project hues read
+  // live from Graph State, announced under their own hex — no curated names.
+  readonly customPaletteEntries = computed(() =>
+    this.graphService.customPalette().map(value => ({ value, name: value })),
+  );
+  readonly customPaletteFull = computed(
+    () => this.graphService.customPalette().length >= MAX_CUSTOM_PALETTE_COLORS,
+  );
+  // Draft hue for the inline add form, shared by both styling menus (only
+  // one menu is ever open). The native picker needs a valid hex, so it
+  // shows the default Node background while the text draft is incomplete.
+  readonly customDraft = signal('');
+  readonly customError = signal<string | null>(null);
+  readonly customPickerValue = computed(() => {
+    const draft = this.customDraft().trim();
+    return isCustomPaletteHex(draft) ? draft : DEFAULT_NODE_BACKGROUND;
+  });
+
+  // Custom Palette membership is plain data (ADR-0037): adding validates
+  // the draft and explains failures inline instead of storing them.
+  addCustomFromInput(): void {
+    const added = this.graphService.addCustomPaletteColor(this.customDraft().trim());
+    if (added === null) {
+      this.customError.set('Enter a #RRGGBB hex not already in the palette (16 max).');
+      return;
+    }
+    this.customDraft.set('');
+    this.customError.set(null);
+  }
+
+  // Deleting a hue resets its uses to the default appearance as one undo
+  // step (ADR-0038); the roster removal itself is permanent, like
+  // Collection and Project deletion — undo restores hues, not the entry.
+  removeCustom(value: string): void {
+    const reset = buildResetCustomPaletteUsesCommand(this.graphService, value);
+    if (reset) this.historyService.execute(reset);
+    this.graphService.removeCustomPaletteColor(value);
+  }
   selectedRegularNodes = computed(() =>
     this.graphService.selectedNodes().filter(node => node.kind !== 'group')
   );

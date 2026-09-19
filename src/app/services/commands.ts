@@ -1082,6 +1082,32 @@ export function buildSetConnectionsColorCommand(
   return parts.length > 0 ? new CompoundCommand('Set Connection Color', parts) : null;
 }
 
+/**
+ * Reset every Node and Connection carrying the given hue to the default
+ * appearance as one undo step — removing a Custom Palette hue resets its
+ * uses (ADR-0038). Matches hues case-insensitively; returns null when
+ * nothing uses the hue, so an unused removal touches no History. The roster
+ * removal itself stays permanent: undo restores the hues, not the entry.
+ */
+export function buildResetCustomPaletteUsesCommand(
+  graphService: GraphService,
+  hex: string,
+): Command | null {
+  const normalized = hex.toUpperCase();
+  const nodeIds = graphService.nodes()
+    .filter(node => node.color !== undefined && node.color.toUpperCase() === normalized)
+    .map(node => node.id);
+  const connectionIds = graphService.connections()
+    .filter(conn => conn.color !== undefined && conn.color.toUpperCase() === normalized)
+    .map(conn => conn.id);
+  const parts: Command[] = [];
+  const nodesCmd = buildSetNodesColorCommand(graphService, nodeIds, null);
+  if (nodesCmd) parts.push(nodesCmd);
+  const connsCmd = buildSetConnectionsColorCommand(graphService, connectionIds, null);
+  if (connsCmd) parts.push(connsCmd);
+  return parts.length > 0 ? new CompoundCommand('Reset Custom Hue Uses', parts) : null;
+}
+
 /** Restyle one Arrowhead end of every given Connection as one undo step, skipping no-ops. */
 export function buildSetConnectionsArrowheadCommand(
   graphService: GraphService,

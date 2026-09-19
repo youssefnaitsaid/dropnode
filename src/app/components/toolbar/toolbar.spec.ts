@@ -196,6 +196,152 @@ describe('ToolbarComponent', () => {
     expect('routeStyle' in graphService.connections()[0]).toBe(false);
   });
 
+  it('shows a Custom section with Project hues and applies one to selected Nodes as one undo step', async () => {
+    const node = graphService.createNode('Node', 0, 0);
+    graphService.addCustomPaletteColor('#A1B2C3');
+    graphService.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(apply).toBeTruthy();
+    apply.click();
+    fixture.detectChanges();
+
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+    expect(fixture.componentInstance.sharedNodeColor()).toBe('#A1B2C3');
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
+  });
+
+  it('adds a custom hue from the menu hex input and deletes it resetting uses to default as one undo step', async () => {
+    const node = graphService.createNode('Node', 0, 0);
+    graphService.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
+    expect(hexInput).toBeTruthy();
+    hexInput.value = '#a1b2c3';
+    hexInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const add = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Add custom hue',
+    ) as HTMLButtonElement;
+    add.click();
+    fixture.detectChanges();
+
+    expect(graphService.customPalette()).toEqual(['#A1B2C3']);
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    apply.click();
+    fixture.detectChanges();
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+
+    // Applying closes the menu like any curated pick — reopen to manage.
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const remove = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Remove custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(remove).toBeTruthy();
+    remove.click();
+    fixture.detectChanges();
+
+    expect(graphService.customPalette()).toEqual([]);
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
+    expect(fixture.componentInstance.sharedNodeColor()).toBeNull();
+    expect(historyService.canUndo()).toBe(true);
+
+    historyService.undo();
+    // Undo restores the hues but not the roster entry — re-adding re-links.
+    expect(graphService.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+    expect(graphService.customPalette()).toEqual([]);
+  });
+
+  it('explains invalid hex input instead of storing it', async () => {
+    const node = graphService.createNode('Node', 0, 0);
+    graphService.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Node styling',
+    ) as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
+    hexInput.value = 'red';
+    hexInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const add = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Add custom hue',
+    ) as HTMLButtonElement;
+    add.click();
+    fixture.detectChanges();
+
+    expect(graphService.customPalette()).toEqual([]);
+    const error = Array.from(document.body.querySelectorAll('*')).find(
+      el => el.textContent?.trim() === 'Enter a #RRGGBB hex not already in the palette (16 max).',
+    );
+    expect(error).toBeTruthy();
+  });
+
+  it('shows customs in the Connection menu and applies with the shared check', async () => {
+    const a = graphService.createNode('A', 0, 0);
+    const b = graphService.createNode('B', 300, 0);
+    const conn = graphService.createConnection(a.id, 'right', b.id, 'left')!;
+    graphService.addCustomPaletteColor('#A1B2C3');
+    graphService.selectConnection(conn.id);
+    fixture.detectChanges();
+
+    const trigger = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Connection styling',
+    ) as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(apply).toBeTruthy();
+    apply.click();
+    fixture.detectChanges();
+
+    expect(graphService.connections()[0].color).toBe('#A1B2C3');
+    expect(fixture.componentInstance.sharedConnectionColor()).toBe('#A1B2C3');
+    expect(historyService.canUndo()).toBe(true);
+  });
+
   it('zooms in and out anchored on the visible Canvas center', () => {
     // No .canvas-container in the test DOM, so the anchor falls back to the
     // window size — half of innerWidth/innerHeight.
