@@ -1124,7 +1124,22 @@ describe('GraphService', () => {
         ],
       } as any);
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid connection c1: color must be a palette color');
+      expect(result.error).toBe('Invalid connection c1: color must be a palette or custom palette color');
+    });
+
+    it('a declared custom palette color imports on a Connection', () => {
+      const result = service.importGraph({
+        nodes: [
+          { id: 'n1', label: 'Node 1', x: 0, y: 0, width: 160, height: 48 },
+          { id: 'n2', label: 'Node 2', x: 200, y: 0, width: 160, height: 48 },
+        ],
+        connections: [
+          { id: 'c1', sourceNodeId: 'n1', sourceHandle: 'right', targetNodeId: 'n2', targetHandle: 'left', color: '#A1B2C3' },
+        ],
+        customPalette: ['#A1B2C3'],
+      } as any);
+      expect(result.success).toBe(true);
+      expect(service.connections()[0].color).toBe('#A1B2C3');
     });
 
     it('a palette connection color imports', () => {
@@ -1473,6 +1488,62 @@ describe('GraphService', () => {
       expect(result.success).toBe(true);
       expect(service.nodes()[0].shape).toBe('diamond');
     });
+
+    it('omits the customPalette key when the Project holds no customs', () => {
+      service.createNode('Plain', 0, 0);
+
+      expect(service.exportGraph()).not.toHaveProperty('customPalette');
+    });
+
+    it('custom hues and their uses survive an export/import round trip', () => {
+      service.addCustomPaletteColor('#A1B2C3');
+      const node = service.createNode('Branded', 0, 0);
+      service.setNodeColor(node.id, '#A1B2C3');
+
+      const exported = service.exportGraph();
+      expect(exported.customPalette).toEqual(['#A1B2C3']);
+
+      service.clearGraph();
+      const result = service.importGraph(exported);
+
+      expect(result.success).toBe(true);
+      expect(service.customPalette()).toEqual(['#A1B2C3']);
+      expect(service.nodes()[0].color).toBe('#A1B2C3');
+    });
+
+    it('normalizes lowercase customs and element colors to uppercase on import', () => {
+      const result = service.importGraph({
+        nodes: [{ id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, color: '#a1b2c3' }],
+        connections: [],
+        customPalette: ['#a1b2c3'],
+      } as GraphState);
+
+      expect(result.success).toBe(true);
+      expect(service.customPalette()).toEqual(['#A1B2C3']);
+      expect(service.nodes()[0].color).toBe('#A1B2C3');
+    });
+
+    it('an empty customPalette array canonicalizes to absent', () => {
+      const result = service.importGraph({
+        nodes: [],
+        connections: [],
+        customPalette: [],
+      } as GraphState);
+
+      expect(result.success).toBe(true);
+      expect(service.customPalette()).toEqual([]);
+      expect(service.exportGraph()).not.toHaveProperty('customPalette');
+    });
+
+    it('a legacy payload without customs imports with an empty roster', () => {
+      const result = service.importGraph({
+        nodes: [{ id: 'a', label: 'A', x: 0, y: 0, width: 160, height: 48, color: NODE_PALETTE[0] }],
+        connections: [],
+      } as GraphState);
+
+      expect(result.success).toBe(true);
+      expect(service.customPalette()).toEqual([]);
+    });
   });
 
   describe('import migration and Text validation', () => {
@@ -1689,13 +1760,55 @@ describe('GraphService', () => {
       const node2 = service.createNode('Node 2', 100, 100);
       service.createConnection(node1.id, 'right', node2.id, 'left');
       service.selectNode(node1.id);
+      service.addCustomPaletteColor('#A1B2C3');
 
       service.clearGraph();
 
       expect(service.nodes().length).toBe(0);
       expect(service.connections().length).toBe(0);
+      expect(service.customPalette()).toEqual([]);
       expect(service.selectedNodeId()).toBeNull();
       expect(service.nodeCount()).toBe(0);
+    });
+  });
+
+  describe('Custom Palette membership', () => {
+    it('adds a hue normalized to uppercase', () => {
+      expect(service.addCustomPaletteColor('#a1b2c3')).toBe('#A1B2C3');
+      expect(service.customPalette()).toEqual(['#A1B2C3']);
+    });
+
+    it('adding a duplicate keeps a single entry', () => {
+      service.addCustomPaletteColor('#A1B2C3');
+
+      expect(service.addCustomPaletteColor('#a1b2c3')).toBe('#A1B2C3');
+      expect(service.customPalette()).toEqual(['#A1B2C3']);
+    });
+
+    it('refuses malformed hues, curated overlaps, and a full roster', () => {
+      expect(service.addCustomPaletteColor('red')).toBeNull();
+      expect(service.addCustomPaletteColor('#FFF')).toBeNull();
+      expect(service.addCustomPaletteColor(NODE_PALETTE[0])).toBeNull();
+      expect(service.customPalette()).toEqual([]);
+
+      for (let i = 0; i < 16; i++) {
+        const hex = `#${(i + 1).toString(16).padStart(6, '0').toUpperCase()}`;
+        expect(service.addCustomPaletteColor(hex)).toBe(hex);
+      }
+      expect(service.addCustomPaletteColor('#FFFFFF')).toBeNull();
+      expect(service.customPalette()).toHaveLength(16);
+    });
+
+    it('removing a hue leaves existing uses stored (orphans keep rendering)', () => {
+      service.addCustomPaletteColor('#A1B2C3');
+      const node = service.createNode('Branded', 0, 0);
+      service.setNodeColor(node.id, '#A1B2C3');
+
+      service.removeCustomPaletteColor('#a1b2c3');
+
+      expect(service.customPalette()).toEqual([]);
+      expect(service.nodes()[0].color).toBe('#A1B2C3');
+      expect(service.exportGraph()).not.toHaveProperty('customPalette');
     });
   });
 
@@ -1998,7 +2111,85 @@ describe('GraphService', () => {
       } as GraphState);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid node a: color must be a palette color');
+      expect(result.error).toBe('Invalid node a: color must be a palette or custom palette color');
+    });
+
+    it('accepts a declared custom palette color on a Node', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({ color: '#A1B2C3' })],
+        connections: [],
+        customPalette: ['#A1B2C3'],
+      } as GraphState);
+
+      expect(result.success).toBe(true);
+      expect(service.nodes().find(n => n.id === 'a')?.color).toBe('#A1B2C3');
+    });
+
+    it('rejects a custom hue that the payload does not declare', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({ color: '#A1B2C3' })],
+        connections: [],
+        customPalette: ['#D4E5F6'],
+      } as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid node a: color must be a palette or custom palette color');
+    });
+
+    it('rejects a customPalette list that is not an array', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({})],
+        connections: [],
+        customPalette: '#A1B2C3',
+      } as unknown as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid graph state: customPalette must be an array');
+    });
+
+    it('rejects a customPalette entry that is not a hex color', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({})],
+        connections: [],
+        customPalette: ['red'],
+      } as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid customPalette entry at index 0: must be a #RRGGBB hex color');
+    });
+
+    it('rejects a customPalette list with duplicates', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({})],
+        connections: [],
+        customPalette: ['#A1B2C3', '#a1b2c3'],
+      } as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid graph state: customPalette must hold unique colors');
+    });
+
+    it('rejects a customPalette list duplicating a curated color', () => {
+      const result = service.importGraph({
+        nodes: [baseNode({})],
+        connections: [],
+        customPalette: [NODE_PALETTE[0]],
+      } as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid graph state: customPalette must not duplicate curated palette colors');
+    });
+
+    it('rejects a customPalette list longer than sixteen hues', () => {
+      const customs = Array.from({ length: 17 }, (_, i) => `#${(i + 1).toString(16).padStart(6, '0').toUpperCase()}`);
+      const result = service.importGraph({
+        nodes: [baseNode({})],
+        connections: [],
+        customPalette: customs,
+      } as GraphState);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid graph state: customPalette may hold at most 16 custom colors');
     });
 
     it('rejects a parentId referencing a non-existent node', () => {

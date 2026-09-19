@@ -222,6 +222,50 @@ describe('PaletteEntryRegistry', () => {
     expect(historyService.canUndo()).toBe(true);
   });
 
+  it('exposes custom palette apply entries for each Project hue in both families', () => {
+    graphService.addCustomPaletteColor('#A1B2C3');
+    const node = graphService.createNode('A', 0, 0);
+    const other = graphService.createNode('B', 300, 0);
+    const conn = graphService.createConnection(node.id, 'right', other.id, 'left')!;
+
+    const nodeEntry = find('node-color-custom-a1b2c3');
+    expect(nodeEntry.label).toBe('Set selected Nodes to #A1B2C3');
+    expect(nodeEntry.category).toBe('Nodes & Groups');
+    expect(nodeEntry.swatch).toBe('#A1B2C3');
+    expect(nodeEntry.available).toBe(false);
+
+    const connEntry = find('connection-color-custom-a1b2c3');
+    expect(connEntry.label).toBe('Set selected Connections to #A1B2C3');
+    expect(connEntry.category).toBe('Connections');
+    expect(connEntry.swatch).toBe('#A1B2C3');
+    expect(connEntry.available).toBe(false);
+
+    graphService.selectNode(node.id);
+    expect(registry.execute('node-color-custom-a1b2c3')).toBe(true);
+    expect(graphService.nodes()[0].color).toBe('#A1B2C3');
+    expect(historyService.canUndo()).toBe(true);
+
+    graphService.selectConnection(conn.id);
+    expect(registry.execute('connection-color-custom-a1b2c3')).toBe(true);
+    expect(graphService.connections()[0].color).toBe('#A1B2C3');
+  });
+
+  it('exposes custom remove entries that drop the hue without touching uses or History', () => {
+    graphService.addCustomPaletteColor('#A1B2C3');
+    const node = graphService.createNode('A', 0, 0);
+    graphService.setNodeColor(node.id, '#A1B2C3');
+
+    const remove = find('node-color-custom-remove-a1b2c3');
+    expect(remove.label).toBe('Remove #A1B2C3 from Project customs');
+    expect(remove.category).toBe('Nodes & Groups');
+    expect(remove.swatch).toBe('#A1B2C3');
+
+    expect(registry.execute('node-color-custom-remove-a1b2c3')).toBe(true);
+    expect(graphService.customPalette()).toEqual([]);
+    expect(graphService.nodes()[0].color).toBe('#A1B2C3');
+    expect(historyService.canUndo()).toBe(false);
+  });
+
   it('executes Route Style entries through the bulk Route Style Command', () => {
     const orthogonal = find('connection-route-orthogonal');
     expect(orthogonal.label).toBe("Set selected Connections' Route Style to Orthogonal");

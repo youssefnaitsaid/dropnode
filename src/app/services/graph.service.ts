@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { GraphNode, HandleSide, NODE_PALETTE, isTextBlock } from '../models/node';
+import { GraphNode, HandleSide, NODE_PALETTE, MAX_CUSTOM_PALETTE_COLORS, isCustomPaletteHex, normalizeCustomPaletteHex, isTextBlock } from '../models/node';
 import { NodeShape, isNodeShape, storedNodeShape } from '../models/node-shape';
 import { isNodeEmoji } from '../models/node-emoji';
 import { Connection, ReroutePoint, MAX_REROUTE_POINTS, ArrowheadType, ArrowheadEnd, ARROWHEAD_TYPES, defaultArrowhead, StrokePattern, StrokeWeight, STROKE_PATTERNS, STROKE_WEIGHTS, DEFAULT_STROKE_PATTERN, DEFAULT_STROKE_WEIGHT, RouteStyle, ROUTE_STYLES, DEFAULT_ROUTE_STYLE, TEXT_POSITION_MIN, TEXT_POSITION_MAX, TEXT_POSITION_DEFAULT } from '../models/connection';
@@ -24,6 +24,10 @@ export class GraphService {
   readonly nodes = signal<GraphNode[]>([]);
   readonly connections = signal<Connection[]>([]);
   readonly pins = signal<Pin[]>([]);
+  // Custom Palette (ADR-0037): the Project's own hues, stored by-value like
+  // other Graph State. Membership here is plain data, never a Command — it
+  // never touches History, matching auto-size and visibility-toggle precedent.
+  readonly customPalette = signal<string[]>([]);
   readonly viewportState = signal<ViewportState>({ panX: 0, panY: 0, zoom: 1 });
 
   // The Selection (ADR-0015): one set freely mixing Nodes and Connections.
@@ -750,6 +754,7 @@ export class GraphService {
     this.nodes.set(canonical.nodes);
     this.connections.set(canonical.connections);
     this.pins.set(canonical.pins ?? []);
+    this.customPalette.set(canonical.customPalette ?? []);
     this.clearSelection();
     return { success: true };
   }
@@ -765,9 +770,22 @@ export class GraphService {
           ? { kind: 'canvas' as const, x: pin.anchor.x, y: pin.anchor.y }
           : { ...pin.anchor },
       })),
+      customPalette: (state.customPalette ?? []).map(entry => normalizeCustomPaletteHex(entry)),
     });
     // The canonical absent form: no key when there are no Pins
     if (canonical.pins !== undefined && canonical.pins.length === 0) delete canonical.pins;
+    // Same absent form for customs: no key when the Project holds none
+    if (canonical.customPalette !== undefined && canonical.customPalette.length === 0) {
+      delete canonical.customPalette;
+    }
+    // Element colors canonicalize to the uppercase storage form so later
+    // comparisons never depend on payload case.
+    for (const node of canonical.nodes) {
+      if (node.color !== undefined) node.color = node.color.toUpperCase();
+    }
+    for (const connection of canonical.connections) {
+      if (connection.color !== undefined) connection.color = connection.color.toUpperCase();
+    }
     return canonical;
   }
 
@@ -781,6 +799,12 @@ export class GraphService {
         return rest;
       }),
       connections: state.connections,
+      // Customs ride the envelope with their Project (ADR-0037): normalized
+      // to the uppercase storage form, and an empty list canonicalizes to
+      // absent so pre-feature envelopes keep their shape.
+      ...(state.customPalette !== undefined && state.customPalette.length > 0
+        ? { customPalette: state.customPalette.map(entry => normalizeCustomPaletteHex(entry)) }
+        : {}),
     });
   }
 
@@ -830,11 +854,34 @@ export class GraphService {
   exportGraph(): GraphState {
     // Deep copy: Text blocks are nested arrays, a shallow copy would alias them
     const pins = this.pins();
+    const customs = this.customPalette();
     return structuredClone({
       nodes: this.nodes(),
       connections: this.connections(),
       ...(pins.length > 0 ? { pins } : {}),
+      ...(customs.length > 0 ? { customPalette: customs } : {}),
     });
+  }
+
+  // Custom Palette membership (ADR-0037): plain data writes, never Commands.
+  // Adding normalizes to uppercase, ignores exact duplicates, and refuses
+  // malformed hues, curated overlaps, and a full roster by returning null.
+  addCustomPaletteColor(hex: string): string | null {
+    if (!isCustomPaletteHex(hex)) return null;
+    const normalized = normalizeCustomPaletteHex(hex);
+    const current = this.customPalette();
+    if (current.includes(normalized)) return normalized;
+    if (NODE_PALETTE.includes(normalized)) return null;
+    if (current.length >= MAX_CUSTOM_PALETTE_COLORS) return null;
+    this.customPalette.set([...current, normalized]);
+    return normalized;
+  }
+
+  // Deleting never rewrites elements: orphaned uses keep their stored hue
+  // (by-value model) and keep rendering and exporting untouched.
+  removeCustomPaletteColor(hex: string): void {
+    const normalized = String(hex).toUpperCase();
+    this.customPalette.update(current => current.filter(entry => entry !== normalized));
   }
 
   // Public so collection import can validate each project's graph with the
@@ -857,6 +904,39 @@ export class GraphService {
     if (pinsRaw !== undefined && !Array.isArray(pinsRaw)) {
       return { valid: false, error: 'Invalid graph state: pins must be an array' };
     }
+
+    // Custom Palette (ADR-0037): absent means no customs; an empty array
+    // canonicalizes to absent. Entries are strict hex, unique
+    // (case-insensitive), capped, and never overlap the curated set.
+    const customsRaw = s['customPalette'];
+    let customs: string[] = [];
+    if (customsRaw !== undefined) {
+      if (!Array.isArray(customsRaw)) {
+        return { valid: false, error: 'Invalid graph state: customPalette must be an array' };
+      }
+      if (customsRaw.length > MAX_CUSTOM_PALETTE_COLORS) {
+        return { valid: false, error: `Invalid graph state: customPalette may hold at most ${MAX_CUSTOM_PALETTE_COLORS} custom colors` };
+      }
+      const seen = new Set<string>();
+      for (let i = 0; i < customsRaw.length; i++) {
+        const entry = customsRaw[i];
+        if (!isCustomPaletteHex(entry)) {
+          return { valid: false, error: `Invalid customPalette entry at index ${i}: must be a #RRGGBB hex color` };
+        }
+        const normalized = normalizeCustomPaletteHex(entry);
+        if (seen.has(normalized)) {
+          return { valid: false, error: 'Invalid graph state: customPalette must hold unique colors' };
+        }
+        seen.add(normalized);
+        if (NODE_PALETTE.includes(normalized)) {
+          return { valid: false, error: 'Invalid graph state: customPalette must not duplicate curated palette colors' };
+        }
+        customs.push(normalized);
+      }
+    }
+    // Element colors may be curated or declared-custom (case-insensitive —
+    // payloads in the wild vary); canonicalization stores the uppercase form.
+    const acceptedColors = new Set([...NODE_PALETTE, ...customs]);
 
     const nodesArr = s['nodes'] as unknown[];
     const connsArr = s['connections'] as unknown[];
@@ -918,8 +998,8 @@ export class GraphService {
           return { valid: false, error: `Invalid node ${nodeId}: shape must be rectangle, pill, diamond, or ellipse` };
         }
       }
-      if (node['color'] !== undefined && !NODE_PALETTE.includes(node['color'] as string)) {
-        return { valid: false, error: `Invalid node ${nodeId}: color must be a palette color` };
+      if (node['color'] !== undefined && !acceptedColors.has(String(node['color']).toUpperCase())) {
+        return { valid: false, error: `Invalid node ${nodeId}: color must be a palette or custom palette color` };
       }
       if (node['emoji'] !== undefined) {
         if (node['kind'] === 'group') {
@@ -988,8 +1068,8 @@ export class GraphService {
         // Legacy plain-string label, migrated on import
         return { valid: false, error: `Invalid connection ${connId}: label must be a string` };
       }
-      if (conn['color'] !== undefined && !NODE_PALETTE.includes(conn['color'] as string)) {
-        return { valid: false, error: `Invalid connection ${connId}: color must be a palette color` };
+      if (conn['color'] !== undefined && !acceptedColors.has(String(conn['color']).toUpperCase())) {
+        return { valid: false, error: `Invalid connection ${connId}: color must be a palette or custom palette color` };
       }
       if (conn['startArrowhead'] !== undefined && !ARROWHEAD_TYPES.includes(conn['startArrowhead'] as ArrowheadType)) {
         return { valid: false, error: `Invalid connection ${connId}: startArrowhead must be none, arrow, or triangle` };
@@ -1122,6 +1202,7 @@ export class GraphService {
     this.nodes.set([]);
     this.connections.set([]);
     this.pins.set([]);
+    this.customPalette.set([]);
     this.clearSelection();
   }
 }

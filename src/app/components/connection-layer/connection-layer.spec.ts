@@ -55,6 +55,16 @@ describe('ConnectionLayerComponent reroute interactions', () => {
     expect(fixture.nativeElement.querySelectorAll('.reroute-point')).toHaveLength(0);
   });
 
+  it('emits arrowhead markers for custom palette hues', () => {
+    graphService.addCustomPaletteColor('#A1B2C3');
+    fixture.detectChanges();
+
+    const arrow = fixture.nativeElement.querySelector('#ah-arrow-A1B2C3');
+    const triangle = fixture.nativeElement.querySelector('#ah-triangle-A1B2C3');
+    expect(arrow).toBeTruthy();
+    expect(triangle).toBeTruthy();
+  });
+
   it('adds a point from a curve double-click and removes a marker from a marker double-click', () => {
     const connection = makeConnection();
     const add = vi.fn();

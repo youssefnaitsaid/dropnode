@@ -249,15 +249,22 @@ export class EditorPageComponent implements OnDestroy {
     // Exit flips `active`, re-running the effect — the restored pre-Present
     // Viewport is what gets saved.
     effect(() => {
-      const nodes = this.graphService.nodes();
-      const connections = this.graphService.connections();
+      // Every Graph State collection is read so any of them re-arms the
+      // debounced save — persisting a hand-picked subset silently drops
+      // the rest (Pins and Custom Palette today).
+      this.graphService.nodes();
+      this.graphService.connections();
+      this.graphService.pins();
+      this.graphService.customPalette();
       const viewport = this.graphService.viewportState();
       const presenting = this.presentationService.active();
       const id = this.currentProjectId;
       if (!id || presenting) return;
       this.saveState.set('saving');
       this.scheduleSave(() => {
-        this.collectionService.saveProjectGraph(id, { nodes, connections });
+        // The canonical payload: the same shape every JSON destination
+        // serializes, so stored Projects never diverge from exports.
+        this.collectionService.saveProjectGraph(id, this.graphService.exportGraph());
         this.collectionService.saveProjectViewport(id, viewport);
       });
     });

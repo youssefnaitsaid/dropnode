@@ -120,10 +120,14 @@ matches the toolbar swatch row and the Command Palette names):
 An element without an applied Palette color shows its default appearance
 (Node: `--dn-paper`; Connection: `--dn-accent`). Applied colors are stored in
 Graph State — changing the palette array changes rendering of *new* choices
-only and must never re-map stored hexes (ADR-0006). The Minimap's selection
-highlight is PastelBlue (`DN_TOKENS.minimapAccent`). A selected element's glow
-(`--selection-glow`) is its own solid color identity, so Palette colors
-double as feedback; an uncolored Node's default glow is `--dn-paper`.
+only and must never re-map stored hexes (ADR-0006). Each Project may extend
+the eight with up to sixteen custom hues (`customPalette`, `#RRGGBB` hex,
+stored by-value); the toolbar shows them as a Custom row below the curated
+row, and deleting an entry orphans existing uses (they keep rendering).
+The Minimap's selection highlight is PastelBlue (`DN_TOKENS.minimapAccent`).
+A selected element's glow (`--selection-glow`) is its own solid color
+identity, so curated and custom Palette colors double as feedback; an
+uncolored Node's default glow is `--dn-paper`.
 
 ## Export themes
 
@@ -134,8 +138,8 @@ chips). **Light** has been fully independent since the 2026-08 redesign (the
 on-screen defaults are dark-on-dark chrome, so "flip the dark-only defaults"
 no longer yields a legible light image): its own literals — white
 background, `#f2f3f5` cards, `#1e1f22` ink, dark Group border — with no
-on-screen token counterparts. Palette-applied colors pass through untouched
-in both.
+on-screen token counterparts. Curated and custom Palette-applied colors pass
+through untouched in both.
 
 ## Layering (z-index ladder)
 

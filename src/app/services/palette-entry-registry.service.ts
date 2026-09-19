@@ -586,6 +586,42 @@ export class PaletteEntryRegistry {
         unavailableReason,
       },
     ));
+    // Custom Palette (ADR-0037): per-value apply entries plus remove
+    // entries. Removing is plain data — no selection needed, no History.
+    for (const value of this.graphService.customPalette()) {
+      const slug = value.replace('#', '').toLowerCase();
+      const lowered = value.toLowerCase();
+      entries.push(this.action(
+        `node-color-custom-${slug}`,
+        `Set selected Nodes to ${value}`,
+        'Nodes & Groups',
+        () => {
+          const command = buildSetNodesColorCommand(this.graphService, this.graphService.selectedNodeIds(), value);
+          if (command) this.historyService.execute(command);
+        },
+        {
+          aliases: [`node custom ${lowered}`, `color nodes ${lowered}`],
+          swatch: value,
+          sortOrder: 0,
+          available,
+          unavailableReason,
+        },
+      ));
+      entries.push(this.action(
+        `node-color-custom-remove-${slug}`,
+        `Remove ${value} from Project customs`,
+        'Nodes & Groups',
+        () => {
+          this.graphService.removeCustomPaletteColor(value);
+        },
+        {
+          aliases: [`remove custom ${lowered}`],
+          swatch: value,
+          sortOrder: 0,
+          available: true,
+        },
+      ));
+    }
     entries.push(this.action(
       'node-color-default',
       'Reset selected Nodes to Default',
@@ -703,6 +739,42 @@ export class PaletteEntryRegistry {
         unavailableReason,
       },
     ));
+    // Custom Palette (ADR-0037): mirrors the Node family — per-value apply
+    // entries plus remove entries over the same shared Project roster.
+    for (const value of this.graphService.customPalette()) {
+      const slug = value.replace('#', '').toLowerCase();
+      const lowered = value.toLowerCase();
+      entries.push(this.action(
+        `connection-color-custom-${slug}`,
+        `Set selected Connections to ${value}`,
+        'Connections',
+        () => {
+          const command = buildSetConnectionsColorCommand(this.graphService, this.graphService.selectedConnectionIds(), value);
+          if (command) this.historyService.execute(command);
+        },
+        {
+          aliases: [`connection custom ${lowered}`, `color connections ${lowered}`],
+          swatch: value,
+          sortOrder: 1,
+          available,
+          unavailableReason,
+        },
+      ));
+      entries.push(this.action(
+        `connection-color-custom-remove-${slug}`,
+        `Remove ${value} from Project customs`,
+        'Connections',
+        () => {
+          this.graphService.removeCustomPaletteColor(value);
+        },
+        {
+          aliases: [`remove custom ${lowered}`],
+          swatch: value,
+          sortOrder: 1,
+          available: true,
+        },
+      ));
+    }
     entries.push(this.action(
       'connection-color-default',
       'Reset selected Connections to Default',
