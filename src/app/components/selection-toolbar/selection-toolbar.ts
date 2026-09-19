@@ -55,6 +55,10 @@ export interface ToolbarAnchor {
 const ANCHOR_GAP = 10;
 const FLIP_MARGIN = 8;
 const TOOLBAR_HEIGHT_ESTIMATE = 60;
+// Row and More-panel height estimates for the More pop direction: the panel
+// holds up to six items, so the estimate covers the tallest mirror.
+const TOOLBAR_ROW_HEIGHT = 48;
+const MORE_PANEL_HEIGHT = 230;
 
 /**
  * Pure anchor math: Selection bounds top-center in canvas coords to a fixed
@@ -132,39 +136,9 @@ export function anchorToolbar(
   ],
   template: `
     @if (visible()) {
-      <div class="toolbar-stack" (keydown)="onToolbarKeydown($event)">
+      <div class="toolbar-stack" [class.more-above]="!moreBelow()" (keydown)="onToolbarKeydown($event)">
         @if (alignOpen()) {
           <app-align-popover />
-        }
-        @if (moreOpen()) {
-          <div hlmDropdownMenu class="w-44" role="menu" aria-label="More selection actions">
-            @if (kind() === 'single-group') {
-              <button hlmDropdownMenuItem (triggered)="addNode()" title="Add node" aria-label="Add node">
-                <ng-icon name="lucideSquarePlus" /><span>Add node</span>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="addTextBlock()" title="Add text block" aria-label="Add text block">
-                <ng-icon name="lucideSquarePlus" /><span>Add text block</span>
-              </button>
-            }
-            @if (kind() === 'single-node' || kind() === 'single-group') {
-              <button hlmDropdownMenuItem (triggered)="toggleResize()" [attr.aria-pressed]="resizeMode.mode()" title="Resize mode" aria-label="Resize mode">
-                <ng-icon name="lucideMoveDiagonal2" /><span>Resize mode</span>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="addPin()" title="Add pin" aria-label="Add pin">
-                <ng-icon name="lucideMessageCircle" /><span>Add pin</span>
-              </button>
-            }
-            @if (kind() === 'single-group') {
-              <button hlmDropdownMenuItem (triggered)="pasteHere()" [disabled]="!canPaste()" title="Paste" aria-label="Paste">
-                <ng-icon name="lucideClipboardPaste" /><span>Paste</span>
-              </button>
-            }
-            @if (hasNodeActions()) {
-              <button hlmDropdownMenuItem (triggered)="exportPng()" title="Export as PNG" aria-label="Export as PNG">
-                <ng-icon name="lucideImageDown" /><span>Export as PNG</span>
-              </button>
-            }
-          </div>
         }
         <div class="selection-toolbar" role="toolbar" aria-label="Selection toolbar">
           @if (kind() === 'single-node') {
@@ -233,6 +207,36 @@ export function anchorToolbar(
             </button>
           }
         </div>
+        @if (moreOpen()) {
+          <div hlmDropdownMenu class="w-44" role="menu" aria-label="More selection actions">
+            @if (kind() === 'single-group') {
+              <button hlmDropdownMenuItem (triggered)="addNode()" title="Add node" aria-label="Add node">
+                <ng-icon name="lucideSquarePlus" /><span>Add node</span>
+              </button>
+              <button hlmDropdownMenuItem (triggered)="addTextBlock()" title="Add text block" aria-label="Add text block">
+                <ng-icon name="lucideSquarePlus" /><span>Add text block</span>
+              </button>
+            }
+            @if (kind() === 'single-node' || kind() === 'single-group') {
+              <button hlmDropdownMenuItem (triggered)="toggleResize()" [attr.aria-pressed]="resizeMode.mode()" title="Resize mode" aria-label="Resize mode">
+                <ng-icon name="lucideMoveDiagonal2" /><span>Resize mode</span>
+              </button>
+              <button hlmDropdownMenuItem (triggered)="addPin()" title="Add pin" aria-label="Add pin">
+                <ng-icon name="lucideMessageCircle" /><span>Add pin</span>
+              </button>
+            }
+            @if (kind() === 'single-group') {
+              <button hlmDropdownMenuItem (triggered)="pasteHere()" [disabled]="!canPaste()" title="Paste" aria-label="Paste">
+                <ng-icon name="lucideClipboardPaste" /><span>Paste</span>
+              </button>
+            }
+            @if (hasNodeActions()) {
+              <button hlmDropdownMenuItem (triggered)="exportPng()" title="Export as PNG" aria-label="Export as PNG">
+                <ng-icon name="lucideImageDown" /><span>Export as PNG</span>
+              </button>
+            }
+          </div>
+        }
       </div>
     }
   `,
@@ -252,6 +256,11 @@ export function anchorToolbar(
       flex-direction: column;
       align-items: center;
       gap: 8px;
+    }
+    /* More pops below the toolbar by default; .more-above promotes it
+       above the toolbar when the Viewport bottom cannot fit it. */
+    .toolbar-stack.more-above > [data-slot='dropdown-menu'] {
+      order: -1;
     }
     .selection-toolbar {
       display: flex;
@@ -319,6 +328,23 @@ export class SelectionToolbarComponent {
 
   readonly canPaste = this.clipboard.canPaste;
   readonly canAlign = this.menus.canAlign;
+
+  /**
+   * More pops below the toolbar by default. It flips above only when the
+   * Viewport bottom cannot fit the panel while the top can; when neither
+   * fits, the roomier side wins with below on a tie. Reads position() so
+   * pan, zoom, and resize re-evaluate it.
+   */
+  readonly moreBelow = computed(() => {
+    const pos = this.position();
+    const toolbarBottom = pos.y + (pos.flipped ? TOOLBAR_ROW_HEIGHT : 0);
+    const toolbarTop = pos.y - (pos.flipped ? 0 : TOOLBAR_ROW_HEIGHT);
+    const spaceBelow = window.innerHeight - toolbarBottom - ANCHOR_GAP;
+    const spaceAbove = toolbarTop - ANCHOR_GAP;
+    if (spaceBelow >= MORE_PANEL_HEIGHT) return true;
+    if (spaceAbove >= MORE_PANEL_HEIGHT) return false;
+    return spaceBelow >= spaceAbove;
+  });
 
   /** The single selected Node, when the Selection is exactly one Node. */
   private readonly singleNode = computed(() => {

@@ -312,6 +312,37 @@ describe('SelectionToolbarComponent', () => {
       expect(hostStyle().left).toBe('280px');
       expect(hostStyle().top).toBe('70px');
     });
+
+    it('pops More below the toolbar by default', () => {
+      stubContainer({ left: 0, top: 80, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 0);
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      button('More options')!.click();
+      fixture.detectChanges();
+      const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
+      expect(stack.classList.contains('more-above')).toBe(false);
+      const children = Array.from(stack.children).map(el =>
+        el.getAttribute('aria-label') ?? el.tagName,
+      );
+      // Toolbar row first, More menu after it.
+      expect(children.indexOf('Selection toolbar')).toBeLessThan(
+        children.indexOf('More selection actions'),
+      );
+    });
+
+    it('pops More above the toolbar when the Viewport bottom cannot fit it', () => {
+      stubContainer({ left: 0, top: 0, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 700);
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      button('More options')!.click();
+      fixture.detectChanges();
+      // Toolbar above the Selection at y=690: 768-690-10 < 230 below,
+      // 690-48-10 >= 230 above.
+      const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
+      expect(stack.classList.contains('more-above')).toBe(true);
+    });
   });
 
   it('cuts the Selection onto the Clipboard and closes', () => {
