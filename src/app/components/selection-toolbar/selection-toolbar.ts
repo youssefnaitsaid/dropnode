@@ -25,6 +25,10 @@ import {
   lucideAlignStartVertical,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
+import {
+  HlmDropdownMenu,
+  HlmDropdownMenuItem,
+} from '@spartan-ng/helm/dropdown-menu';
 import { AlignPopoverComponent } from '../align-popover/align-popover';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -90,7 +94,7 @@ export function anchorToolbar(
   selector: 'app-selection-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmButton, AlignPopoverComponent],
+  imports: [NgIcon, HlmButton, HlmDropdownMenu, HlmDropdownMenuItem, AlignPopoverComponent],
   host: {
     '[style.left.px]': 'position().x',
     '[style.top.px]': 'position().y',
@@ -120,30 +124,30 @@ export function anchorToolbar(
           <app-align-popover />
         }
         @if (moreOpen()) {
-          <div class="more-popover" role="menu" aria-label="More selection actions">
+          <div hlmDropdownMenu class="w-44" role="menu" aria-label="More selection actions">
             @if (kind() === 'single-group') {
-              <button hlmBtn variant="ghost" (click)="addNode()" title="Add node" aria-label="Add node">
+              <button hlmDropdownMenuItem (triggered)="addNode()" title="Add node" aria-label="Add node">
                 <ng-icon name="lucideSquarePlus" /><span>Add node</span>
               </button>
-              <button hlmBtn variant="ghost" (click)="addTextBlock()" title="Add text block" aria-label="Add text block">
+              <button hlmDropdownMenuItem (triggered)="addTextBlock()" title="Add text block" aria-label="Add text block">
                 <ng-icon name="lucideSquarePlus" /><span>Add text block</span>
               </button>
             }
             @if (kind() === 'single-node' || kind() === 'single-group') {
-              <button hlmBtn variant="ghost" (click)="toggleResize()" [attr.aria-pressed]="resizeMode.mode()" title="Resize mode" aria-label="Resize mode">
+              <button hlmDropdownMenuItem (triggered)="toggleResize()" [attr.aria-pressed]="resizeMode.mode()" title="Resize mode" aria-label="Resize mode">
                 <ng-icon name="lucideMoveDiagonal2" /><span>Resize mode</span>
               </button>
-              <button hlmBtn variant="ghost" (click)="addPin()" title="Add pin" aria-label="Add pin">
+              <button hlmDropdownMenuItem (triggered)="addPin()" title="Add pin" aria-label="Add pin">
                 <ng-icon name="lucideMessageCircle" /><span>Add pin</span>
               </button>
             }
             @if (kind() === 'single-group') {
-              <button hlmBtn variant="ghost" (click)="pasteHere()" [disabled]="!canPaste()" title="Paste" aria-label="Paste">
+              <button hlmDropdownMenuItem (triggered)="pasteHere()" [disabled]="!canPaste()" title="Paste" aria-label="Paste">
                 <ng-icon name="lucideClipboardPaste" /><span>Paste</span>
               </button>
             }
             @if (hasNodeActions()) {
-              <button hlmBtn variant="ghost" (click)="exportPng()" title="Export as PNG" aria-label="Export as PNG">
+              <button hlmDropdownMenuItem (triggered)="exportPng()" title="Export as PNG" aria-label="Export as PNG">
                 <ng-icon name="lucideImageDown" /><span>Export as PNG</span>
               </button>
             }
@@ -249,22 +253,7 @@ export function anchorToolbar(
       border-radius: 8px;
       box-shadow: var(--dn-shadow-chip);
     }
-    .more-popover {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding: 6px;
-      background: var(--card);
-      color: var(--card-foreground);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      box-shadow: var(--dn-shadow-pop);
-    }
-    .more-popover button {
-      justify-content: flex-start;
-      gap: 8px;
-    }
-    .selection-toolbar button:hover, .more-popover button:hover {
+    .selection-toolbar button:hover {
       color: var(--card-foreground) !important;
     }
   `],
@@ -275,7 +264,7 @@ export class SelectionToolbarComponent {
   private readonly menus = inject(ContextMenuService);
   private readonly clipboard = inject(ClipboardService);
   private readonly exportDialog = inject(ExportDialogService);
-  private readonly resizeMode = inject(ResizeModeService);
+  readonly resizeMode = inject(ResizeModeService);
   private readonly lock = inject(CanvasLockService);
   private readonly presenting = inject(PresentationService);
   private readonly chain = inject(ChainHighlightService);
@@ -477,12 +466,15 @@ export class SelectionToolbarComponent {
   }
 
   /**
-   * Roving focus inside the toolbar: arrows move between enabled buttons
+   * Roving focus inside the toolbar row: arrows move between enabled buttons
    * (wrapping), Home and End jump. Stopped so global Canvas arrow gestures
    * never fire while the toolbar owns focus. Tab order stays native.
+   * Events from the More dropdown menu are left to the CDK menu, which owns
+   * arrow navigation there.
    */
   onToolbarKeydown(event: KeyboardEvent): void {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    if ((event.target as HTMLElement | null)?.closest?.('[data-slot="dropdown-menu"]')) return;
     const buttons = Array.from(
       (this.host.nativeElement as HTMLElement).querySelectorAll('button:not([disabled])'),
     ) as HTMLButtonElement[];

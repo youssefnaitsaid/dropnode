@@ -398,4 +398,17 @@ describe('SelectionToolbarComponent', () => {
     );
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Edit text');
   });
+
+  it('renders More with the shared dropdown-menu styling', () => {
+    const node = graph.createNode('N', 0, 0);
+    graph.selectNode(node.id);
+    fixture.detectChanges();
+    button('More options')!.click();
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector('[aria-label="More selection actions"]');
+    expect(panel?.getAttribute('data-slot')).toBe('dropdown-menu');
+    expect(panel?.querySelector('[aria-label="Export as PNG"]')?.getAttribute('data-slot')).toBe(
+      'dropdown-menu-item',
+    );
+  });
 });
