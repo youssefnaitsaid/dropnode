@@ -55,10 +55,6 @@ export interface ToolbarAnchor {
 const ANCHOR_GAP = 10;
 const FLIP_MARGIN = 8;
 const TOOLBAR_HEIGHT_ESTIMATE = 60;
-// Row and More-panel height estimates for the More pop direction: the panel
-// holds up to six items, so the estimate covers the tallest mirror.
-const TOOLBAR_ROW_HEIGHT = 48;
-const MORE_PANEL_HEIGHT = 230;
 
 /**
  * Pure anchor math: Selection bounds top-center in canvas coords to a fixed
@@ -136,7 +132,7 @@ export function anchorToolbar(
   ],
   template: `
     @if (visible()) {
-      <div class="toolbar-stack" [class.more-above]="!moreBelow()" (keydown)="onToolbarKeydown($event)">
+      <div class="toolbar-stack" (keydown)="onToolbarKeydown($event)">
         @if (alignOpen()) {
           <app-align-popover />
         }
@@ -257,11 +253,6 @@ export function anchorToolbar(
       align-items: center;
       gap: 8px;
     }
-    /* More pops below the toolbar by default; .more-above promotes it
-       above the toolbar when the Viewport bottom cannot fit it. */
-    .toolbar-stack.more-above > [data-slot='dropdown-menu'] {
-      order: -1;
-    }
     .selection-toolbar {
       display: flex;
       align-items: center;
@@ -328,23 +319,6 @@ export class SelectionToolbarComponent {
 
   readonly canPaste = this.clipboard.canPaste;
   readonly canAlign = this.menus.canAlign;
-
-  /**
-   * More pops below the toolbar by default. It flips above only when the
-   * Viewport bottom cannot fit the panel while the top can; when neither
-   * fits, the roomier side wins with below on a tie. Reads position() so
-   * pan, zoom, and resize re-evaluate it.
-   */
-  readonly moreBelow = computed(() => {
-    const pos = this.position();
-    const toolbarBottom = pos.y + (pos.flipped ? TOOLBAR_ROW_HEIGHT : 0);
-    const toolbarTop = pos.y - (pos.flipped ? 0 : TOOLBAR_ROW_HEIGHT);
-    const spaceBelow = window.innerHeight - toolbarBottom - ANCHOR_GAP;
-    const spaceAbove = toolbarTop - ANCHOR_GAP;
-    if (spaceBelow >= MORE_PANEL_HEIGHT) return true;
-    if (spaceAbove >= MORE_PANEL_HEIGHT) return false;
-    return spaceBelow >= spaceAbove;
-  });
 
   /** The single selected Node, when the Selection is exactly one Node. */
   private readonly singleNode = computed(() => {

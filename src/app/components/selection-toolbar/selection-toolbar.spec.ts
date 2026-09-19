@@ -313,7 +313,7 @@ describe('SelectionToolbarComponent', () => {
       expect(hostStyle().top).toBe('70px');
     });
 
-    it('pops More below the toolbar by default', () => {
+    it('pops More below the toolbar', () => {
       stubContainer({ left: 0, top: 80, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 0);
       graph.selectNode(node.id);
@@ -321,7 +321,6 @@ describe('SelectionToolbarComponent', () => {
       button('More options')!.click();
       fixture.detectChanges();
       const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
-      expect(stack.classList.contains('more-above')).toBe(false);
       const children = Array.from(stack.children).map(el =>
         el.getAttribute('aria-label') ?? el.tagName,
       );
@@ -331,17 +330,22 @@ describe('SelectionToolbarComponent', () => {
       );
     });
 
-    it('pops More above the toolbar when the Viewport bottom cannot fit it', () => {
+    it('keeps More below the toolbar even when the Viewport bottom cannot fit it', () => {
       stubContainer({ left: 0, top: 0, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 700);
       graph.selectNode(node.id);
       fixture.detectChanges();
       button('More options')!.click();
       fixture.detectChanges();
-      // Toolbar above the Selection at y=690: 768-690-10 < 230 below,
-      // 690-48-10 >= 230 above.
+      // Toolbar above the Selection at y=690; the panel hangs below it over
+      // the node and past the Viewport edge — overlap and overflow accepted.
       const stack = fixture.nativeElement.querySelector('.toolbar-stack') as HTMLElement;
-      expect(stack.classList.contains('more-above')).toBe(true);
+      const children = Array.from(stack.children).map(el =>
+        el.getAttribute('aria-label') ?? el.tagName,
+      );
+      expect(children.indexOf('Selection toolbar')).toBeLessThan(
+        children.indexOf('More selection actions'),
+      );
     });
   });
 
