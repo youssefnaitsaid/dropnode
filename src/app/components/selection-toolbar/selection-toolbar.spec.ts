@@ -279,6 +279,28 @@ describe('SelectionToolbarComponent', () => {
       expect((fixture.nativeElement as HTMLElement).classList.contains('flipped')).toBe(true);
     });
 
+    it('stays on top when it fits there even with more room below', () => {
+      stubContainer({ left: 0, top: 100, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 0);
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      // Above fits (100-10-60 >= 8) while below holds far more space — top wins.
+      expect(hostStyle().top).toBe('90px');
+      expect((fixture.nativeElement as HTMLElement).classList.contains('flipped')).toBe(false);
+    });
+
+    it('picks the roomier side when neither side fits', () => {
+      stubContainer({ left: 0, top: 0, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 0);
+      graph.selectNode(node.id);
+      graph.setViewport({ zoom: 15 });
+      fixture.detectChanges();
+      // 48-unit node at 15x is 720 tall: above fails (0-10-60), below fails
+      // (720+10+60 > 768), and below holds more room (48 > 0).
+      expect(hostStyle().top).toBe('730px');
+      expect((fixture.nativeElement as HTMLElement).classList.contains('flipped')).toBe(true);
+    });
+
     it('tracks pan and zoom live', () => {
       stubContainer({ left: 100, top: 80, width: 800, height: 600 });
       const node = graph.createNode('N', 0, 0);

@@ -58,8 +58,10 @@ const TOOLBAR_HEIGHT_ESTIMATE = 60;
 
 /**
  * Pure anchor math: Selection bounds top-center in canvas coords to a fixed
- * Viewport point — centered above with a gap, clamped inside the Viewport,
- * flipping below when the top is clipped. Tested through the component spec.
+ * Viewport point — centered above with a gap and clamped inside the
+ * Viewport. Top is the default; the toolbar drops below only when the top
+ * cannot fit it, choosing the side with more free area when neither fits.
+ * Tested through the component spec.
  */
 export function anchorToolbar(
   bounds: { x: number; y: number; width: number; height: number },
@@ -70,12 +72,23 @@ export function anchorToolbar(
   const centerCanvasX = bounds.x + bounds.width / 2;
   const clientX = container.left + centerCanvasX * viewport.zoom + viewport.panX;
   const topClientY = container.top + bounds.y * viewport.zoom + viewport.panY;
+  const bottomClientY = container.top + (bounds.y + bounds.height) * viewport.zoom + viewport.panY;
+  const x = Math.min(Math.max(clientX, FLIP_MARGIN), windowSize.width - FLIP_MARGIN);
   const aboveY = topClientY - ANCHOR_GAP;
-  if (aboveY - TOOLBAR_HEIGHT_ESTIMATE < FLIP_MARGIN) {
-    const belowY = container.top + (bounds.y + bounds.height) * viewport.zoom + viewport.panY + ANCHOR_GAP;
-    return { x: Math.min(Math.max(clientX, FLIP_MARGIN), windowSize.width - FLIP_MARGIN), y: belowY, flipped: true };
+  const belowY = bottomClientY + ANCHOR_GAP;
+  if (aboveY - TOOLBAR_HEIGHT_ESTIMATE >= FLIP_MARGIN) {
+    return { x, y: aboveY, flipped: false };
   }
-  return { x: Math.min(Math.max(clientX, FLIP_MARGIN), windowSize.width - FLIP_MARGIN), y: aboveY, flipped: false };
+  if (belowY + TOOLBAR_HEIGHT_ESTIMATE <= windowSize.height - FLIP_MARGIN) {
+    return { x, y: belowY, flipped: true };
+  }
+  // Neither side fits: take the side with more free area, top on a tie.
+  const spaceAbove = topClientY;
+  const spaceBelow = windowSize.height - bottomClientY;
+  if (spaceBelow > spaceAbove) {
+    return { x, y: belowY, flipped: true };
+  }
+  return { x, y: aboveY, flipped: false };
 }
 
 /**
