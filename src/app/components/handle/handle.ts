@@ -134,7 +134,7 @@ export class HandleComponent {
   }
 
   onStartDrag(event: MouseEvent): void {
-    // Left button only — right-click is reserved for the context menu
+    // Left button only — right-clicks on Handles are swallowed
     if (event.button !== 0) return;
     this.startDrag.emit({
       nodeId: this.nodeId(),

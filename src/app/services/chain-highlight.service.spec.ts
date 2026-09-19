@@ -63,10 +63,11 @@ describe('ChainHighlightService', () => {
     expect(chainService.litNodeIds().has(aId)).toBe(true);
   });
 
-  it('resumes highlight after context menu closes (node)', () => {
+  it('resumes highlight after context menu closes (pin)', () => {
     const { aId } = setupChain();
+    const pin = graphService.createPin({ kind: 'canvas', x: 5, y: 5 }, 'Note')!;
     chainService.setHovered(aId);
-    contextMenuService.openFor({ kind: 'node', nodeId: aId }, 10, 10);
+    contextMenuService.openFor({ kind: 'pin', pinId: pin.id }, 5, 5);
     expect(chainService.isSuppressed()).toBe(true);
 
     contextMenuService.clear();
@@ -75,13 +76,14 @@ describe('ChainHighlightService', () => {
     expect(chainService.hasHighlight()).toBe(true);
   });
 
-  it('resumes highlight after context menu closes (group)', () => {
+  it('resumes highlight after repeated pin menu open/close cycles', () => {
     const { gId, aId } = setupChain();
+    const pin = graphService.createPin({ kind: 'canvas', x: 5, y: 5 }, 'Note')!;
     chainService.setHovered(gId);
     // Group is part of chain, so hovering group should highlight
     expect(chainService.hasHighlight()).toBe(true);
 
-    contextMenuService.openFor({ kind: 'node', nodeId: gId }, 10, 10);
+    contextMenuService.openFor({ kind: 'pin', pinId: pin.id }, 5, 5);
     expect(chainService.isSuppressed()).toBe(true);
 
     contextMenuService.clear();
@@ -91,10 +93,10 @@ describe('ChainHighlightService', () => {
     expect(chainService.hasHighlight()).toBe(true);
   });
 
-  it('resumes highlight after context menu closes (connection)', () => {
-    const { aId, connId } = setupChain();
+  it('resumes highlight after canvas menu closes following hover', () => {
+    const { aId } = setupChain();
     chainService.setHovered(aId);
-    contextMenuService.openFor({ kind: 'connection', connectionId: connId }, 10, 10);
+    contextMenuService.openFor({ kind: 'canvas' }, 10, 10);
     expect(chainService.isSuppressed()).toBe(true);
 
     contextMenuService.clear();

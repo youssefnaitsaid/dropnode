@@ -97,8 +97,8 @@ export class ClipboardService {
   }
 
   /**
-   * Paste the Clipboard entry centered on a canvas point (the Context Menu
-   * path). With a parentGroupId, pasted regular top-level nodes become
+   * Paste the Clipboard entry centered on a canvas point (the empty-Canvas
+   * menu path). With a parentGroupId, pasted regular top-level nodes become
    * children of that Group; a pasted Group always lands parentless.
    */
   pasteAt(x: number, y: number, parentGroupId?: string): void {

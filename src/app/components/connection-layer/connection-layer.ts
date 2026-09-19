@@ -494,7 +494,8 @@ export class ConnectionLayerComponent {
   private contextMenuService = inject(ContextMenuService);
 
   constructor() {
-    // The context menu's "Edit text" opens this Connection's inline editor
+    // An "Edit text" request (Selection Toolbar, Command Palette) opens
+    // this Connection's inline editor
     effect(() => {
       const id = this.contextMenuService.connectionTextRequest();
       if (id && this.connections().some(c => c.id === id)) {
@@ -693,7 +694,7 @@ export class ConnectionLayerComponent {
   }
 
   onConnectionMouseDown(conn: Connection, event: MouseEvent): void {
-    // Left button only — right-click is reserved for the context menu, and
+    // Left button only — right-clicks on Connections are swallowed, and
     // middle-drag must bubble up so the Canvas can pan
     if (event.button !== 0) return;
     event.stopPropagation();

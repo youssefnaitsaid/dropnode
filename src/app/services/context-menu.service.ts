@@ -2,23 +2,23 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { GraphService } from './graph.service';
 import { HistoryService } from './history.service';
 import { ClipboardService } from './clipboard.service';
-import { ExportDialogService } from './export-dialog.service';
 import {
-  CreateNodeCommand, CreateGroupCommand, CreateTextBlockCommand, DeleteNodeCompoundCommand, DeleteConnectionCommand,
+  CreateNodeCommand, CreateGroupCommand, CreateTextBlockCommand,
   DeletePinCommand, AddConnectionReroutePointCommand,
   buildDeleteSelectionCommand, buildAlignSelectionCommand, buildDistributeSelectionCommand,
 } from './commands';
 import { AlignKind, DistributeAxis } from '../models/align-distribute';
-import { ExportScopeRequest } from '../models/export-image';
 import { PinAnchor } from '../models/pin';
 import { MAX_REROUTE_POINTS } from '../models/connection';
 import { connectionRoute, routePointAt } from '../models/curve';
 
-/** What a right-click landed on, and — for the empty Canvas — nothing more. */
+/**
+ * What a right-click landed on: the empty Canvas, or a Pin. Element actions
+ * (Nodes, Groups, Text Blocks, Connections, multi-Selections) live in the
+ * Selection Toolbar — right-clicks there are swallowed, never a menu.
+ */
 export type ContextTarget =
   | { kind: 'canvas' }
-  | { kind: 'node'; nodeId: string }
-  | { kind: 'connection'; connectionId: string }
   | { kind: 'pin'; pinId: string };
 
 // New Node / New Group placement, centered on the right-click point. The Node
@@ -33,16 +33,12 @@ export class ContextMenuService {
   private graphService = inject(GraphService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
-  private exportDialogService = inject(ExportDialogService);
 
   // The context the currently-open menu acts on, plus the canvas-coordinate
   // point of the right-click (where empty-Canvas creations are centered).
   private target = signal<ContextTarget | null>(null);
   private pointX = 0;
   private pointY = 0;
-  // Captured after openFor applies the target/Selection keep-or-collapse rule;
-  // later graph or Selection changes cannot change the requested artifact.
-  private exportScopeRequest: ExportScopeRequest = { rootIds: [], isMultiSelection: false };
 
   // Requests for the thin UI to open an existing inline editor. The Node and
   // Connection-Layer components watch these and clear them once consumed.
@@ -56,24 +52,19 @@ export class ContextMenuService {
   readonly pinCreateRequest = signal<PinAnchor | null>(null);
   readonly pinEditRequest = signal<string | null>(null);
 
-  // Which menu the thin UI should render for the currently-open context.
-  // Right-clicking a member of a multi-Selection keeps the set and shows the
-  // multi menu; a non-member collapsed to a single target in openFor.
+  // Which menu the thin UI should render for the currently-open context:
+  // the empty Canvas, or a Pin (which never joins the Selection).
   readonly menuKind = computed(() => {
     const t = this.target();
     if (!t) return null;
-    if (this.graphService.selectionSize() > 1) {
-      if (t.kind === 'node' && this.graphService.isNodeSelected(t.nodeId)) return 'multi';
-      if (t.kind === 'connection' && this.graphService.isConnectionSelected(t.connectionId)) return 'multi';
-    }
     return t.kind;
   });
 
-  // A node target shows "Add node" only when it is a Group. Reads nodes()
-  // inside the computed so it stays correct if the target Group is mutated.
-  readonly targetIsGroup = computed(() => {
+  // The Pin target of the open menu, if any — Pins never join the
+  // Selection, so the Selection Toolbar reads this for its Pin case.
+  readonly activePinId = computed(() => {
     const t = this.target();
-    return t?.kind === 'node' && this.isGroup(t.nodeId);
+    return t?.kind === 'pin' ? t.pinId : null;
   });
 
   // Drives the Paste item's disabled state — the menu shape stays stable
@@ -85,60 +76,27 @@ export class ContextMenuService {
   }
 
   /**
-   * Prime the menu for a right-click. A target that is already part of a
-   * multi-Selection keeps the whole Selection (the menu acts on the set);
-   * any other target collapses the Selection to itself, and the empty
-   * Canvas clears it.
+   * Prime the menu for a right-click: the empty Canvas clears the Selection,
+   * a Pin leaves it untouched (Pins never join the Selection).
    */
   openFor(target: ContextTarget, canvasX: number, canvasY: number): void {
     this.target.set(target);
     this.pointX = canvasX;
     this.pointY = canvasY;
 
-    switch (target.kind) {
-      case 'node':
-        if (!this.graphService.isNodeSelected(target.nodeId)) {
-          this.graphService.selectNode(target.nodeId);
-        }
-        break;
-      case 'connection':
-        if (!this.graphService.isConnectionSelected(target.connectionId)) {
-          this.graphService.selectConnection(target.connectionId);
-        }
-        break;
-      case 'canvas':
-        this.graphService.clearSelection();
-        break;
-      case 'pin':
-        // Pins never join the Selection — the current Selection stays as-is
-        break;
+    if (target.kind === 'canvas') {
+      this.graphService.clearSelection();
     }
-
-    const isMultiSelection = this.menuKind() === 'multi';
-    this.exportScopeRequest = {
-      rootIds: isMultiSelection
-        ? [...this.graphService.selectedNodeIds()]
-        : target.kind === 'node' ? [target.nodeId] : [],
-      isMultiSelection,
-    };
   }
 
-  /**
-   * Create a "New Node" (160x48) centered on the right-click point. When the
-   * menu was opened on a Group, the node becomes a child of that Group.
-   */
+  /** Create a "New Node" (160x48) centered on the right-click point. */
   addNode(): void {
-    const target = this.target();
-    if (!target) return;
-    const parentId =
-      target.kind === 'node' && this.isGroup(target.nodeId) ? target.nodeId : undefined;
     this.historyService.execute(
       new CreateNodeCommand(
         this.graphService,
         'New Node',
         this.pointX - NODE_OFFSET_X,
         this.pointY - NODE_OFFSET_Y,
-        parentId,
       ),
     );
   }
@@ -157,49 +115,27 @@ export class ContextMenuService {
 
   /**
    * Create a "New Text Block" (160x48) centered on the right-click point.
-   * When the menu was opened on a Group, the block becomes a child of that
-   * Group — the same placement rule as Add node.
    */
   addTextBlock(): void {
-    const target = this.target();
-    if (!target) return;
-    const parentId =
-      target.kind === 'node' && this.isGroup(target.nodeId) ? target.nodeId : undefined;
     this.historyService.execute(
       new CreateTextBlockCommand(
         this.graphService,
         'New Text Block',
         this.pointX - NODE_OFFSET_X,
         this.pointY - NODE_OFFSET_Y,
-        parentId,
       ),
     );
   }
 
-  private isGroup(nodeId: string): boolean {
-    return this.graphService.nodes().find(n => n.id === nodeId)?.kind === 'group';
-  }
-
   /**
-   * Request a ghost-pin at the right-click point: anchored to the Canvas, or
-   * to the Node/Group target at an offset from its top-left. The popover
-   * opens; Graph State and History stay untouched until a non-empty commit.
+   * Request a ghost-pin at the right-click point, anchored to the Canvas.
+   * The popover opens; Graph State and History stay untouched until a
+   * non-empty commit. Node-anchored Pins come from the Selection Toolbar,
+   * the Command Palette, or armed placement instead.
    */
   addPin(): void {
-    const target = this.target();
-    if (!target) return;
-    if (target.kind === 'canvas') {
-      this.pinCreateRequest.set({ kind: 'canvas', x: this.pointX, y: this.pointY });
-      return;
-    }
-    if (target.kind === 'node') {
-      const node = this.graphService.nodes().find(n => n.id === target.nodeId);
-      if (!node) return;
-      this.pinCreateRequest.set({
-        kind: 'node', nodeId: node.id,
-        offsetX: this.pointX - node.x, offsetY: this.pointY - node.y,
-      });
-    }
+    if (!this.target()) return;
+    this.pinCreateRequest.set({ kind: 'canvas', x: this.pointX, y: this.pointY });
   }
 
   /** Request ghost-pin creation without opening a Context Menu (Palette path). */
@@ -231,26 +167,8 @@ export class ContextMenuService {
     }
   }
 
-  /**
-   * Delete the target — a Node with its Connections (one compound undo step),
-   * or a lone Connection — matching the Delete/Backspace shortcut exactly.
-   */
-  deleteTarget(): void {
-    const target = this.target();
-    if (!target) return;
-    if (target.kind === 'node') {
-      this.historyService.execute(new DeleteNodeCompoundCommand(this.graphService, target.nodeId));
-    } else if (target.kind === 'connection') {
-      this.historyService.execute(new DeleteConnectionCommand(this.graphService, target.connectionId));
-    }
-  }
-
-  /** Ask the UI to open the target Group's inline Label editor (Groups only). */
-  rename(): void {
-    const target = this.target();
-    if (target?.kind === 'node' && this.isGroup(target.nodeId)) {
-      this.renameRequest.set(target.nodeId);
-    }
+  private isGroup(nodeId: string): boolean {
+    return this.graphService.nodes().find(n => n.id === nodeId)?.kind === 'group';
   }
 
   clearRenameRequest(): void {
@@ -260,16 +178,6 @@ export class ContextMenuService {
   /** Request an inline Group Label editor without opening a Context Menu. */
   requestRename(nodeId: string): void {
     if (this.isGroup(nodeId)) this.renameRequest.set(nodeId);
-  }
-
-  /** Ask the UI to open the target Node's or Connection's Text editor. */
-  editText(): void {
-    const target = this.target();
-    if (target?.kind === 'node' && !this.isGroup(target.nodeId)) {
-      this.editTextRequest.set(target.nodeId);
-    } else if (target?.kind === 'connection') {
-      this.connectionTextRequest.set(target.connectionId);
-    }
   }
 
   /** Request an inline Text editor without opening a Context Menu. */
@@ -288,19 +196,12 @@ export class ContextMenuService {
     this.pinEditRequest.set(pinId);
   }
 
-  /** Context Menu "Add Reroute Point": same action on the right-clicked Connection. */
-  addReroutePoint(): void {
-    const target = this.target();
-    if (target?.kind !== 'connection') return;
-    this.addReroutePointToConnection(target.connectionId);
-  }
-
   /**
    * "Add Reroute Point": append a point at the route's midpoint (the route's
    * default text position) and focus it, so arrows move it immediately (shape
    * brief). Silent past the drag path's 32-point ceiling, matching the mouse
-   * add's guard. Shared by the Connection Context Menu and the Command
-   * Palette (which acts on the selected Connection).
+   * add's guard. Shared by the Selection Toolbar and the Command Palette
+   * (which acts on the selected Connection).
    */
   addReroutePointToConnection(connectionId: string): void {
     const conn = this.graphService.connections().find(c => c.id === connectionId);
@@ -327,44 +228,14 @@ export class ContextMenuService {
     });
   }
 
-  // Clipboard actions apply to Nodes and Groups only — a Connection or the
-  // empty Canvas is a silent no-op, matching the shortcut convention.
+  // Clipboard actions on the Selection (ADR-0015): Cut/Copy/Duplicate stay
+  // Node/Group operations — with no Node in the Selection they are silent
+  // no-ops, matching the shortcuts. The Selection Toolbar and the Command
+  // Palette drive these; the Canvas menu offers Paste on empty Canvas.
 
-  /** Copy the target Node or Group onto the Clipboard. Never touches History. */
-  copyTarget(): void {
-    const target = this.target();
-    if (target?.kind === 'node') {
-      this.clipboardService.copy(target.nodeId);
-    }
-  }
-
-  /** Cut the target Node or Group: copy, then remove as one undo step. */
-  cutTarget(): void {
-    const target = this.target();
-    if (target?.kind === 'node') {
-      this.clipboardService.cut(target.nodeId);
-    }
-  }
-
-  /**
-   * Paste centered on the right-click point. On a Group target the pasted
-   * nodes become its children (mirroring "Add node"); on the Canvas they
-   * land parentless.
-   */
+  /** Paste the Clipboard entry centered on the right-click point. */
   pasteHere(): void {
-    const target = this.target();
-    if (!target) return;
-    const parentGroupId =
-      target.kind === 'node' && this.isGroup(target.nodeId) ? target.nodeId : undefined;
-    this.clipboardService.pasteAt(this.pointX, this.pointY, parentGroupId);
-  }
-
-  /** Duplicate the target Node or Group at +24,+24 — Clipboard untouched. */
-  duplicateTarget(): void {
-    const target = this.target();
-    if (target?.kind === 'node') {
-      this.clipboardService.duplicate(target.nodeId);
-    }
+    this.clipboardService.pasteAt(this.pointX, this.pointY);
   }
 
   clearEditTextRequest(): void {
@@ -375,16 +246,9 @@ export class ContextMenuService {
     this.connectionTextRequest.set(null);
   }
 
-  /** Open the existing Export as… dialog for the frozen Node/Group roots. */
-  exportPng(): void {
-    const kind = this.menuKind();
-    if (kind !== 'node' && kind !== 'multi') return;
-    this.exportDialogService.requestOpen(undefined, this.exportScopeRequest);
-  }
-
-  // Multi-Selection menu actions (ADR-0015): each acts on the whole
-  // Selection. Cut/Copy/Duplicate stay Node/Group operations — with no Node
-  // in the Selection they are silent no-ops, matching the shortcuts.
+  // Selection actions (ADR-0015): each acts on the whole Selection.
+  // Cut/Copy/Duplicate stay Node/Group operations — with no Node in the
+  // Selection they are silent no-ops, matching the shortcuts.
 
   cutSelection(): void {
     const nodeIds = this.graphService.selectedNodeIds();
