@@ -20,6 +20,7 @@ import { CanvasToolService } from '../../services/canvas-tool.service';
 import { ToolbarComponent } from '../toolbar/toolbar';
 import { FloatingToolbarComponent } from '../floating-toolbar/floating-toolbar';
 import { SelectionActionsBarComponent } from '../selection-actions-bar/selection-actions-bar';
+import { SelectionToolbarComponent } from '../selection-toolbar/selection-toolbar';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
 import { CollectionService } from '../../services/collection.service';
@@ -38,7 +39,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
   selector: 'app-editor-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CanvasComponent, ToolbarComponent, FloatingToolbarComponent, SelectionActionsBarComponent, MinimapComponent, HistoryPanelComponent, OutlineComponent],
+  imports: [CanvasComponent, ToolbarComponent, FloatingToolbarComponent, SelectionActionsBarComponent, SelectionToolbarComponent, MinimapComponent, HistoryPanelComponent, OutlineComponent],
   template: `
     <h1 class="sr-only">{{ projectTitle() }}</h1>
     @if (!presentationService.active()) {
@@ -82,6 +83,11 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
         <app-selection-actions-bar />
         <app-floating-toolbar />
       </div>
+      <!-- Selection Toolbar (spec #70): near-Selection mirror of the Context
+           Menu actions. Fixed-positioned by the component itself; hidden in
+           Present Mode like all chrome. The component hides for empty
+           Selections, Canvas Lock, and Text edit sessions. -->
+      <app-selection-toolbar />
     }
     <!-- Present Mode's only overlay: a non-interactive Step counter. Live so
          screen readers announce each Step change (WCAG 4.1.3). -->

@@ -20,7 +20,10 @@ export class ChainHighlightService {
 
   readonly hoveredId = this._hoveredId.asReadonly();
 
-  /** True when any suppression condition is active. */
+  /** True while a Node Text/Label or Connection Text edit session is open. */
+  readonly textEditingActive = computed(() => this._nodeEditing() || this._connectionEditing());
+
+  /** True while any suppression condition is active. */
   readonly isSuppressed = computed(() => {
     if (this._dragSuppressed()) return true;
     if (this._nodeEditing()) return true;

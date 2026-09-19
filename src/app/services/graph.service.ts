@@ -696,7 +696,8 @@ export class GraphService {
   // Bounds of the current Selection: each Node by its rect, a Group unioned
   // with its children (a child's edge can overhang the Group rect), each
   // Connection by its cubic bezier curve bounds. Null when nothing is selected.
-  private selectionBounds(): Bounds | null {
+  // Public for the Selection Toolbar anchor; pure Viewport math lives there.
+  selectionBounds(): Bounds | null {
     return this.elementsBounds(this.selectedNodeIds(), this.selectedConnectionIds());
   }
 

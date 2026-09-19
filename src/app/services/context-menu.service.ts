@@ -76,6 +76,13 @@ export class ContextMenuService {
     return t?.kind === 'node' && this.isGroup(t.nodeId);
   });
 
+  // The Pin target of the open menu, if any — Pins never join the
+  // Selection, so the Selection Toolbar reads this for its Pin case.
+  readonly activePinId = computed(() => {
+    const t = this.target();
+    return t?.kind === 'pin' ? t.pinId : null;
+  });
+
   // Drives the Paste item's disabled state — the menu shape stays stable
   readonly canPaste = this.clipboardService.canPaste;
 
