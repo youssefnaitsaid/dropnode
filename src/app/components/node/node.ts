@@ -436,7 +436,8 @@ export class NodeComponent implements AfterViewInit {
       }
     });
 
-    // The context menu's "Rename" opens a Group's inline Label editor
+    // A "Rename" request (Selection Toolbar, Command Palette, Outline) opens
+    // a Group's inline Label editor
     effect(() => {
       if (this.contextMenuService.renameRequest() === this.node().id) {
         this.isEditing.set(true);
@@ -444,7 +445,8 @@ export class NodeComponent implements AfterViewInit {
       }
     });
 
-    // The context menu's "Edit text" opens a regular node's Text editor
+    // An "Edit text" request (Selection Toolbar, Command Palette, Outline)
+    // opens a regular node's Text editor
     effect(() => {
       if (this.contextMenuService.editTextRequest() === this.node().id) {
         this.isEditing.set(true);
@@ -529,7 +531,8 @@ export class NodeComponent implements AfterViewInit {
     // Present Mode and Canvas Lock: no select/drag — let the event bubble
     // to the canvas so Space+drag and middle-drag pans stay live over elements
     if (this.presentationService.active() || this.canvasLock.locked()) return;
-    // Left button only — right-click is reserved for the context menu
+    // Left button only — right-clicks on cards are swallowed (element
+    // actions live in the Selection Toolbar)
     if (event.button !== 0) return;
     event.stopPropagation();
     this.startMove.emit({ nodeId: this.node().id, event });
@@ -650,7 +653,7 @@ export class NodeComponent implements AfterViewInit {
   }
 
   onGripMouseDown(corner: GripCorner, event: MouseEvent): void {
-    // Left button only — right-click is reserved for the context menu
+    // Left button only — right-clicks on grips are swallowed
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();

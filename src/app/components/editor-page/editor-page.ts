@@ -52,7 +52,7 @@ import { CanvasLockService } from '../../services/canvas-lock.service';
     @if (graphService.nodes().length === 0) {
       <div class="empty-canvas-hint">
         <span class="empty-canvas-hint-line">Double-click or double-tap the Canvas to add a Node</span>
-        <span class="empty-canvas-hint-sub">Commands (Ctrl+K) opens the palette · Right-click for more actions</span>
+        <span class="empty-canvas-hint-sub">Commands (Ctrl+K) opens the palette · Right-click the Canvas for adds · Select anything for actions</span>
       </div>
     }
     <!-- Hidden when empty (nothing to map), when the user toggled it off,

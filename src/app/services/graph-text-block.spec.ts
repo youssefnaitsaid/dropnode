@@ -178,18 +178,6 @@ describe('GraphService Text Blocks', () => {
       history.undo();
       expect(service.nodes().length).toBe(0);
     });
-
-    it('creates a child of the Group when the target is a Group', () => {
-      const menus = TestBed.inject(ContextMenuService);
-      const group = service.createGroup('G', 0, 0);
-
-      menus.openFor({ kind: 'node', nodeId: group.id }, 200, 120);
-      menus.addTextBlock();
-
-      const child = service.nodes().find(n => n.parentId === group.id);
-      expect(child?.kind).toBe('annotation');
-      expect(child?.text).toEqual(textFromString('New Text Block'));
-    });
   });
 
   describe('Text Block parity', () => {

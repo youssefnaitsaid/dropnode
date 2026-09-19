@@ -73,7 +73,7 @@ describe('CanvasComponent reroute interactions', () => {
     expect(graphService.connections()[0].reroutePoints).toEqual([{ x: 180, y: 130 }]);
   });
 
-  it('bubbles a marker context menu to the parent Connection target', () => {
+  it('swallows a right-click on a Reroute Point marker: no menu, Selection untouched', () => {
     const connection = makeConnection();
     const marker = fixture.nativeElement.querySelector('.reroute-point') as SVGCircleElement;
 
@@ -85,8 +85,12 @@ describe('CanvasComponent reroute interactions', () => {
       }),
     );
 
-    expect(contextMenuService.menuKind()).toBe('connection');
+    expect(contextMenuService.menuKind()).toBeNull();
+    // Setup selected the Connection to render its marker — the right-click
+    // leaves that Selection exactly as it was.
     expect(graphService.selectedConnectionId()).toBe(connection.id);
+    expect(graphService.nodes().length).toBe(2);
+    expect(connection).toBeTruthy();
   });
 
   it('routes plain and Ctrl Connection selection through the parent selection rules', () => {
@@ -264,17 +268,19 @@ describe('CanvasComponent keyboard context menu', () => {
     expect(contextMenuService.menuKind()).toBe('canvas');
   });
 
-  it('opens the Node menu from Shift+F10 when a Node card is focused', () => {
+  it('summons no menu from Shift+F10 when a Node card is focused (toolbar covers it)', () => {
     const node = graphService.createNode('N', 0, 0);
     fixture.detectChanges();
     const card = fixture.nativeElement.querySelector('[data-node-id]') as HTMLElement;
     card.focus();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }));
-    expect(contextMenuService.menuKind()).toBe('node');
+    expect(contextMenuService.menuKind()).toBeNull();
+    expect(graphService.selectedNodeId()).toBeNull();
+    expect(node).toBeTruthy();
   });
 
-  it('opens the Connection menu from Shift+F10 when a Connection is focused', () => {
+  it('summons no menu from Shift+F10 when a Connection is focused', () => {
     const source = graphService.createNode('A', 0, 0);
     const target = graphService.createNode('B', 320, 0);
     const connection = graphService.createConnection(source.id, 'right', target.id, 'left')!;
@@ -284,11 +290,11 @@ describe('CanvasComponent keyboard context menu', () => {
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }));
 
-    expect(contextMenuService.menuKind()).toBe('connection');
-    expect(graphService.isConnectionSelected(connection.id)).toBe(true);
+    expect(contextMenuService.menuKind()).toBeNull();
+    expect(graphService.isConnectionSelected(connection.id)).toBe(false);
   });
 
-  it('opens the Connection menu from Shift+F10 when a Reroute Point is focused', () => {
+  it('summons no menu from Shift+F10 when a Reroute Point is focused', () => {
     const source = graphService.createNode('A', 0, 0);
     const target = graphService.createNode('B', 320, 0);
     const connection = graphService.createConnection(source.id, 'right', target.id, 'left')!;
@@ -300,7 +306,7 @@ describe('CanvasComponent keyboard context menu', () => {
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }));
 
-    expect(contextMenuService.menuKind()).toBe('connection');
+    expect(contextMenuService.menuKind()).toBeNull();
   });
 
   it('ignores Shift+F10 while focus is in an input', () => {

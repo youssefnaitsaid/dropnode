@@ -88,7 +88,7 @@ The honest trade-off: because there is no cloud, your graphs live in the browser
 ### Performance & accessibility
 
 - **Snappy at scale** — designed for graphs of ~200 nodes and ~100 connections with hybrid DOM/SVG rendering and `OnPush` change detection.
-- **Keyboard-first** — every node, handle, connection, reroute point, and pin is keyboard-focusable and screen-reader named; arrows nudge, `Enter` activates, `Shift+F10` opens the context menu.
+- **Keyboard-first** — every node, handle, connection, reroute point, and pin is keyboard-focusable and screen-reader named; arrows nudge, `Enter` activates, the Selection Toolbar is Tab-reachable, `Shift+F10` opens the empty-Canvas context menu.
 
 ## Getting started
 

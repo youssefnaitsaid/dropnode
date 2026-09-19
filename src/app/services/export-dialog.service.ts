@@ -22,9 +22,9 @@ export class ExportDialogService {
   readonly openRequests: Signal<number> = this._openRequests.asReadonly();
   /** The Project the current request came from, if any. */
   readonly projectId: Signal<string | undefined> = this._projectId.asReadonly();
-  /** Frozen Export Scope request captured when a Context Menu opened. */
+  /** Frozen Export Scope request captured by the Selection Toolbar. */
   readonly scope: Signal<Required<ExportScopeRequest> | undefined> = this._scope.asReadonly();
-  /** Frozen Export Scope roots captured when a Context Menu opened. */
+  /** Frozen Export Scope roots captured by the Selection Toolbar. */
   readonly scopeRootIds: Signal<readonly string[] | undefined> = computed(() => this._scope()?.rootIds);
   /** Format requested by a direct palette entry; scoped requests always use PNG. */
   readonly format: Signal<ExportFormat> = this._format.asReadonly();

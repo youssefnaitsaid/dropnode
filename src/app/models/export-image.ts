@@ -35,7 +35,7 @@ export interface ExportScope {
   pins: Pin[];
 }
 
-/** Frozen scope metadata carried from a Context Menu into the Export dialog. */
+/** Frozen scope metadata carried from the Selection Toolbar into the Export dialog. */
 export interface ExportScopeRequest {
   rootIds: readonly string[];
   isMultiSelection?: boolean;

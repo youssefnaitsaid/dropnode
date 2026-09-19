@@ -5,17 +5,11 @@ import {
 import { CdkContextMenuTrigger } from '@angular/cdk/menu';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
-  lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
-  lucideImageDown, lucideMessageCircle,
-  lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
-  lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
-  lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
-  lucideMoveDiagonal2, lucideCheck, lucideMapPin,
+  lucideSquarePlus, lucideGroup, lucideTrash2,
+  lucideClipboardPaste, lucideMessageCircle,
 } from '@ng-icons/lucide';
 import {
-  HlmDropdownMenu, HlmDropdownMenuItem, HlmDropdownMenuSub, HlmDropdownMenuSubTrigger,
-  HlmDropdownMenuItemSubIndicator,
+  HlmDropdownMenu, HlmDropdownMenuItem,
 } from '@spartan-ng/helm/dropdown-menu';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -23,7 +17,6 @@ import { ContextMenuService } from '../../services/context-menu.service';
 import { ClipboardService } from '../../services/clipboard.service';
 import { PresentationService } from '../../services/presentation.service';
 import { CanvasLockService } from '../../services/canvas-lock.service';
-import { ResizeModeService } from '../../services/resize-mode.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
 import { CanvasToolService } from '../../services/canvas-tool.service';
 import {
@@ -63,17 +56,11 @@ import { Text } from '../../models/text';
   imports: [
     NodeComponent, ConnectionLayerComponent, PinLayerComponent, NgIcon,
     CdkContextMenuTrigger, HlmDropdownMenu, HlmDropdownMenuItem,
-    HlmDropdownMenuSub, HlmDropdownMenuSubTrigger, HlmDropdownMenuItemSubIndicator,
   ],
   providers: [
     provideIcons({
-      lucideSquarePlus, lucideGroup, lucidePencil, lucideTag, lucideTrash2,
-      lucideScissors, lucideCopy, lucideClipboardPaste, lucideCopyPlus,
-      lucideImageDown, lucideMessageCircle,
-      lucideAlignStartVertical, lucideAlignCenterVertical, lucideAlignEndVertical,
-      lucideAlignStartHorizontal, lucideAlignCenterHorizontal, lucideAlignEndHorizontal,
-      lucideAlignHorizontalSpaceBetween, lucideAlignVerticalSpaceBetween,
-      lucideMoveDiagonal2, lucideCheck, lucideMapPin,
+      lucideSquarePlus, lucideGroup, lucideTrash2,
+      lucideClipboardPaste, lucideMessageCircle,
     }),
   ],
   template: `
@@ -212,82 +199,6 @@ import { Text } from '../../models/text';
               <span>Paste</span>
             </button>
           }
-          @case ('node') {
-            @if (contextMenuService.targetIsGroup()) {
-              <button hlmDropdownMenuItem (triggered)="contextMenuService.addNode()">
-                <ng-icon name="lucideSquarePlus" />
-                <span>Add node</span>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="contextMenuService.addTextBlock()">
-                <ng-icon name="lucideSquarePlus" />
-                <span>Add text block</span>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="contextMenuService.rename()">
-                <ng-icon name="lucidePencil" />
-                <span>Rename</span>
-              </button>
-            } @else {
-              <button hlmDropdownMenuItem (triggered)="contextMenuService.editText()">
-                <ng-icon name="lucidePencil" />
-                <span>Edit text</span>
-              </button>
-            }
-            <button
-              hlmDropdownMenuItem
-              [attr.aria-pressed]="resizeMode.mode()"
-              (triggered)="resizeMode.toggle()"
-            >
-              <ng-icon name="lucideMoveDiagonal2" />
-              <span>Resize mode</span>
-              @if (resizeMode.mode()) {
-                <ng-icon name="lucideCheck" class="ml-auto" />
-              }
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.addPin()">
-              <ng-icon name="lucideMessageCircle" />
-              <span>Add pin</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.cutTarget()">
-              <ng-icon name="lucideScissors" />
-              <span>Cut</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.copyTarget()">
-              <ng-icon name="lucideCopy" />
-              <span>Copy</span>
-            </button>
-            @if (contextMenuService.targetIsGroup()) {
-              <button hlmDropdownMenuItem [disabled]="!contextMenuService.canPaste()" (triggered)="contextMenuService.pasteHere()">
-                <ng-icon name="lucideClipboardPaste" />
-                <span>Paste</span>
-              </button>
-            }
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.duplicateTarget()">
-              <ng-icon name="lucideCopyPlus" />
-              <span>Duplicate</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.exportPng()">
-              <ng-icon name="lucideImageDown" />
-              <span>Export as PNG</span>
-            </button>
-            <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteTarget()">
-              <ng-icon name="lucideTrash2" />
-              <span>Delete</span>
-            </button>
-          }
-          @case ('connection') {
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.editText()">
-              <ng-icon name="lucideTag" />
-              <span>Edit text</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.addReroutePoint()">
-              <ng-icon name="lucideMapPin" />
-              <span>Add Reroute Point</span>
-            </button>
-            <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteTarget()">
-              <ng-icon name="lucideTrash2" />
-              <span>Delete</span>
-            </button>
-          }
           @case ('pin') {
             <button hlmDropdownMenuItem (triggered)="contextMenuService.editPin()">
               <ng-icon name="lucideMessageCircle" />
@@ -298,75 +209,7 @@ import { Text } from '../../models/text';
               <span>Delete pin</span>
             </button>
           }
-          @case ('multi') {
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.cutSelection()">
-              <ng-icon name="lucideScissors" />
-              <span>Cut</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.copySelection()">
-              <ng-icon name="lucideCopy" />
-              <span>Copy</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.duplicateSelection()">
-              <ng-icon name="lucideCopyPlus" />
-              <span>Duplicate</span>
-            </button>
-            @if (contextMenuService.canAlign()) {
-              <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="alignSubmenu">
-                <ng-icon name="lucideAlignStartVertical" />
-                <span>Align</span>
-                <hlm-dropdown-menu-item-sub-indicator />
-              </button>
-            }
-            <button hlmDropdownMenuItem (triggered)="contextMenuService.exportPng()">
-              <ng-icon name="lucideImageDown" />
-              <span>Export as PNG</span>
-            </button>
-            <button hlmDropdownMenuItem variant="destructive" (triggered)="contextMenuService.deleteSelection()">
-              <ng-icon name="lucideTrash2" />
-              <span>Delete</span>
-            </button>
-          }
         }
-      </div>
-    </ng-template>
-
-    <!-- Align/Distribute submenu of the multi menu (spec #25): eight Commands
-         on the Selection's roots; Distribute needs three of them -->
-    <ng-template #alignSubmenu>
-      <div hlmDropdownMenuSub class="w-52">
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('left')">
-          <ng-icon name="lucideAlignStartVertical" />
-          <span>Align left</span>
-        </button>
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('center')">
-          <ng-icon name="lucideAlignCenterVertical" />
-          <span>Align horizontal center</span>
-        </button>
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('right')">
-          <ng-icon name="lucideAlignEndVertical" />
-          <span>Align right</span>
-        </button>
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('top')">
-          <ng-icon name="lucideAlignStartHorizontal" />
-          <span>Align top</span>
-        </button>
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('middle')">
-          <ng-icon name="lucideAlignCenterHorizontal" />
-          <span>Align vertical middle</span>
-        </button>
-        <button hlmDropdownMenuItem (triggered)="contextMenuService.alignSelection('bottom')">
-          <ng-icon name="lucideAlignEndHorizontal" />
-          <span>Align bottom</span>
-        </button>
-        <button hlmDropdownMenuItem [disabled]="!contextMenuService.canDistribute()" (triggered)="contextMenuService.distributeSelection('horizontal')">
-          <ng-icon name="lucideAlignHorizontalSpaceBetween" />
-          <span>Distribute horizontally</span>
-        </button>
-        <button hlmDropdownMenuItem [disabled]="!contextMenuService.canDistribute()" (triggered)="contextMenuService.distributeSelection('vertical')">
-          <ng-icon name="lucideAlignVerticalSpaceBetween" />
-          <span>Distribute vertically</span>
-        </button>
       </div>
     </ng-template>
   `,
@@ -442,7 +285,6 @@ export class CanvasComponent {
   contextMenuService = inject(ContextMenuService);
   presentationService = inject(PresentationService);
   private canvasLock = inject(CanvasLockService);
-  protected resizeMode = inject(ResizeModeService);
   private historyService = inject(HistoryService);
   private clipboardService = inject(ClipboardService);
   private chainHighlightService = inject(ChainHighlightService);
@@ -729,8 +571,9 @@ export class CanvasComponent {
       return;
     }
     if ((event.target as HTMLElement | null)?.closest?.('app-node, [data-pin-id], .pin-popover')) return;
-    // Left button only — right-click is reserved for the context menu and
-    // must never start a Marquee or clear selection (the menu handles that)
+    // Left button only — non-left buttons never start a Marquee or clear the
+    // Selection (right-clicks on elements are swallowed; Canvas and Pin
+    // right-clicks open their menus through the contextmenu handler below)
     if (event.button !== 0) return;
     // Present Mode and Canvas Lock: no Marquee, no click-to-clear — the pan
     // branches above stay live (free-roam is part of the tour, and Lock is
@@ -833,9 +676,10 @@ export class CanvasComponent {
   }
 
   // Space tracking for the pan gesture; ignored while typing so the editors
-  // keep their spacebar. Shift+F10 / the Context Menu key opens the Canvas
-  // context menu for keyboard users (WCAG 2.1.1): the menu resolves its
-  // target exactly like a right-click, from the focused element downward.
+  // keep their spacebar. Shift+F10 / the Context Menu key opens the
+  // empty-Canvas context menu for keyboard users (WCAG 2.1.1). Element
+  // actions are keyboard-reachable through the Selection Toolbar instead,
+  // so element focus no longer summons a menu.
   @HostListener('document:keydown', ['$event'])
   onDocumentKeyDown(event: KeyboardEvent): void {
     if (event.key === 'F10' && event.shiftKey || event.key === 'ContextMenu') {
@@ -853,77 +697,19 @@ export class CanvasComponent {
   }
 
   /**
-   * Keyboard path to the Context Menu. Dispatches a synthetic contextmenu on
-   * the element that represents the current target — the focused Node card,
-   * the selected Node/Connection, or the empty Canvas — so the existing
-   * target-resolution and open flow runs unchanged (synthetic events never
-   * summon the browser's native menu).
+   * Keyboard path to the empty-Canvas Context Menu. Dispatches a synthetic
+   * contextmenu on the Canvas container (synthetic events never summon the
+   * browser's native menu). It mirrors right-click exactly: element focus or
+   * a non-empty Selection summons nothing — element actions live in the
+   * Selection Toolbar, which keyboard users reach by Tab.
    */
   private openContextMenuForKeyboard(): void {
     if (this.presentationService.active() || this.canvasLock.locked()) return;
-    // Element, not HTMLElement: SVG paths (Connection hit targets) are
-    // focusable too, and they are Elements, never HTMLElements
+    if (this.graphService.selectionSize() > 0) return;
     const active = document.activeElement instanceof Element ? document.activeElement : null;
+    if (active?.closest?.('[data-node-id],path.connection-hit,.reroute-point,[data-pin-id]')) return;
 
-    // Focus is on a Node card: its menu (multi-Selection keep/collapse applies)
-    const nodeEl = active?.closest('[data-node-id]') as HTMLElement | null;
-    if (nodeEl) {
-      this.dispatchContextMenu(nodeEl);
-      return;
-    }
-
-    // Focus is on a Connection hit path (tab order or the [ / ] cycle):
-    // select it if needed, then open its menu — the keyboard path to a
-    // Connection's commands
-    const connHit = active?.closest('path.connection-hit') as SVGPathElement | null;
-    if (connHit) {
-      const connectionId = connHit.getAttribute('data-connection-id');
-      if (connectionId && !this.graphService.isConnectionSelected(connectionId)) {
-        this.graphService.selectConnection(connectionId);
-      }
-      this.dispatchContextMenu(connHit);
-      return;
-    }
-
-    // Focus is on a Reroute Point: its Connection's menu — the point can't
-    // carry its own menu, and its actions (Edit text, Delete) are the
-    // Connection's
-    const rerouteEl = active?.closest('.reroute-point') as SVGCircleElement | null;
-    if (rerouteEl) {
-      const connectionId = rerouteEl.getAttribute('data-connection-id');
-      if (connectionId) {
-        if (!this.graphService.isConnectionSelected(connectionId)) {
-          this.graphService.selectConnection(connectionId);
-        }
-        const hit = document.querySelector<SVGPathElement>(
-          `path.connection-hit[data-connection-id="${connectionId}"]`,
-        );
-        if (hit) this.dispatchContextMenu(hit);
-        return;
-      }
-    }
-
-    // A Selection exists: open on its selected Node, else its Connection
-    const selectedNodeId = this.graphService.selectedNodeId();
-    if (selectedNodeId) {
-      const card = document.querySelector<HTMLElement>(`[data-node-id="${selectedNodeId}"]`);
-      if (card) {
-        this.dispatchContextMenu(card);
-        return;
-      }
-    }
-    const selectedConnectionId = this.graphService.selectedConnectionId();
-    if (selectedConnectionId) {
-      const hit = document.querySelector<SVGPathElement>(
-        `path.connection-hit[data-connection-id="${selectedConnectionId}"]`,
-      );
-      if (hit) {
-        this.dispatchContextMenu(hit);
-        return;
-      }
-    }
-
-    // Nothing selected: the empty-Canvas menu, centered
+    // The empty-Canvas menu, centered
     const container = document.querySelector<HTMLElement>('.canvas-container');
     if (container) this.dispatchContextMenu(container);
   }
@@ -945,10 +731,13 @@ export class CanvasComponent {
     }
   }
 
-  // Right-click: select the target and prime the context menu with the
-  // right-click point (in canvas coords). The CdkContextMenuTrigger on the
-  // outer element opens the menu; inline text inputs stop propagation so the
-  // native browser menu still works there.
+  // Right-click: prime the remaining context menus (empty Canvas, Pin) with
+  // the right-click point (in canvas coords). Element actions live in the
+  // Selection Toolbar, so right-clicks on Nodes, Groups, Text Blocks,
+  // Connections, and Reroute Points are swallowed — no menu, Selection
+  // untouched. The CdkContextMenuTrigger on the outer element opens the
+  // menu; inline text inputs stop propagation so the native browser menu
+  // still works there.
   onContextMenu(event: MouseEvent): void {
     // Armed placement: right-click cancels arming with no History entry
     // and no menu
@@ -970,21 +759,10 @@ export class CanvasComponent {
     const el = event.target as HTMLElement | null;
     const canvasPos = this.clientPointToCanvas(event.clientX, event.clientY) ?? { x: 0, y: 0 };
 
-    const nodeEl = el?.closest?.('[data-node-id]');
-    if (nodeEl) {
-      this.contextMenuService.openFor(
-        { kind: 'node', nodeId: nodeEl.getAttribute('data-node-id')! },
-        canvasPos.x, canvasPos.y,
-      );
-      return;
-    }
-
-    const connEl = el?.closest?.('[data-connection-id]');
-    if (connEl) {
-      this.contextMenuService.openFor(
-        { kind: 'connection', connectionId: connEl.getAttribute('data-connection-id')! },
-        canvasPos.x, canvasPos.y,
-      );
+    const nodeOrConnEl = el?.closest?.('[data-node-id],[data-connection-id]');
+    if (nodeOrConnEl) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 

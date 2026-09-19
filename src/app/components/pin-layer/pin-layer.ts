@@ -180,7 +180,7 @@ export class PinLayerComponent {
   private suppressCommit = false;
 
   constructor() {
-    // Consume ghost-pin creation requests (Context Menu, Palette Entry)
+    // Consume ghost-pin creation requests (Canvas menu, Palette Entry)
     effect(() => {
       const request = this.contextMenuService.pinCreateRequest();
       if (!request) return;
@@ -189,7 +189,7 @@ export class PinLayerComponent {
       this.openPopover({ mode: 'ghost', anchor: request, x: point?.x ?? 0, y: point?.y ?? 0 }, '');
     });
 
-    // Consume edit requests (Context Menu "Edit pin")
+    // Consume edit requests (Pin menu "Edit pin")
     effect(() => {
       const pinId = this.contextMenuService.pinEditRequest();
       if (!pinId) return;

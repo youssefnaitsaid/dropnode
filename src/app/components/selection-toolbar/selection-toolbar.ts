@@ -41,7 +41,7 @@ import { PresentationService } from '../../services/presentation.service';
 import { ChainHighlightService } from '../../services/chain-highlight.service';
 import { CreateNodeCommand, CreateTextBlockCommand } from '../../services/commands';
 
-/** Which mirror the toolbar shows: one per Context Menu shape. */
+/** Which mirror the toolbar shows: one per Selection shape. */
 type ToolbarKind = 'single-node' | 'single-group' | 'single-connection' | 'multi' | 'pin';
 
 export interface ToolbarAnchor {
