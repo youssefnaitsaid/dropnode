@@ -349,6 +349,21 @@ describe('SelectionToolbarComponent', () => {
       ) as HTMLElement;
       expect(getComputedStyle(menu).position).toBe('absolute');
     });
+
+    it('docks More flush to the toolbar with no entry animation', () => {
+      stubContainer({ left: 0, top: 80, width: 800, height: 600 });
+      const node = graph.createNode('N', 0, 0);
+      graph.selectNode(node.id);
+      fixture.detectChanges();
+      button('More options')!.click();
+      fixture.detectChanges();
+      const menu = fixture.nativeElement.querySelector(
+        '[aria-label="More selection actions"]',
+      ) as HTMLElement;
+      const style = getComputedStyle(menu);
+      expect(style.top).toBe('100%');
+      expect(style.animationName).toBe('none');
+    });
   });
 
   it('cuts the Selection onto the Clipboard and closes', () => {

@@ -268,18 +268,19 @@ export function anchorToolbar(
       transform: translateX(-50%);
       bottom: calc(100% + 8px);
     }
-    /* More pops below the toolbar by default; .more-above docks it above
-       when the Viewport bottom cannot fit it. Either way it is out of flow,
-       so the toolbar row stays fixed. */
+    /* More docks flush against the toolbar row — no gap — and never
+       animates: it appears instantly, out of flow, so the row stays fixed. */
     .toolbar-stack > [data-slot='dropdown-menu'] {
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
-      top: calc(100% + 8px);
+      top: 100%;
+      animation: none !important;
+      transition: none !important;
     }
     .toolbar-stack.more-above > [data-slot='dropdown-menu'] {
       top: auto;
-      bottom: calc(100% + 8px);
+      bottom: 100%;
     }
     .selection-toolbar {
       display: flex;
@@ -356,7 +357,7 @@ export class SelectionToolbarComponent {
   readonly moreBelow = computed(() => {
     const pos = this.position();
     const toolbarBottom = pos.y + (pos.flipped ? TOOLBAR_ROW_HEIGHT : 0);
-    return window.innerHeight - toolbarBottom - ANCHOR_GAP >= MORE_PANEL_HEIGHT;
+    return window.innerHeight - toolbarBottom >= MORE_PANEL_HEIGHT;
   });
 
   /** The single selected Node, when the Selection is exactly one Node. */
