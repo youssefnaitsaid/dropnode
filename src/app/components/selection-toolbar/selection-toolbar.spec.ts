@@ -36,6 +36,8 @@ describe('SelectionToolbarComponent', () => {
 
   afterEach(() => {
     fixture?.destroy();
+    // The styling triggers open CDK overlay menus into the document body
+    document.body.innerHTML = '';
   });
 
   it('shows nothing for an empty Selection', () => {
@@ -477,8 +479,17 @@ describe('SelectionToolbarComponent', () => {
     fixture.detectChanges();
     const first = button('Edit text')!;
     first.focus();
+    // Node styling sits inline between Edit and the clipboard actions.
     first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Node styling');
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+    );
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Cut');
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
+    );
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Node styling');
     (document.activeElement as HTMLElement).dispatchEvent(
       new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
     );
@@ -496,5 +507,324 @@ describe('SelectionToolbarComponent', () => {
     expect(panel?.querySelector('[aria-label="Export as PNG"]')?.getAttribute('data-slot')).toBe(
       'dropdown-menu-item',
     );
+  });
+
+  it('shows one Node styling trigger and applies Shape to regular Nodes only, undoing as one command', async () => {
+    const node = graph.createNode('Node', 0, 0);
+    const group = graph.createGroup('Group', 400, 0);
+    graph.setSelection([node.id, group.id], []);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling');
+    expect(trigger).not.toBeNull();
+
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pill = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Pill',
+    ) as HTMLButtonElement;
+    expect(pill).toBeTruthy();
+    pill.click();
+    fixture.detectChanges();
+
+    expect(graph.nodes().find(item => item.id === node.id)?.shape).toBe('pill');
+    expect(graph.nodes().find(item => item.id === group.id)?.shape).toBeUndefined();
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect(graph.nodes().find(item => item.id === node.id)?.shape).toBeUndefined();
+  });
+
+  it('shows no Shape check for a mixed regular selection and disables Shape items for a Group-only selection', async () => {
+    const first = graph.createNode('First', 0, 0);
+    const second = graph.createNode('Second', 300, 0);
+    graph.setNodeShape(second.id, 'ellipse');
+    graph.setSelection([first.id, second.id], []);
+    fixture.detectChanges();
+
+    // Mixed regular selection: no shared Shape, so no item can read active
+    expect(fixture.componentInstance.sharedNodeShape()).toBeUndefined();
+
+    // Group-only selection: the trigger stays (Groups take color), but the
+    // Shape section is disabled and clicking does nothing
+    graph.selectNode(graph.createGroup('Only Group', 600, 0).id);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling');
+    expect(trigger).not.toBeNull();
+
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pill = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Pill',
+    ) as HTMLButtonElement;
+    expect(pill.hasAttribute('disabled')).toBe(true);
+
+    pill.click();
+    fixture.detectChanges();
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('shows an Emoji section and applies the pick to regular Nodes only, undoing as one command', async () => {
+    const node = graph.createNode('Node', 0, 0);
+    const group = graph.createGroup('Group', 400, 0);
+    graph.setSelection([node.id, group.id], []);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling');
+    expect(trigger).not.toBeNull();
+
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const cells = Array.from(document.body.querySelectorAll('.emoji-cell')) as HTMLButtonElement[];
+    expect(cells).toHaveLength(48);
+    const idea = cells.find(button => button.getAttribute('aria-label') === 'Idea')!;
+    expect(idea.getAttribute('title')).toBe('Idea');
+    idea.click();
+    fixture.detectChanges();
+
+    expect(graph.nodes().find(item => item.id === node.id)?.emoji).toBe('💡');
+    expect(graph.nodes().find(item => item.id === group.id)?.emoji).toBeUndefined();
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect(graph.nodes().find(item => item.id === node.id)?.emoji).toBeUndefined();
+  });
+
+  it('shows no Emoji check for a mixed regular selection and disables Emoji items for a Group-only selection', async () => {
+    const first = graph.createNode('First', 0, 0);
+    const second = graph.createNode('Second', 300, 0);
+    graph.setNodeEmoji(second.id, '💡');
+    graph.setSelection([first.id, second.id], []);
+    fixture.detectChanges();
+
+    // Mixed regular selection: no shared Emoji, so no item can read active
+    expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
+
+    // Group-only selection: the trigger stays (Groups take color), but the
+    // Emoji section is disabled with a hint and clicking does nothing
+    graph.selectNode(graph.createGroup('Only Group', 600, 0).id);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
+
+    const trigger = button('Node styling');
+    expect(trigger).not.toBeNull();
+
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const label = Array.from(document.body.querySelectorAll('*')).find(
+      el => el.textContent?.trim() === 'Emoji — select a regular Node first',
+    );
+    expect(label).toBeTruthy();
+    const idea = Array.from(document.body.querySelectorAll('.emoji-cell')).find(
+      button => button.getAttribute('aria-label') === 'Idea',
+    ) as HTMLButtonElement;
+    expect(idea.hasAttribute('disabled')).toBe(true);
+
+    idea.click();
+    fixture.detectChanges();
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('shows a Route Style section and applies orthogonal to selected Connections, undoing as one command', async () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.selectConnection(conn.id);
+    fixture.detectChanges();
+
+    const trigger = button('Connection styling');
+    expect(trigger).not.toBeNull();
+
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const orthogonal = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Orthogonal',
+    ) as HTMLButtonElement;
+    expect(orthogonal).toBeTruthy();
+    orthogonal.click();
+    fixture.detectChanges();
+
+    expect(graph.connections()[0].routeStyle).toBe('orthogonal');
+    expect(fixture.componentInstance.sharedRouteStyle()).toBe('orthogonal');
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect('routeStyle' in graph.connections()[0]).toBe(false);
+  });
+
+  it('shows a Custom section with Project hues and applies one to selected Nodes as one undo step', async () => {
+    const node = graph.createNode('Node', 0, 0);
+    graph.addCustomPaletteColor('#A1B2C3');
+    graph.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling')!;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(apply).toBeTruthy();
+    apply.click();
+    fixture.detectChanges();
+
+    expect(graph.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+    expect(fixture.componentInstance.sharedNodeColor()).toBe('#A1B2C3');
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect(graph.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
+  });
+
+  it('adds a custom hue from the menu hex input and deletes it resetting uses to default as one undo step', async () => {
+    const node = graph.createNode('Node', 0, 0);
+    graph.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling')!;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
+    expect(hexInput).toBeTruthy();
+    hexInput.value = '#a1b2c3';
+    hexInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const add = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Add custom hue',
+    ) as HTMLButtonElement;
+    add.click();
+    fixture.detectChanges();
+
+    expect(graph.customPalette()).toEqual(['#A1B2C3']);
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    apply.click();
+    fixture.detectChanges();
+    expect(graph.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+
+    // Applying closes the menu like any curated pick — reopen to manage.
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const remove = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Remove custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(remove).toBeTruthy();
+    remove.click();
+    fixture.detectChanges();
+
+    expect(graph.customPalette()).toEqual([]);
+    expect(graph.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
+    expect(fixture.componentInstance.sharedNodeColor()).toBeNull();
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    // Undo restores the hues but not the roster entry — re-adding re-links.
+    expect(graph.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
+    expect(graph.customPalette()).toEqual([]);
+  });
+
+  it('explains invalid hex input instead of storing it', async () => {
+    const node = graph.createNode('Node', 0, 0);
+    graph.setSelection([node.id], []);
+    fixture.detectChanges();
+
+    const trigger = button('Node styling')!;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
+    hexInput.value = 'red';
+    hexInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const add = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Add custom hue',
+    ) as HTMLButtonElement;
+    add.click();
+    fixture.detectChanges();
+
+    expect(graph.customPalette()).toEqual([]);
+    const error = Array.from(document.body.querySelectorAll('*')).find(
+      el => el.textContent?.trim() === 'Enter a #RRGGBB hex not already in the palette (16 max).',
+    );
+    expect(error).toBeTruthy();
+  });
+
+  it('shows customs in the Connection menu and applies with the shared check', async () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.addCustomPaletteColor('#A1B2C3');
+    graph.selectConnection(conn.id);
+    fixture.detectChanges();
+
+    const trigger = button('Connection styling')!;
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const apply = Array.from(document.body.querySelectorAll('button')).find(
+      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
+    ) as HTMLButtonElement;
+    expect(apply).toBeTruthy();
+    apply.click();
+    fixture.detectChanges();
+
+    expect(graph.connections()[0].color).toBe('#A1B2C3');
+    expect(fixture.componentInstance.sharedConnectionColor()).toBe('#A1B2C3');
+    expect(history.canUndo()).toBe(true);
+  });
+
+  it('shows both styling triggers for a mixed Node + Connection Selection', () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.setSelection([a.id], [conn.id]);
+    fixture.detectChanges();
+
+    expect(toolbar()).not.toBeNull();
+    expect(button('Node styling')).not.toBeNull();
+    expect(button('Connection styling')).not.toBeNull();
+  });
+
+  it('hides both styling triggers for a Pin Selection', () => {
+    const pin = graph.createPin({ kind: 'canvas', x: 100, y: 100 }, 'hello')!;
+    TestBed.inject(ContextMenuService).openFor({ kind: 'pin', pinId: pin.id }, 100, 100);
+    fixture.detectChanges();
+
+    expect(toolbar()).not.toBeNull();
+    expect(button('Node styling')).toBeNull();
+    expect(button('Connection styling')).toBeNull();
   });
 });

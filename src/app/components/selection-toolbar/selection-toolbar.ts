@@ -23,12 +23,35 @@ import {
   lucideImageDown,
   lucideMapPin,
   lucideAlignStartVertical,
+  lucideCheck,
+  lucideX,
+  lucideMinus,
+  lucideArrowRight,
+  lucidePlay,
 } from '@ng-icons/lucide';
 import { HlmButton } from '@spartan-ng/helm/button';
 import {
   HlmDropdownMenu,
+  HlmDropdownMenuTrigger,
   HlmDropdownMenuItem,
+  HlmDropdownMenuLabel,
+  HlmDropdownMenuSeparator,
 } from '@spartan-ng/helm/dropdown-menu';
+import {
+  buildSetNodesColorCommand,
+  buildResetCustomPaletteUsesCommand,
+  buildSetNodesShapeCommand,
+  buildSetNodesEmojiCommand,
+  buildSetConnectionsColorCommand,
+  buildSetConnectionsArrowheadCommand,
+  buildSetConnectionsStrokePatternCommand,
+  buildSetConnectionsStrokeWeightCommand,
+  buildSetConnectionsRouteStyleCommand,
+} from '../../services/commands';
+import { DEFAULT_NODE_BACKGROUND, NODE_PALETTE, NODE_PALETTE_NAMES, MAX_CUSTOM_PALETTE_COLORS, isCustomPaletteHex } from '../../models/node';
+import { NODE_EMOJIS } from '../../models/node-emoji';
+import { NodeShape, effectiveNodeShape } from '../../models/node-shape';
+import { ArrowheadType, ArrowheadEnd, effectiveArrowhead, StrokePattern, StrokeWeight, effectiveStrokePattern, effectiveStrokeWeight, RouteStyle, effectiveRouteStyle } from '../../models/connection';
 import { AlignPopoverComponent } from '../align-popover/align-popover';
 import { GraphService } from '../../services/graph.service';
 import { HistoryService } from '../../services/history.service';
@@ -107,7 +130,7 @@ export function anchorToolbar(
   selector: 'app-selection-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmButton, HlmDropdownMenu, HlmDropdownMenuItem, AlignPopoverComponent],
+  imports: [NgIcon, HlmButton, HlmDropdownMenu, HlmDropdownMenuTrigger, HlmDropdownMenuItem, HlmDropdownMenuLabel, HlmDropdownMenuSeparator, AlignPopoverComponent],
   host: {
     '[style.left.px]': 'position().x',
     '[style.top.px]': 'position().y',
@@ -128,6 +151,11 @@ export function anchorToolbar(
       lucideImageDown,
       lucideMapPin,
       lucideAlignStartVertical,
+      lucideCheck,
+      lucideX,
+      lucideMinus,
+      lucideArrowRight,
+      lucidePlay,
     }),
   ],
   template: `
@@ -154,8 +182,62 @@ export function anchorToolbar(
             <button hlmBtn variant="ghost" size="icon" (click)="addReroutePoint()" title="Add Reroute Point" aria-label="Add Reroute Point">
               <ng-icon name="lucideMapPin" />
             </button>
-            <button hlmBtn variant="ghost" size="icon" (click)="remove()" title="Delete" aria-label="Delete">
-              <ng-icon name="lucideTrash2" />
+          }
+          @if (graph.selectedNodes().length > 0) {
+            <!-- Node styling: one trigger previewing the shared color and Shape
+                 (ADR-0028); the details live in the dropdown so a Node selection
+                 reads as one decision instead of thirteen buttons. -->
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon"
+              [hlmDropdownMenuTrigger]="nodeMenu"
+              title="Node — color, shape, and emoji"
+              aria-label="Node styling"
+            >
+              <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                <g [attr.fill]="nodePreviewFill()" stroke="currentColor" stroke-width="1.5">
+                  @switch (nodePreviewShape()) {
+                    @case ('rectangle') {
+                      <rect x="3" y="5" width="14" height="10" rx="2" />
+                    }
+                    @case ('pill') {
+                      <rect x="2" y="6" width="16" height="8" rx="4" />
+                    }
+                    @case ('diamond') {
+                      <polygon points="10,2 18,10 10,18 2,10" />
+                    }
+                    @default {
+                      <ellipse cx="10" cy="10" rx="7" ry="5" />
+                    }
+                  }
+                </g>
+              </svg>
+            </button>
+          }
+          @if (graph.selectedConnections().length > 0) {
+            <!-- Connection styling: one trigger previewing the shared color,
+                 pattern, and weight; the details live in the dropdown so a
+                 Connection selection reads as one decision instead of twenty-two
+                 buttons (ADR-0028). -->
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon"
+              [hlmDropdownMenuTrigger]="connectionMenu"
+              title="Connection — color, arrowheads, pattern, weight"
+              aria-label="Connection styling"
+            >
+              <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                <path
+                  d="M2 10 H18"
+                  fill="none"
+                  [attr.stroke]="connectionPreviewColor()"
+                  [attr.stroke-width]="sharedStrokePreviewWeight()"
+                  stroke-linecap="round"
+                  [attr.stroke-dasharray]="sharedStrokePreviewDash()"
+                />
+              </svg>
             </button>
           }
           @if (hasNodeActions()) {
@@ -197,12 +279,301 @@ export function anchorToolbar(
               <ng-icon name="lucideTrash2" />
             </button>
           }
-          @if (hasNodeActions()) {
+          @if (hasNodeActions() || kind() === 'single-connection') {
             <button hlmBtn variant="ghost" size="icon" (click)="remove()" title="Delete" aria-label="Delete">
               <ng-icon name="lucideTrash2" />
             </button>
           }
         </div>
+        <ng-template #nodeMenu>
+          <div hlmDropdownMenu class="w-56">
+            <div hlmDropdownMenuLabel>Color</div>
+            <button hlmDropdownMenuItem (triggered)="setColor(null)">
+              <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+              <span>Default</span>
+              @if (sharedNodeColor() === null) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+            @for (entry of paletteEntries; track entry.value) {
+              <button hlmDropdownMenuItem (triggered)="setColor(entry.value)">
+                <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                <span>{{ entry.name }}</span>
+                @if (sharedNodeColor() === entry.value) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <!-- Custom Palette (ADR-0037): Project hues beside the curated row —
+                 same apply rules, per-hue delete, inline add. -->
+            <div hlmDropdownMenuLabel>Custom</div>
+            @for (entry of customPaletteEntries(); track entry.value) {
+              <div class="flex items-center gap-1 px-1">
+                <button hlmDropdownMenuItem class="grow" (triggered)="setColor(entry.value)" [attr.aria-label]="'Apply custom hue ' + entry.value">
+                  <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                  <span>{{ entry.name }}</span>
+                  @if (sharedNodeColor() === entry.value) {
+                    <ng-icon name="lucideCheck" class="ml-auto" />
+                  }
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  (click)="removeCustom(entry.value); $event.stopPropagation()"
+                  [title]="'Remove custom hue ' + entry.value"
+                  [attr.aria-label]="'Remove custom hue ' + entry.value"
+                  [disabled]="lock.locked()"
+                >
+                  <ng-icon name="lucideX" />
+                </button>
+              </div>
+            }
+            <div class="flex items-center gap-1 px-2 py-1" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+              <input
+                type="color"
+                [value]="customPickerValue()"
+                (input)="customDraft.set($any($event.target).value)"
+                aria-label="Pick a custom hue"
+                [disabled]="lock.locked()"
+              />
+              <input
+                type="text"
+                [value]="customDraft()"
+                (input)="customDraft.set($any($event.target).value)"
+                placeholder="#RRGGBB"
+                aria-label="New custom hue hex"
+                [disabled]="lock.locked()"
+              />
+              <button
+                hlmBtn
+                variant="outline"
+                size="sm"
+                (click)="addCustomFromInput()"
+                aria-label="Add custom hue"
+                [disabled]="customPaletteFull() || lock.locked()"
+              >
+                Add
+              </button>
+            </div>
+            @if (customError() !== null) {
+              <div class="px-2 pb-1 text-xs" role="alert">{{ customError() }}</div>
+            }
+            @if (customPaletteFull()) {
+              <div class="px-2 pb-1 text-xs">Custom palette full (16 hues).</div>
+            }
+            <hlm-dropdown-menu-separator />
+            <!-- Groups carry no Shape (ADR-0023); the section stays visible but
+                 disabled so the state is explained (ADR-0028) -->
+            <div hlmDropdownMenuLabel>
+              {{ selectedRegularNodes().length === 0 ? 'Shape — select a regular Node first' : 'Shape' }}
+            </div>
+            @for (option of shapeOptions; track option.shape) {
+              <button
+                hlmDropdownMenuItem
+                [disabled]="selectedRegularNodes().length === 0"
+                (triggered)="setShape(option.shape)"
+              >
+                <svg viewBox="0 0 20 20" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  @switch (option.shape) {
+                    @case ('rectangle') {
+                      <rect x="3" y="5" width="14" height="10" rx="2" />
+                    }
+                    @case ('pill') {
+                      <rect x="2" y="6" width="16" height="8" rx="4" />
+                    }
+                    @case ('diamond') {
+                      <polygon points="10,2 18,10 10,18 2,10" />
+                    }
+                    @default {
+                      <ellipse cx="10" cy="10" rx="7" ry="5" />
+                    }
+                  }
+                </svg>
+                <span>{{ option.label }}</span>
+                @if (sharedNodeShape() === option.shape) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <hlm-dropdown-menu-separator />
+            <!-- Regular Nodes only, like Shape (ADR-0030); the section stays
+                 visible but disabled so the state is explained (ADR-0028) -->
+            <div hlmDropdownMenuLabel>
+              {{ selectedRegularNodes().length === 0 ? 'Emoji — select a regular Node first' : 'Emoji' }}
+            </div>
+            <button
+              hlmDropdownMenuItem
+              [disabled]="selectedRegularNodes().length === 0"
+              (triggered)="setEmoji(null)"
+            >
+              <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+              <span>None</span>
+              @if (sharedNodeEmoji() === null) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+            <div class="emoji-grid" role="group" aria-label="Emoji choices">
+              @for (entry of emojiEntries; track entry.emoji) {
+                <button
+                  hlmDropdownMenuItem
+                  class="emoji-cell"
+                  [disabled]="selectedRegularNodes().length === 0"
+                  (triggered)="setEmoji(entry.emoji)"
+                  [title]="entry.name"
+                  [attr.aria-label]="entry.name"
+                  [attr.aria-pressed]="sharedNodeEmoji() === entry.emoji"
+                >
+                  <span class="emoji-glyph" aria-hidden="true">{{ entry.emoji }}</span>
+                  @if (sharedNodeEmoji() === entry.emoji) {
+                    <ng-icon name="lucideCheck" class="emoji-check" />
+                  }
+                </button>
+              }
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-template #connectionMenu>
+          <div hlmDropdownMenu class="w-64">
+            <div hlmDropdownMenuLabel>Color</div>
+            <button hlmDropdownMenuItem (triggered)="setConnectionColor(null)">
+              <span class="menu-swatch menu-swatch-default" aria-hidden="true"></span>
+              <span>Default</span>
+              @if (sharedConnectionColor() === null) {
+                <ng-icon name="lucideCheck" class="ml-auto" />
+              }
+            </button>
+            @for (entry of paletteEntries; track entry.value) {
+              <button hlmDropdownMenuItem (triggered)="setConnectionColor(entry.value)">
+                <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                <span>{{ entry.name }}</span>
+                @if (sharedConnectionColor() === entry.value) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <!-- Custom Palette (ADR-0037): same Project hues as the Node menu. -->
+            <div hlmDropdownMenuLabel>Custom</div>
+            @for (entry of customPaletteEntries(); track entry.value) {
+              <div class="flex items-center gap-1 px-1">
+                <button hlmDropdownMenuItem class="grow" (triggered)="setConnectionColor(entry.value)" [attr.aria-label]="'Apply custom hue ' + entry.value">
+                  <span class="menu-swatch" [style.background]="entry.value" aria-hidden="true"></span>
+                  <span>{{ entry.name }}</span>
+                  @if (sharedConnectionColor() === entry.value) {
+                    <ng-icon name="lucideCheck" class="ml-auto" />
+                  }
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  (click)="removeCustom(entry.value); $event.stopPropagation()"
+                  [title]="'Remove custom hue ' + entry.value"
+                  [attr.aria-label]="'Remove custom hue ' + entry.value"
+                  [disabled]="lock.locked()"
+                >
+                  <ng-icon name="lucideX" />
+                </button>
+              </div>
+            }
+            <div class="flex items-center gap-1 px-2 py-1" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+              <input
+                type="color"
+                [value]="customPickerValue()"
+                (input)="customDraft.set($any($event.target).value)"
+                aria-label="Pick a custom hue"
+                [disabled]="lock.locked()"
+              />
+              <input
+                type="text"
+                [value]="customDraft()"
+                (input)="customDraft.set($any($event.target).value)"
+                placeholder="#RRGGBB"
+                aria-label="New custom hue hex"
+                [disabled]="lock.locked()"
+              />
+              <button
+                hlmBtn
+                variant="outline"
+                size="sm"
+                (click)="addCustomFromInput()"
+                aria-label="Add custom hue"
+                [disabled]="customPaletteFull() || lock.locked()"
+              >
+                Add
+              </button>
+            </div>
+            @if (customError() !== null) {
+              <div class="px-2 pb-1 text-xs" role="alert">{{ customError() }}</div>
+            }
+            @if (customPaletteFull()) {
+              <div class="px-2 pb-1 text-xs">Custom palette full (16 hues).</div>
+            }
+            <hlm-dropdown-menu-separator />
+            <div hlmDropdownMenuLabel>Start arrowhead</div>
+            @for (opt of arrowheadOptions; track opt.type) {
+              <button hlmDropdownMenuItem (triggered)="setArrowhead('start', opt.type)">
+                <ng-icon [name]="opt.icon" class="flip-x" />
+                <span>{{ opt.label }}</span>
+                @if (sharedArrowhead('start') === opt.type) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <hlm-dropdown-menu-separator />
+            <div hlmDropdownMenuLabel>End arrowhead</div>
+            @for (opt of arrowheadOptions; track opt.type) {
+              <button hlmDropdownMenuItem (triggered)="setArrowhead('end', opt.type)">
+                <ng-icon [name]="opt.icon" />
+                <span>{{ opt.label }}</span>
+                @if (sharedArrowhead('end') === opt.type) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <hlm-dropdown-menu-separator />
+            <div hlmDropdownMenuLabel>Pattern</div>
+            @for (opt of strokePatternOptions; track opt.pattern) {
+              <button hlmDropdownMenuItem (triggered)="setStrokePattern(opt.pattern)">
+                <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                  <path d="M2 10 H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" [attr.stroke-dasharray]="opt.dash" />
+                </svg>
+                <span>{{ opt.label }}</span>
+                @if (sharedStrokePattern() === opt.pattern) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <hlm-dropdown-menu-separator />
+            <div hlmDropdownMenuLabel>Weight</div>
+            @for (opt of strokeWeightOptions; track opt.weight) {
+              <button hlmDropdownMenuItem (triggered)="setStrokeWeight(opt.weight)">
+                <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                  <path d="M2 10 H18" fill="none" stroke="currentColor" [attr.stroke-width]="opt.previewWidth" stroke-linecap="round" />
+                </svg>
+                <span>{{ opt.label }}</span>
+                @if (sharedStrokeWeight() === opt.weight) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+            <hlm-dropdown-menu-separator />
+            <div hlmDropdownMenuLabel>Route Style</div>
+            @for (opt of routeStyleOptions; track opt.style) {
+              <button hlmDropdownMenuItem (triggered)="setRouteStyle(opt.style)">
+                <svg viewBox="0 0 20 20" class="size-4" aria-hidden="true">
+                  <path [attr.d]="opt.path" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{{ opt.label }}</span>
+                @if (sharedRouteStyle() === opt.style) {
+                  <ng-icon name="lucideCheck" class="ml-auto" />
+                }
+              </button>
+            }
+          </div>
+        </ng-template>
+
         @if (moreOpen()) {
           <div hlmDropdownMenu class="w-44" role="menu" aria-label="More selection actions">
             @if (kind() === 'single-group') {
@@ -296,16 +667,63 @@ export function anchorToolbar(
     .selection-toolbar button:hover {
       color: var(--card-foreground) !important;
     }
+    /* Menu swatches: the Palette color items inside the styling triggers
+       (ADR-0028); the dashed inner ring marks the Default swatch */
+    .menu-swatch {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+    }
+    .menu-swatch-default {
+      position: relative;
+      background: var(--dn-paper);
+    }
+    .menu-swatch-default::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 50%;
+      border: 1px dashed var(--muted-foreground);
+    }
+    /* Emoji picker (ADR-0030): the 48 curated glyphs as a compact grid with
+       name tooltips, inside the Node styling trigger beside Color/Shape */
+    .emoji-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 2px;
+      padding: 4px 8px 8px;
+    }
+    .emoji-cell {
+      position: relative;
+      justify-content: center;
+      padding: 4px 0;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .emoji-glyph {
+      line-height: 1;
+    }
+    .emoji-check {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      font-size: 10px;
+    }
+    .flip-x {
+      transform: scaleX(-1);
+    }
   `],
 })
 export class SelectionToolbarComponent {
-  private readonly graph = inject(GraphService);
-  private readonly history = inject(HistoryService);
+  readonly graph = inject(GraphService);
+  readonly history = inject(HistoryService);
   private readonly menus = inject(ContextMenuService);
   private readonly clipboard = inject(ClipboardService);
   private readonly exportDialog = inject(ExportDialogService);
   readonly resizeMode = inject(ResizeModeService);
-  private readonly lock = inject(CanvasLockService);
+  readonly lock = inject(CanvasLockService);
   private readonly presenting = inject(PresentationService);
   private readonly chain = inject(ChainHighlightService);
   private readonly host = inject(ElementRef);
@@ -346,6 +764,234 @@ export class SelectionToolbarComponent {
 
   readonly canPaste = this.clipboard.canPaste;
   readonly canAlign = this.menus.canAlign;
+
+  // The Palette with its canonical names (CONTEXT.md): user-facing controls
+  // show the name, never the raw hex
+  readonly paletteEntries: readonly { name: string; value: string }[] = NODE_PALETTE.map(
+    (value, index) => ({ value, name: NODE_PALETTE_NAMES[index] ?? value }),
+  );
+  // Custom Palette entries (CONTEXT.md: Custom Palette): Project hues read
+  // live from Graph State, announced under their own hex — no curated names.
+  readonly customPaletteEntries = computed(() =>
+    this.graph.customPalette().map(value => ({ value, name: value })),
+  );
+  readonly customPaletteFull = computed(
+    () => this.graph.customPalette().length >= MAX_CUSTOM_PALETTE_COLORS,
+  );
+  // Draft hue for the inline add form, shared by both styling menus (only
+  // one menu is ever open). The native picker needs a valid hex, so it
+  // shows the default Node background while the text draft is incomplete.
+  readonly customDraft = signal('');
+  readonly customError = signal<string | null>(null);
+  readonly customPickerValue = computed(() => {
+    const draft = this.customDraft().trim();
+    return isCustomPaletteHex(draft) ? draft : DEFAULT_NODE_BACKGROUND;
+  });
+
+  // Custom Palette membership is plain data (ADR-0037): adding validates
+  // the draft and explains failures inline instead of storing them.
+  addCustomFromInput(): void {
+    const added = this.graph.addCustomPaletteColor(this.customDraft().trim());
+    if (added === null) {
+      this.customError.set('Enter a #RRGGBB hex not already in the palette (16 max).');
+      return;
+    }
+    this.customDraft.set('');
+    this.customError.set(null);
+  }
+
+  // Deleting a hue resets its uses to the default appearance as one undo
+  // step (ADR-0038); the roster removal itself is permanent, like
+  // Collection and Project deletion — undo restores hues, not the entry.
+  removeCustom(value: string): void {
+    const reset = buildResetCustomPaletteUsesCommand(this.graph, value);
+    if (reset) this.history.execute(reset);
+    this.graph.removeCustomPaletteColor(value);
+  }
+
+  selectedRegularNodes = computed(() =>
+    this.graph.selectedNodes().filter(node => node.kind !== 'group')
+  );
+  shapeOptions: { shape: NodeShape; label: string }[] = [
+    { shape: 'rectangle', label: 'Rectangle' },
+    { shape: 'pill', label: 'Pill' },
+    { shape: 'diamond', label: 'Diamond' },
+    { shape: 'ellipse', label: 'Ellipse' },
+  ];
+  // The curated Emoji set in picker order (ADR-0030): tooltips and aria
+  // labels use the stable names, never the raw glyph.
+  readonly emojiEntries = NODE_EMOJIS;
+
+  // Start icons are the same glyphs flipped horizontally (see .flip-x) so they
+  // point backward along the curve, teaching the source→target direction.
+  arrowheadOptions: { type: ArrowheadType; icon: string; label: string }[] = [
+    { type: 'none', icon: 'lucideMinus', label: 'None' },
+    { type: 'arrow', icon: 'lucideArrowRight', label: 'Arrow' },
+    { type: 'triangle', icon: 'lucidePlay', label: 'Triangle' },
+  ];
+
+  // Re-exposed for the template's active-state checks
+  effectiveArrowhead = effectiveArrowhead;
+
+  // Segmented options with inline preview glyphs drawn as the stroke itself
+  strokePatternOptions: { pattern: StrokePattern; dash: string | null; label: string }[] = [
+    { pattern: 'solid', dash: null, label: 'Solid' },
+    { pattern: 'dashed', dash: '6 4', label: 'Dashed' },
+    { pattern: 'dotted', dash: '0.1 4', label: 'Dotted' },
+  ];
+
+  strokeWeightOptions: { weight: StrokeWeight; previewWidth: number; label: string }[] = [
+    { weight: 'thin', previewWidth: 1, label: 'Thin' },
+    { weight: 'normal', previewWidth: 2, label: 'Normal' },
+    { weight: 'thick', previewWidth: 3.5, label: 'Thick' },
+  ];
+
+  // Route Style options with inline previews drawn as the route itself: a
+  // free curve beside a right-angle orthogonal route (ADR-0031)
+  routeStyleOptions: { style: RouteStyle; path: string; label: string }[] = [
+    { style: 'curve', path: 'M2 14 C 7 14, 13 6, 18 6', label: 'Curve' },
+    { style: 'orthogonal', path: 'M2 14 H11 V6 H18', label: 'Orthogonal' },
+  ];
+
+  // A styling control reads as active only when ALL its targets share the
+  // value (ADR-0015); undefined means a mixed set — nothing highlights.
+  sharedNodeColor = (): string | null | undefined => {
+    const nodes = this.graph.selectedNodes();
+    if (nodes.length === 0) return undefined;
+    const first = nodes[0].color ?? null;
+    return nodes.every(n => (n.color ?? null) === first) ? first : undefined;
+  };
+
+  sharedNodeShape = (): NodeShape | undefined => {
+    const nodes = this.selectedRegularNodes();
+    if (nodes.length === 0) return undefined;
+    const first = effectiveNodeShape(nodes[0].shape);
+    return nodes.every(n => effectiveNodeShape(n.shape) === first) ? first : undefined;
+  };
+
+  // Null means every selected regular Node lacks an Emoji; undefined means a
+  // mixed set (or no regular Node) — nothing highlights.
+  sharedNodeEmoji = (): string | null | undefined => {
+    const nodes = this.selectedRegularNodes();
+    if (nodes.length === 0) return undefined;
+    const first = nodes[0].emoji ?? null;
+    return nodes.every(n => (n.emoji ?? null) === first) ? first : undefined;
+  };
+
+  sharedConnectionColor = (): string | null | undefined => {
+    const conns = this.graph.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = conns[0].color ?? null;
+    return conns.every(c => (c.color ?? null) === first) ? first : undefined;
+  };
+
+  sharedArrowhead = (end: ArrowheadEnd): ArrowheadType | undefined => {
+    const conns = this.graph.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = effectiveArrowhead(conns[0], end);
+    return conns.every(c => effectiveArrowhead(c, end) === first) ? first : undefined;
+  };
+
+  sharedStrokePattern = (): StrokePattern | undefined => {
+    const conns = this.graph.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = effectiveStrokePattern(conns[0]);
+    return conns.every(c => effectiveStrokePattern(c) === first) ? first : undefined;
+  };
+
+  sharedStrokeWeight = (): StrokeWeight | undefined => {
+    const conns = this.graph.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = effectiveStrokeWeight(conns[0]);
+    return conns.every(c => effectiveStrokeWeight(c) === first) ? first : undefined;
+  };
+
+  sharedRouteStyle = (): RouteStyle | undefined => {
+    const conns = this.graph.selectedConnections();
+    if (conns.length === 0) return undefined;
+    const first = effectiveRouteStyle(conns[0]);
+    return conns.every(c => effectiveRouteStyle(c) === first) ? first : undefined;
+  };
+
+  // Live preview on the Connection trigger: the shared pattern's dash and the
+  // shared weight's width, falling back to the defaults when nothing shares.
+  sharedStrokePreviewDash = (): string | null => {
+    const pattern = this.sharedStrokePattern();
+    return this.strokePatternOptions.find(o => o.pattern === pattern)?.dash ?? null;
+  };
+
+  sharedStrokePreviewWeight = (): number => {
+    const weight = this.sharedStrokeWeight();
+    return this.strokeWeightOptions.find(o => o.weight === weight)?.previewWidth ?? 2;
+  };
+
+  // Live preview on the Connection trigger: the shared color joins the stroke
+  // preview; absent or mixed falls back to the default Connection stroke.
+  connectionPreviewColor = (): string => this.sharedConnectionColor() ?? 'var(--dn-accent)';
+
+  // Live preview on the Node trigger: the shared Shape's silhouette filled
+  // with the shared color; mixed or absent values fall back to the defaults
+  // (rectangle silhouette, paper fill), mirroring the stroke preview rule.
+  nodePreviewShape = (): NodeShape => this.sharedNodeShape() ?? 'rectangle';
+  nodePreviewFill = (): string => this.sharedNodeColor() ?? 'var(--dn-paper)';
+
+  // Bulk styling (ADR-0015): one compound Command over all selected targets;
+  // the factories return null when nothing would change — no dead undo steps.
+  setColor(color: string | null): void {
+    const cmd = buildSetNodesColorCommand(
+      this.graph, this.graph.selectedNodeIds(), color,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setShape(shape: NodeShape): void {
+    const cmd = buildSetNodesShapeCommand(
+      this.graph, this.graph.selectedNodeIds(), shape,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setEmoji(emoji: string | null): void {
+    const cmd = buildSetNodesEmojiCommand(
+      this.graph, this.graph.selectedNodeIds(), emoji,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setConnectionColor(color: string | null): void {
+    const cmd = buildSetConnectionsColorCommand(
+      this.graph, this.graph.selectedConnectionIds(), color,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setArrowhead(end: ArrowheadEnd, type: ArrowheadType): void {
+    const cmd = buildSetConnectionsArrowheadCommand(
+      this.graph, this.graph.selectedConnectionIds(), end, type,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setStrokePattern(pattern: StrokePattern): void {
+    const cmd = buildSetConnectionsStrokePatternCommand(
+      this.graph, this.graph.selectedConnectionIds(), pattern,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setStrokeWeight(weight: StrokeWeight): void {
+    const cmd = buildSetConnectionsStrokeWeightCommand(
+      this.graph, this.graph.selectedConnectionIds(), weight,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
+
+  setRouteStyle(style: RouteStyle): void {
+    const cmd = buildSetConnectionsRouteStyleCommand(
+      this.graph, this.graph.selectedConnectionIds(), style,
+    );
+    if (cmd) this.history.execute(cmd);
+  }
 
   /** The single selected Node, when the Selection is exactly one Node. */
   private readonly singleNode = computed(() => {
