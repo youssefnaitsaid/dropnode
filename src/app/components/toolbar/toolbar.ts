@@ -130,7 +130,7 @@ import {
           [title]="canvasLock.locked() ? 'Unlock canvas' : 'Lock canvas'"
           [attr.aria-label]="canvasLock.locked() ? 'Unlock canvas' : 'Lock canvas'"
         >
-          <ng-icon [name]="canvasLock.locked() ? 'lucideLockOpen' : 'lucideLock'" />
+          <ng-icon [name]="canvasLock.locked() ? 'lucideLock' : 'lucideLockOpen'" />
         </button>
         <span class="min-w-10 text-center text-sm font-medium text-sidebar-foreground">{{ zoomPercent() }}%</span>
         @if (scratchMode()) {

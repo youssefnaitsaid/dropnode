@@ -575,11 +575,13 @@ describe('PaletteEntryRegistry Canvas Lock', () => {
     expect(find('lock-canvas').label).toBe('Lock Canvas');
     expect(find('lock-canvas').category).toBe('Viewport');
     expect(find('lock-canvas').available).toBe(true);
+    expect(find('lock-canvas').icon).toBe('lucideLock');
 
     registry.execute('lock-canvas');
     expect(canvasLock.locked()).toBe(true);
     expect(find('unlock-canvas').label).toBe('Unlock Canvas');
     expect(find('unlock-canvas').available).toBe(true);
+    expect(find('unlock-canvas').icon).toBe('lucideLockOpen');
 
     registry.execute('unlock-canvas');
     expect(canvasLock.locked()).toBe(false);

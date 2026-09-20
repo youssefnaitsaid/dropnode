@@ -429,7 +429,7 @@ export class PaletteEntryRegistry {
         () => this.canvasLock.toggle(),
         {
           aliases: ['lock', 'unlock', 'read only', 'view only', 'freeze canvas'],
-          icon: 'lucideLock',
+          icon: this.canvasLock.locked() ? 'lucideLockOpen' : 'lucideLock',
         },
       ),
 
