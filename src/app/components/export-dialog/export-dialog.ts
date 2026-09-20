@@ -15,11 +15,12 @@ import {
 const PREVIEW_DEBOUNCE_MS = 150;
 
 /**
- * The "Export as…" dialog (issue #15): format (PNG | JSON), Export Theme
- * (dark | light, PNG only), and a live preview fed by the real snapshot
- * pipeline — preview and download share renderPng, so they only differ if
- * the graph changes in between. Scoped requests hide JSON and carry their
- * frozen root ids through the same PNG pipeline.
+ * The "Export as…" dialog (issue #15): format (PNG | JSON | Mermaid),
+ * Export Theme (dark | light, PNG only), and a live preview fed by the real
+ * pipelines — preview and download share renderPng for PNG and the Mermaid
+ * payload getter for Mermaid, so they only differ if the graph changes in
+ * between. Scoped requests hide JSON and Mermaid and carry their frozen root
+ * ids through the same PNG pipeline.
  */
 @Component({
   selector: 'app-export-dialog',
@@ -68,6 +69,14 @@ const PREVIEW_DEBOUNCE_MS = 150;
                     [class.export-seg-active]="format() === 'json'"
                     (click)="setFormat('json')"
                   >JSON</button>
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="sm"
+                    class="export-seg"
+                    [class.export-seg-active]="format() === 'mermaid'"
+                    (click)="setFormat('mermaid')"
+                  >Mermaid</button>
                 </div>
               </div>
             }
@@ -120,15 +129,18 @@ const PREVIEW_DEBOUNCE_MS = 150;
                 <p class="p-4 text-sm text-muted-foreground">Rendering preview…</p>
               }
             } @else {
-              <pre class="m-0 whitespace-pre font-mono text-xs text-muted-foreground">{{ jsonPreview() }}</pre>
+              <pre class="m-0 whitespace-pre font-mono text-xs text-muted-foreground">{{ format() === 'mermaid' ? mermaidPreview() : jsonPreview() }}</pre>
             }
           </div>
 
           <div class="flex justify-end gap-2">
             <button hlmBtn variant="outline" (click)="close()">Cancel</button>
+            @if (format() === 'mermaid') {
+              <button hlmBtn variant="outline" (click)="copyMermaid()">Copy Mermaid</button>
+            }
             <button hlmBtn (click)="download()">
               <ng-icon name="lucideDownload" />
-              Download {{ format() === 'png' ? 'PNG' : 'JSON' }}
+              Download {{ format() === 'png' ? 'PNG' : format() === 'json' ? 'JSON' : 'Mermaid' }}
             </button>
           </div>
         </div>
@@ -172,6 +184,15 @@ export class ExportDialogComponent implements OnDestroy {
   private closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
 
   jsonPreview = computed(() => this.exportService.jsonPayload());
+  /**
+   * Tracks isOpen so the Project-derived title stays fresh: projectId is set
+   * in open() just before the dialog opens, and plain-field reads create no
+   * dependency of their own.
+   */
+  mermaidPreview = computed(() => {
+    this.isOpen();
+    return this.exportService.mermaidPayload(this.projectId);
+  });
 
   constructor() {
     // Regenerate the PNG preview (debounced) whenever the dialog is open in
@@ -227,8 +248,17 @@ export class ExportDialogComponent implements OnDestroy {
     this.includePins.set(include);
   }
 
+  /** Copies the previewed Mermaid and keeps the dialog open for a Download. */
+  copyMermaid(): void {
+    void this.exportService.copyMermaid(this.projectId);
+  }
+
   download(): void {
-    if (this.format() === 'json' && !this.isScoped()) {
+    if (this.format() === 'mermaid' && !this.isScoped()) {
+      // Same live-graph contract as JSON: the download matches the preview
+      // and the projectId titles the document as well as naming the file.
+      this.exportService.exportMermaidToFile(this.projectId);
+    } else if (this.format() === 'json' && !this.isScoped()) {
       // Always the live graph — exactly what the preview showed; the
       // projectId only names the file (auto-save can lag the editor).
       this.exportService.exportToFile(this.projectId);

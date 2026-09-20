@@ -8,6 +8,7 @@ import {
   expandExportScope, normalizeExportScopeRequest,
 } from '../models/export-image';
 import { pinPoints } from '../models/pin';
+import { buildMermaidExport } from '../models/export-mermaid';
 import { encodeShareParam } from '../models/share-link';
 import { ToastService } from '../components/toast/toast';
 
@@ -63,6 +64,35 @@ export class ExportService {
 
   copyJson(): Promise<void> {
     return this.copyToClipboard(this.graphAsJson(), 'Copied to clipboard', 'Failed to copy to clipboard');
+  }
+
+  // ── Mermaid export (flat flowchart with frontmatter title) ──
+
+  /**
+   * The exact Mermaid payload every Mermaid destination shares — the dialog
+   * previews this. Titled after the Project when given its id (the title is
+   * frontmatter content, not just the filename), else the Scratch Canvas default.
+   */
+  mermaidPayload(projectId?: string): string {
+    const title = projectId !== undefined
+      ? (this.collectionService.getProject(projectId)?.name ?? 'dropnode-graph')
+      : 'dropnode-graph';
+    return buildMermaidExport(
+      this.graphService.nodes(),
+      this.graphService.connections(),
+      title,
+    );
+  }
+
+  /** Downloads the live editor graph as Mermaid named after the Project. */
+  exportMermaidToFile(projectId?: string): void {
+    const payload = this.mermaidPayload(projectId);
+    this.downloadBlob(new Blob([payload], { type: 'text/plain' }), this.filenameBase(projectId) + '.mmd');
+    this.toastService.show('Graph exported to file', 'success');
+  }
+
+  copyMermaid(projectId?: string): Promise<void> {
+    return this.copyToClipboard(this.mermaidPayload(projectId), 'Copied to clipboard', 'Failed to copy to clipboard');
   }
 
   copyLink(): Promise<void> {

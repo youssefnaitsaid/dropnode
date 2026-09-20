@@ -382,6 +382,96 @@ describe('ExportService', () => {
     });
   });
 
+  describe('Mermaid export (flat flowchart with frontmatter title)', () => {
+    let capturedBlob: Blob | null;
+    let clickedAnchor: HTMLAnchorElement | null;
+    let clickSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      capturedBlob = null;
+      clickedAnchor = null;
+      URL.createObjectURL = vi.fn((blob: Blob) => {
+        capturedBlob = blob;
+        return 'blob:mock-url';
+      }) as typeof URL.createObjectURL;
+      URL.revokeObjectURL = vi.fn() as typeof URL.revokeObjectURL;
+      clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          clickedAnchor = this;
+        });
+    });
+
+    afterEach(() => {
+      clickSpy.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it('mermaidPayload returns the live graph as Mermaid titled dropnode-graph', () => {
+      const hello = graphService.createNode('Hello', 0, 0);
+
+      const payload = service.mermaidPayload();
+
+      expect(payload).toContain('---\ntitle: "dropnode-graph"\n---\nflowchart LR\n');
+      expect(payload).toContain(`n_${hello.id}["Hello"]`);
+    });
+
+    it('titles the payload after the Project while still serializing the live graph', () => {
+      const col = collectionService.createCollection('C');
+      const proj = collectionService.createProject(col.id, 'Onboarding Flow!', {
+        nodes: [{ id: 'node_9_9', label: 'Stale store', x: 1, y: 2, width: 160, height: 48 }],
+        connections: [],
+      });
+      const live = graphService.createNode('Live', 0, 0);
+
+      const payload = service.mermaidPayload(proj.id);
+
+      expect(payload).toContain('---\ntitle: "Onboarding Flow!"\n---\n');
+      expect(payload).toContain(`n_${live.id}["Live"]`);
+      expect(payload).not.toContain('Stale store');
+    });
+
+    it('exportMermaidToFile downloads the payload as Mermaid named after the Project', async () => {
+      const col = collectionService.createCollection('C');
+      const proj = collectionService.createProject(col.id, 'Onboarding Flow!');
+      graphService.createNode('Live', 0, 0);
+
+      service.exportMermaidToFile(proj.id);
+
+      expect(clickedAnchor?.download).toBe('onboarding-flow.mmd');
+      const text = await capturedBlob!.text();
+      expect(text).toBe(service.mermaidPayload(proj.id));
+      expect(text).toContain('---\ntitle: "Onboarding Flow!"\n---\n');
+      expect(toastService.message()).toBe('Graph exported to file');
+      expect(toastService.type()).toBe('success');
+    });
+
+    it('copyMermaid writes the payload to the clipboard and shows a success toast', async () => {
+      const hello = graphService.createNode('Clipboard Node', 10, 20);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+      await service.copyMermaid();
+
+      expect(writeText).toHaveBeenCalledTimes(1);
+      const written = writeText.mock.calls[0][0];
+      expect(written).toBe(service.mermaidPayload());
+      expect(written).toContain(`n_${hello.id}["Clipboard Node"]`);
+      expect(toastService.message()).toBe('Copied to clipboard');
+      expect(toastService.type()).toBe('success');
+    });
+
+    it('copyMermaid shows an error toast when the clipboard write fails', async () => {
+      const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+      await service.copyMermaid();
+
+      expect(toastService.message()).toBe('Failed to copy to clipboard');
+      expect(toastService.type()).toBe('error');
+    });
+  });
+
   describe('PNG export (renderer stubbed — the shim itself is untestable in jsdom)', () => {
     let render: ReturnType<typeof vi.fn>;
     let capturedBlob: Blob | null;
