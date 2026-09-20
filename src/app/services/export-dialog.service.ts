@@ -3,7 +3,7 @@ import {
   ExportScopeInput, ExportScopeRequest, normalizeExportScopeRequest,
 } from '../models/export-image';
 
-export type ExportFormat = 'png' | 'json';
+export type ExportFormat = 'png' | 'json' | 'mermaid';
 
 /**
  * Cross-component glue for the single "Export as…" dialog hosted in the app

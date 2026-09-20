@@ -179,6 +179,10 @@ import {
           <ng-icon name="lucideCopy" />
           <span>Copy JSON</span>
         </button>
+        <button hlmDropdownMenuItem (triggered)="copyMermaid()">
+          <ng-icon name="lucideCopy" />
+          <span>Copy Mermaid</span>
+        </button>
         <button hlmDropdownMenuItem (triggered)="copyLink()">
           <ng-icon name="lucideLink" />
           <span>Copy link</span>
@@ -317,6 +321,10 @@ export class ToolbarComponent {
 
   copyJson(): void {
     this.exportService.copyJson();
+  }
+
+  copyMermaid(): void {
+    this.exportService.copyMermaid();
   }
 
   copyLink(): void {

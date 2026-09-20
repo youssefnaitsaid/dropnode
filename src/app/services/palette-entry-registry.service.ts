@@ -442,6 +442,9 @@ export class PaletteEntryRegistry {
       this.action('export-json', isScratch ? 'Export graph as JSON' : 'Export current Project as JSON', 'Project', () => {
         this.exportDialogService.requestOpen(currentProjectId ?? undefined, undefined, 'json');
       }, { aliases: ['download json', 'json export'], icon: 'lucideFileJson' }),
+      this.action('export-mermaid', isScratch ? 'Export graph as Mermaid' : 'Export current Project as Mermaid', 'Project', () => {
+        this.exportDialogService.requestOpen(currentProjectId ?? undefined, undefined, 'mermaid');
+      }, { aliases: ['download mermaid', 'mermaid export', 'mmd export'], icon: 'lucideDownload' }),
       this.action('export-as', isScratch ? 'Export graph as…' : 'Export current Project as…', 'Project', () => {
         this.exportDialogService.requestOpen(currentProjectId ?? undefined);
       }, { aliases: ['export', 'download'], icon: 'lucideDownload' }),
@@ -458,6 +461,9 @@ export class PaletteEntryRegistry {
       this.action('copy-json', isScratch ? 'Copy graph JSON' : 'Copy current Project JSON', 'Project', () => {
         void this.exportService.copyJson();
       }, { aliases: ['copy graph', 'copy data'], icon: 'lucideBraces' }),
+      this.action('copy-mermaid', isScratch ? 'Copy graph Mermaid' : 'Copy current Project Mermaid', 'Project', () => {
+        void this.exportService.copyMermaid(currentProjectId ?? undefined);
+      }, { aliases: ['copy mermaid', 'copy diagram'], icon: 'lucideCopy' }),
       this.action('copy-link', isScratch ? 'Copy graph link' : 'Copy current Project link', 'Project', () => {
         void this.exportService.copyLink();
       }, { aliases: ['share link', 'copy url'], icon: 'lucideLink' }),

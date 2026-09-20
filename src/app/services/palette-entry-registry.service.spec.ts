@@ -379,10 +379,32 @@ describe('PaletteEntryRegistry', () => {
     expect(exportDialogService.openRequests()).toBe(1);
   });
 
+  it('opens the Mermaid export through the existing dialog with the Mermaid format', () => {
+    expect(registry.execute('export-mermaid')).toBe(true);
+    expect(exportDialogService.format()).toBe('mermaid');
+    expect(exportDialogService.openRequests()).toBe(1);
+  });
+
+  it('copies Mermaid through a direct entry with route-aware labels', () => {
+    graphService.createNode('Hello', 0, 0);
+    expect(find('copy-mermaid').label).toBe('Copy graph Mermaid');
+    expect(find('copy-mermaid').category).toBe('Project');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    expect(registry.execute('copy-mermaid')).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0][0]).toContain('flowchart LR');
+
+    vi.unstubAllGlobals();
+  });
+
   it('uses route-aware current Project labels', async () => {
     const router = TestBed.inject(Router);
     await router.navigateByUrl('/p/project-1');
     expect(find('export-json').label).toBe('Export current Project as JSON');
+    expect(find('export-mermaid').label).toBe('Export current Project as Mermaid');
+    expect(find('copy-mermaid').label).toBe('Copy current Project Mermaid');
     expect(find('save-as-project').available).toBe(false);
   });
 
@@ -578,7 +600,7 @@ describe('PaletteEntryRegistry Canvas Lock', () => {
     }
 
     for (const id of ['zoom-in', 'zoom-out', 'zoom-to-fit', 'present-reading-order', 'present-following-connections', 'export-png',
-      'export-json', 'export-as', 'copy-json', 'copy-link', 'toggle-minimap', 'toggle-outline',
+      'export-json', 'export-mermaid', 'export-as', 'copy-json', 'copy-mermaid', 'copy-link', 'toggle-minimap', 'toggle-outline',
       'toggle-connection-jumps', 'toggle-pins', 'toggle-sidebar', 'save-as-project',
       'new-collection', 'import-collection', 'unlock-canvas']) {
       expect(find(id).available).toBe(true);
