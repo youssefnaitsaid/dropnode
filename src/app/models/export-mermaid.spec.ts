@@ -69,4 +69,18 @@ describe('buildMermaidExport', () => {
       '---\ntitle: "Meeting: \\"notes\\" Second line"\n---\nflowchart LR\n',
     );
   });
+
+  it('drops Connections touching Groups so no line references an undefined node', () => {
+    const nodes = [
+      { id: 'group_1', label: 'Cluster', x: 0, y: 0, width: 320, height: 200, kind: 'group' as const },
+      node('node_2', 'Loose'),
+    ];
+    const connections = [
+      { id: 'conn_1', sourceNodeId: 'group_1', sourceHandle: 'right' as const, targetNodeId: 'node_2', targetHandle: 'left' as const },
+    ];
+
+    expect(buildMermaidExport(nodes, connections, 'dropnode-graph')).toBe(
+      '---\ntitle: "dropnode-graph"\n---\nflowchart LR\nn_node_2["Loose"]\n',
+    );
+  });
 });

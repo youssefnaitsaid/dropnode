@@ -58,7 +58,11 @@ export function buildMermaidExport(
     if (node.kind === 'group') continue;
     lines.push(`${safeId(node.id)}["${sanitizeMermaidLabel(displayText(node))}"]`);
   }
+  // Groups export no definition, so a Connection touching a Group would point
+  // at an undefined node — drop it, the both-endpoints-inside rule.
+  const groupIds = new Set(nodes.filter(node => node.kind === 'group').map(node => node.id));
   for (const connection of connections) {
+    if (groupIds.has(connection.sourceNodeId) || groupIds.has(connection.targetNodeId)) continue;
     const from = safeId(connection.sourceNodeId);
     const to = safeId(connection.targetNodeId);
     if (connection.text && !isTextEmpty(connection.text)) {
