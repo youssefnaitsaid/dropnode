@@ -26,6 +26,26 @@ describe('SelectionToolbarComponent', () => {
   const toolbar = (): HTMLElement | null =>
     fixture.nativeElement.querySelector('[aria-label="Selection toolbar"]');
 
+  const overlayButton = (label: string): HTMLButtonElement | undefined =>
+    Array.from(document.body.querySelectorAll('button')).find(
+      el => (el as HTMLElement).getAttribute('aria-label') === label,
+    ) as HTMLButtonElement | undefined;
+
+  // Styling pops are nested: the row trigger opens the horizontal family
+  // bar, then the family opens its horizontal child pop.
+  const openFamily = async (toolbarLabel: string, familyLabel: string): Promise<void> => {
+    button(toolbarLabel)!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const family = overlayButton(familyLabel);
+    expect(family, `family ${familyLabel}`).toBeTruthy();
+    family!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [SelectionToolbarComponent] });
     fixture = TestBed.createComponent(SelectionToolbarComponent);
@@ -509,25 +529,18 @@ describe('SelectionToolbarComponent', () => {
     );
   });
 
-  it('shows one Node styling trigger and applies Shape to regular Nodes only, undoing as one command', async () => {
+  it('opens the Shape child pop and applies Shape to regular Nodes only, undoing as one command', async () => {
     const node = graph.createNode('Node', 0, 0);
     const group = graph.createGroup('Group', 400, 0);
     graph.setSelection([node.id, group.id], []);
     fixture.detectChanges();
 
-    const trigger = button('Node styling');
-    expect(trigger).not.toBeNull();
+    expect(button('Node styling')).not.toBeNull();
+    await openFamily('Node styling', 'Node shape');
 
-    trigger!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const pill = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Pill',
-    ) as HTMLButtonElement;
+    const pill = overlayButton('Pill');
     expect(pill).toBeTruthy();
-    pill.click();
+    pill!.click();
     fixture.detectChanges();
 
     expect(graph.nodes().find(item => item.id === node.id)?.shape).toBe('pill');
@@ -538,52 +551,41 @@ describe('SelectionToolbarComponent', () => {
     expect(graph.nodes().find(item => item.id === node.id)?.shape).toBeUndefined();
   });
 
-  it('shows no Shape check for a mixed regular selection and disables Shape items for a Group-only selection', async () => {
+  it('shows no shared Shape and disables Shape cells for a Group-only Selection', async () => {
     const first = graph.createNode('First', 0, 0);
     const second = graph.createNode('Second', 300, 0);
     graph.setNodeShape(second.id, 'ellipse');
     graph.setSelection([first.id, second.id], []);
     fixture.detectChanges();
 
-    // Mixed regular selection: no shared Shape, so no item can read active
+    // Mixed regular selection: no shared Shape, so no cell can read active
     expect(fixture.componentInstance.sharedNodeShape()).toBeUndefined();
 
     // Group-only selection: the trigger stays (Groups take color), but the
-    // Shape section is disabled and clicking does nothing
+    // Shape cells are disabled and clicking does nothing
     graph.selectNode(graph.createGroup('Only Group', 600, 0).id);
     fixture.detectChanges();
 
-    const trigger = button('Node styling');
-    expect(trigger).not.toBeNull();
+    expect(button('Node styling')).not.toBeNull();
+    await openFamily('Node styling', 'Node shape');
 
-    trigger!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const pill = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Pill',
-    ) as HTMLButtonElement;
+    const pill = overlayButton('Pill')!;
     expect(pill.hasAttribute('disabled')).toBe(true);
+    expect(pill.getAttribute('title')).toBe('Select a regular Node first');
 
     pill.click();
     fixture.detectChanges();
     expect(history.canUndo()).toBe(false);
   });
 
-  it('shows an Emoji section and applies the pick to regular Nodes only, undoing as one command', async () => {
+  it('opens the Emoji child pop and applies the pick to regular Nodes only, undoing as one command', async () => {
     const node = graph.createNode('Node', 0, 0);
     const group = graph.createGroup('Group', 400, 0);
     graph.setSelection([node.id, group.id], []);
     fixture.detectChanges();
 
-    const trigger = button('Node styling');
-    expect(trigger).not.toBeNull();
-
-    trigger!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    expect(button('Node styling')).not.toBeNull();
+    await openFamily('Node styling', 'Node emoji');
 
     const cells = Array.from(document.body.querySelectorAll('.emoji-cell')) as HTMLButtonElement[];
     expect(cells).toHaveLength(48);
@@ -600,64 +602,49 @@ describe('SelectionToolbarComponent', () => {
     expect(graph.nodes().find(item => item.id === node.id)?.emoji).toBeUndefined();
   });
 
-  it('shows no Emoji check for a mixed regular selection and disables Emoji items for a Group-only selection', async () => {
+  it('shows no shared Emoji and disables Emoji cells for a Group-only Selection', async () => {
     const first = graph.createNode('First', 0, 0);
     const second = graph.createNode('Second', 300, 0);
     graph.setNodeEmoji(second.id, '💡');
     graph.setSelection([first.id, second.id], []);
     fixture.detectChanges();
 
-    // Mixed regular selection: no shared Emoji, so no item can read active
+    // Mixed regular selection: no shared Emoji, so no cell can read active
     expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
 
     // Group-only selection: the trigger stays (Groups take color), but the
-    // Emoji section is disabled with a hint and clicking does nothing
+    // Emoji cells are disabled with the reason as their title
     graph.selectNode(graph.createGroup('Only Group', 600, 0).id);
     fixture.detectChanges();
     expect(fixture.componentInstance.sharedNodeEmoji()).toBeUndefined();
 
-    const trigger = button('Node styling');
-    expect(trigger).not.toBeNull();
+    expect(button('Node styling')).not.toBeNull();
+    await openFamily('Node styling', 'Node emoji');
 
-    trigger!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const label = Array.from(document.body.querySelectorAll('*')).find(
-      el => el.textContent?.trim() === 'Emoji — select a regular Node first',
-    );
-    expect(label).toBeTruthy();
     const idea = Array.from(document.body.querySelectorAll('.emoji-cell')).find(
       button => button.getAttribute('aria-label') === 'Idea',
     ) as HTMLButtonElement;
     expect(idea.hasAttribute('disabled')).toBe(true);
+    expect(idea.getAttribute('title')).toBe('Select a regular Node first');
 
     idea.click();
     fixture.detectChanges();
     expect(history.canUndo()).toBe(false);
   });
 
-  it('shows a Route Style section and applies orthogonal to selected Connections, undoing as one command', async () => {
+  it('opens the Route child pop and applies orthogonal to selected Connections, undoing as one command', async () => {
     const a = graph.createNode('A', 0, 0);
     const b = graph.createNode('B', 300, 0);
     const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
     graph.selectConnection(conn.id);
     fixture.detectChanges();
 
-    const trigger = button('Connection styling');
-    expect(trigger).not.toBeNull();
+    expect(button('Connection styling')).not.toBeNull();
+    await openFamily('Connection styling', 'Connection route');
 
-    trigger!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const orthogonal = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Orthogonal',
-    ) as HTMLButtonElement;
+    const orthogonal = overlayButton('Orthogonal');
     expect(orthogonal).toBeTruthy();
-    orthogonal.click();
+    orthogonal!.click();
     fixture.detectChanges();
 
     expect(graph.connections()[0].routeStyle).toBe('orthogonal');
@@ -668,23 +655,17 @@ describe('SelectionToolbarComponent', () => {
     expect('routeStyle' in graph.connections()[0]).toBe(false);
   });
 
-  it('shows a Custom section with Project hues and applies one to selected Nodes as one undo step', async () => {
+  it('opens the Color child pop with Project hues and applies one to selected Nodes as one undo step', async () => {
     const node = graph.createNode('Node', 0, 0);
     graph.addCustomPaletteColor('#A1B2C3');
     graph.setSelection([node.id], []);
     fixture.detectChanges();
 
-    const trigger = button('Node styling')!;
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await openFamily('Node styling', 'Node color');
 
-    const apply = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
-    ) as HTMLButtonElement;
+    const apply = overlayButton('Apply custom hue #A1B2C3');
     expect(apply).toBeTruthy();
-    apply.click();
+    apply!.click();
     fixture.detectChanges();
 
     expect(graph.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
@@ -695,16 +676,12 @@ describe('SelectionToolbarComponent', () => {
     expect(graph.nodes().find(item => item.id === node.id)?.color).toBeUndefined();
   });
 
-  it('adds a custom hue from the menu hex input and deletes it resetting uses to default as one undo step', async () => {
+  it('adds a custom hue from the child-pop hex input and deletes it resetting uses to default as one undo step', async () => {
     const node = graph.createNode('Node', 0, 0);
     graph.setSelection([node.id], []);
     fixture.detectChanges();
 
-    const trigger = button('Node styling')!;
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await openFamily('Node styling', 'Node color');
 
     const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
     expect(hexInput).toBeTruthy();
@@ -728,14 +705,9 @@ describe('SelectionToolbarComponent', () => {
     expect(graph.nodes().find(item => item.id === node.id)?.color).toBe('#A1B2C3');
 
     // Applying closes the menu like any curated pick — reopen to manage.
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await openFamily('Node styling', 'Node color');
 
-    const remove = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.getAttribute('aria-label') === 'Remove custom hue #A1B2C3',
-    ) as HTMLButtonElement;
+    const remove = overlayButton('Remove custom hue #A1B2C3');
     expect(remove).toBeTruthy();
     remove.click();
     fixture.detectChanges();
@@ -751,16 +723,12 @@ describe('SelectionToolbarComponent', () => {
     expect(graph.customPalette()).toEqual([]);
   });
 
-  it('explains invalid hex input instead of storing it', async () => {
+  it('announces invalid hex input instead of storing it', async () => {
     const node = graph.createNode('Node', 0, 0);
     graph.setSelection([node.id], []);
     fixture.detectChanges();
 
-    const trigger = button('Node styling')!;
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await openFamily('Node styling', 'Node color');
 
     const hexInput = document.body.querySelector('input[aria-label="New custom hue hex"]') as HTMLInputElement;
     hexInput.value = 'red';
@@ -780,7 +748,7 @@ describe('SelectionToolbarComponent', () => {
     expect(error).toBeTruthy();
   });
 
-  it('shows customs in the Connection menu and applies with the shared check', async () => {
+  it('opens the Connection Color child pop and applies with the shared ring', async () => {
     const a = graph.createNode('A', 0, 0);
     const b = graph.createNode('B', 300, 0);
     const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
@@ -788,22 +756,52 @@ describe('SelectionToolbarComponent', () => {
     graph.selectConnection(conn.id);
     fixture.detectChanges();
 
-    const trigger = button('Connection styling')!;
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await openFamily('Connection styling', 'Connection color');
 
-    const apply = Array.from(document.body.querySelectorAll('button')).find(
-      button => button.getAttribute('aria-label') === 'Apply custom hue #A1B2C3',
-    ) as HTMLButtonElement;
+    const apply = overlayButton('Apply custom hue #A1B2C3');
     expect(apply).toBeTruthy();
-    apply.click();
+    apply!.click();
     fixture.detectChanges();
 
     expect(graph.connections()[0].color).toBe('#A1B2C3');
     expect(fixture.componentInstance.sharedConnectionColor()).toBe('#A1B2C3');
     expect(history.canUndo()).toBe(true);
+  });
+
+  it('shows the Node families as an icons-only horizontal bar', async () => {
+    const node = graph.createNode('N', 0, 0);
+    graph.selectNode(node.id);
+    fixture.detectChanges();
+
+    button('Node styling')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    for (const family of ['Node color', 'Node shape', 'Node emoji']) {
+      const cell = overlayButton(family);
+      expect(cell, family).toBeTruthy();
+      expect(cell!.textContent?.trim()).toBe('');
+    }
+  });
+
+  it('shows the Connection families as an icons-only horizontal bar', async () => {
+    const a = graph.createNode('A', 0, 0);
+    const b = graph.createNode('B', 300, 0);
+    const conn = graph.createConnection(a.id, 'right', b.id, 'left')!;
+    graph.selectConnection(conn.id);
+    fixture.detectChanges();
+
+    button('Connection styling')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    for (const family of ['Connection color', 'Connection arrowheads', 'Connection line', 'Connection route']) {
+      const cell = overlayButton(family);
+      expect(cell, family).toBeTruthy();
+      expect(cell!.textContent?.trim()).toBe('');
+    }
   });
 
   it('shows both styling triggers for a mixed Node + Connection Selection', () => {
